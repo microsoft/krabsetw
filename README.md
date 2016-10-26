@@ -23,6 +23,12 @@ Important Notes
 * The call to "start" on the trace object is blocking so thread management may be necessary.
 * The Visual Studio solution is krabs\krabs.sln.
 
+NuGet Packages
+==============
+NuGet packages are available both for the krabsetw C++ headers and the O365.Security.Native.ETW .NET library:
+* https://www.nuget.org/packages/O365.Security.Native.ETW/
+* https://www.nuget.org/packages/krabsetw/
+
 Community & Contact
 ==============
 Please feel free to file issues through GitHub for bugs and feature requests and we'll respond to them as quickly as we're able.
