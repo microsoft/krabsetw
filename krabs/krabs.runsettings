@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <!-- Configurations that affect the Test Framework -->
+  <RunConfiguration>
+    <TargetPlatform>x64</TargetPlatform>
+  </RunConfiguration>
+  <MSTest>
+    <SettingsFile>.\MTA.testsettings</SettingsFile>
+  </MSTest>
+</RunSettings>

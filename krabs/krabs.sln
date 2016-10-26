@@ -1,0 +1,110 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{5C9E224B-AEB7-456B-B309-92292ACE1A0D}"
+	ProjectSection(SolutionItems) = preProject
+		.nuget\NuGet.Config = .nuget\NuGet.Config
+		.nuget\NuGet.exe = .nuget\NuGet.exe
+		.nuget\NuGet.targets = .nuget\NuGet.targets
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "O365.Security.Native.ETW", "..\O365.Security.Native.ETW\O365.Security.Native.ETW.vcxproj", "{ED4E6027-541F-440A-A5EE-15DBB7B89423}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleKrabsCSharpExe", "..\SampleKrabsCSharpExe\SampleKrabsCSharpExe.csproj", "{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "krabstests", "..\krabstests\krabstests.vcxproj", "{880977B8-15CA-421B-BF48-D01626A530A2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E583602B-48AC-46A6-B0F0-343CE0B6AE33}"
+	ProjectSection(SolutionItems) = preProject
+		krabs.runsettings = krabs.runsettings
+		MTA.testsettings = MTA.testsettings
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs headers", "krabs headers", "{1FD19105-D67C-492B-B98F-53E00A324269}"
+	ProjectSection(SolutionItems) = preProject
+		krabs.hpp = krabs.hpp
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs", "krabs", "{371361C8-96EC-4D6D-B80B-2E47E3453264}"
+	ProjectSection(SolutionItems) = preProject
+		krabs\client.hpp = krabs\client.hpp
+		krabs\collection_view.hpp = krabs\collection_view.hpp
+		krabs\compiler_check.hpp = krabs\compiler_check.hpp
+		krabs\errors.hpp = krabs\errors.hpp
+		krabs\guid.hpp = krabs\guid.hpp
+		krabs\kernel_guids.hpp = krabs\kernel_guids.hpp
+		krabs\kernel_providers.hpp = krabs\kernel_providers.hpp
+		krabs\kt.hpp = krabs\kt.hpp
+		krabs\lock.hpp = krabs\lock.hpp
+		krabs\nightmare.hpp = krabs\nightmare.hpp
+		krabs\parse_types.hpp = krabs\parse_types.hpp
+		krabs\parser.hpp = krabs\parser.hpp
+		krabs\property.hpp = krabs\property.hpp
+		krabs\provider.hpp = krabs\provider.hpp
+		krabs\schema.hpp = krabs\schema.hpp
+		krabs\schema_locator.hpp = krabs\schema_locator.hpp
+		krabs\size_provider.hpp = krabs\size_provider.hpp
+		krabs\tdh_helpers.hpp = krabs\tdh_helpers.hpp
+		krabs\trace.hpp = krabs\trace.hpp
+		krabs\ut.hpp = krabs\ut.hpp
+		krabs\version_helpers.hpp = krabs\version_helpers.hpp
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "filtering", "filtering", "{96FA58B5-A1F6-4107-9FB4-226290F9D696}"
+	ProjectSection(SolutionItems) = preProject
+		krabs\filtering\comparers.hpp = krabs\filtering\comparers.hpp
+		krabs\filtering\event_filter.hpp = krabs\filtering\event_filter.hpp
+		krabs\filtering\predicates.hpp = krabs\filtering\predicates.hpp
+		krabs\filtering\view_adapters.hpp = krabs\filtering\view_adapters.hpp
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "testing", "testing", "{9ED1AE76-2EAA-4CCF-8F01-458BDC8BCD53}"
+	ProjectSection(SolutionItems) = preProject
+		krabs\testing\event_filter_proxy.hpp = krabs\testing\event_filter_proxy.hpp
+		krabs\testing\filler.hpp = krabs\testing\filler.hpp
+		krabs\testing\proxy.hpp = krabs\testing\proxy.hpp
+		krabs\testing\record_builder.hpp = krabs\testing\record_builder.hpp
+		krabs\testing\record_property_thunk.hpp = krabs\testing\record_property_thunk.hpp
+		krabs\testing\synth_record.hpp = krabs\testing\synth_record.hpp
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtwTestsCS", "..\ManagedETWTests\EtwTestsCS.csproj", "{600CFE03-FD84-4323-9439-839D81C31972}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C4AB7F5F-2FB3-4C16-A1F3-F6700C655B02}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ED4E6027-541F-440A-A5EE-15DBB7B89423}.Debug|x64.ActiveCfg = Debug|x64
+		{ED4E6027-541F-440A-A5EE-15DBB7B89423}.Debug|x64.Build.0 = Debug|x64
+		{ED4E6027-541F-440A-A5EE-15DBB7B89423}.Release|x64.ActiveCfg = Release|x64
+		{ED4E6027-541F-440A-A5EE-15DBB7B89423}.Release|x64.Build.0 = Release|x64
+		{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}.Debug|x64.Build.0 = Debug|Any CPU
+		{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}.Release|x64.ActiveCfg = Release|Any CPU
+		{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}.Release|x64.Build.0 = Release|Any CPU
+		{880977B8-15CA-421B-BF48-D01626A530A2}.Debug|x64.ActiveCfg = Debug|x64
+		{880977B8-15CA-421B-BF48-D01626A530A2}.Debug|x64.Build.0 = Debug|x64
+		{880977B8-15CA-421B-BF48-D01626A530A2}.Release|x64.ActiveCfg = Release|x64
+		{880977B8-15CA-421B-BF48-D01626A530A2}.Release|x64.Build.0 = Release|x64
+		{600CFE03-FD84-4323-9439-839D81C31972}.Debug|x64.ActiveCfg = Debug|x64
+		{600CFE03-FD84-4323-9439-839D81C31972}.Debug|x64.Build.0 = Debug|x64
+		{600CFE03-FD84-4323-9439-839D81C31972}.Release|x64.ActiveCfg = Release|x64
+		{600CFE03-FD84-4323-9439-839D81C31972}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{880977B8-15CA-421B-BF48-D01626A530A2} = {C4AB7F5F-2FB3-4C16-A1F3-F6700C655B02}
+		{371361C8-96EC-4D6D-B80B-2E47E3453264} = {1FD19105-D67C-492B-B98F-53E00A324269}
+		{96FA58B5-A1F6-4107-9FB4-226290F9D696} = {371361C8-96EC-4D6D-B80B-2E47E3453264}
+		{9ED1AE76-2EAA-4CCF-8F01-458BDC8BCD53} = {371361C8-96EC-4D6D-B80B-2E47E3453264}
+		{600CFE03-FD84-4323-9439-839D81C31972} = {C4AB7F5F-2FB3-4C16-A1F3-F6700C655B02}
+	EndGlobalSection
+EndGlobal

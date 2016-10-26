@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<TestSettings name="Local" id="af0fb7ef-e4cb-451a-8cf0-f076c2ad079d" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Description>These are default test settings for a local test run with threadmodel set to MTA.</Description>
+  <Deployment enabled="false" />
+  <Execution hostProcessPlatform="MSIL">
+    <ExecutionThread apartmentState="MTA" />
+  </Execution>
+</TestSettings>

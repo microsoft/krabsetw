@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+    <metadata>
+        <id>krabsetw</id>
+        <version>1.0.0</version>
+        <title>Krabs ETW Wrappers</title>
+        <authors>Microsoft Corporation, OneDrive/SharePoint Security</authors>
+        <owners>Microsoft Corporation, OneDrive/SharePoint Security</owners>
+        <projectUrl>https://onedrive.visualstudio.com/DefaultCollection/Security</projectUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</description>
+        <summary>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</summary>
+        <releaseNotes></releaseNotes>
+        <copyright>Copyright 2016 Microsoft Corporation</copyright>
+        <language />
+        <tags>ETW krabs krabsetw native headers cpp</tags>
+        <dependencies>
+            <dependency id="boost" version="1.61.0" />
+        </dependencies>
+    </metadata>
+    <files>
+    <file src="build\native\krabsetw.targets" target="build\native\krabsetw.targets" />
+        <file src="krabs\Readme.txt" target="" />
+        <file src="krabs\krabs.hpp" target="lib\native\include\krabs.hpp" />
+        <file src="krabs\krabs.cpp" target="lib\native\src\krabs.cpp" />
+        <file src="krabs\krabs\*.hpp" target="lib\native\include\krabs\" />
+        <file src="krabs\krabs\filtering\*.hpp" target="lib\native\include\krabs\filtering\" />
+        <file src="krabs\krabs\testing\*.hpp" target="lib\native\include\krabs\testing\" />
+    </files>
+</package>
