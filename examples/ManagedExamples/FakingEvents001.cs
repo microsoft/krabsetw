@@ -8,11 +8,11 @@ using System;
 using O365.Security.ETW;
 using Testing = O365.Security.ETW.Testing;
 
-namespace Example
+namespace ManagedExamples
 {
-    class Program
+    public static class FakingEvents001
     {
-        static void Main(string[] args)
+        public static void Start()
         {
             // The usual suspects for setting up the trace...
             var trace = new O365.Security.ETW.UserTrace("My Named Trace");
@@ -21,13 +21,10 @@ namespace Example
             var powershellProvider = new O365.Security.ETW.Provider(powershellGuid);
             powershellProvider.Any = Provider.AllBitsSet;
 
-            powershellProvider.OnEvent += (EventRecord record) =>
+            powershellProvider.OnEvent += (record) =>
             {
-                var schema = new Schema(record);
-                var parser = new Parser(schema);
-
                 Console.WriteLine("Event properties:");
-                foreach (Property prop in parser.Properties)
+                foreach (Property prop in record.Properties)
                 {
                     Console.WriteLine("\t" + prop.Name);
                 }

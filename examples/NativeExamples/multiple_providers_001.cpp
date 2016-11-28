@@ -4,12 +4,13 @@
 // This example shows how to use a user_trace with multiple providers.
 
 #include <iostream>
-#include <krabs.hpp>
+#include "..\..\krabs\krabs.hpp"
+#include "examples.h"
 
-void setup_ps_provider(krabs::provider<>& provider);
-void setup_wininet_provider(krabs::provider<>& provider);
+static void setup_ps_provider(krabs::provider<>& provider);
+static void setup_wininet_provider(krabs::provider<>& provider);
 
-int main(int argc, wchar_t* argv[])
+void multiple_providers_001::start()
 {
     // user_trace instances should be used for any non-kernel traces that are defined
     // by components or programs in Windows.
@@ -38,8 +39,6 @@ int main(int argc, wchar_t* argv[])
     // you'll need to synchronize the call to start. Because 'start' is a blocking call,
     // it will prevent any other thread from enabling additional providers.
     trace.start();
-
-    return 0;
 }
 
 void setup_ps_provider(krabs::provider<>& provider)

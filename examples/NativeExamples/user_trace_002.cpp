@@ -8,9 +8,10 @@
 #include <iostream>
 #include <cassert>
 
-#include <krabs/krabs.hpp>
+#include "..\..\krabs\krabs.hpp"
+#include "examples.h"
 
-int main(int argc, wchar_t* argv[])
+void user_trace_002::start()
 {
     // user_trace instances should be used for any non-kernel traces that are defined
     // by components or programs in Windows. They can optionally take a name -- if none
@@ -49,6 +50,4 @@ int main(int argc, wchar_t* argv[])
     provider.add_filter(filter);
     trace.enable(provider);
     trace.start();
-
-    return 0;
 }

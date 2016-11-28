@@ -6,12 +6,13 @@
 #include <iostream>
 #include <thread>
 #include <condition_variable>
-#include <krabs.hpp>
+#include "..\..\krabs\krabs.hpp"
+#include "examples.h"
 
-void setup_ps_provider(krabs::provider<>& provider);
-void setup_image_load_provider(krabs::kernel::image_load_provider& provider);
+static void setup_ps_provider(krabs::provider<>& provider);
+static void setup_image_load_provider(krabs::kernel::image_load_provider& provider);
 
-int main(int argc, wchar_t* argv[])
+void kernel_and_user_trace_001::start()
 {
     // user_trace instances should be used for any non-kernel traces that are defined
     // by components or programs in Windows. You can have multiple ETW traces in a given
@@ -53,8 +54,6 @@ int main(int argc, wchar_t* argv[])
 
     user_thread.join();
     kernel_thread.join();
-
-    return 0;
 }
 
 void setup_ps_provider(krabs::provider<>& provider)

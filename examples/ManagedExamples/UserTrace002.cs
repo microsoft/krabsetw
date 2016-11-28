@@ -8,11 +8,11 @@
 using System;
 using O365.Security.ETW;
 
-namespace Example
+namespace ManagedExamples
 {
-    class Program
+    public static class UserTrace002
     {
-        static void Main(string[] args)
+        public static void Start()
         {
             // UserTrace instances should be used for any non-kernel traces that are defined
             // by components or programs in Windows. They can optionally take a name -- if none
@@ -49,10 +49,9 @@ namespace Example
             var filter = new EventFilter(Filter.EventIdIs(7937));
 
             // EventFilters have attached callbacks, just like a regular provider.
-            filter.OnEvent += (EventRecord record) =>
+            filter.OnEvent += (record) =>
             {
-                var schema = new Schema(record);
-                System.Diagnostics.Debug.Assert(schema.Id == 7937);
+                System.Diagnostics.Debug.Assert(record.Id == 7937);
                 Console.WriteLine("Event 7937 received");
             };
 

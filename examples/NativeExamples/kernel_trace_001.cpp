@@ -5,10 +5,10 @@
 // a notice whenever a binary image (executable or DLL) is loaded.
 
 #include <iostream>
-#include <krabs/krabs.hpp>
+#include "..\..\krabs\krabs.hpp"
+#include "examples.h"
 
-
-int main(int argc, wchar_t* argv[])
+void kernel_trace_001::start()
 {
     // Kernel traces use the kernel_trace class, which looks and acts a lot like the
     // user_trace class.
@@ -37,6 +37,4 @@ int main(int argc, wchar_t* argv[])
     // it is used.
     trace.enable(provider);
     trace.start();
-
-    return 0;
 }

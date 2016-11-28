@@ -5,9 +5,10 @@
 // invocations.
 
 #include <iostream>
-#include <krabs/krabs.hpp>
+#include "..\..\krabs\krabs.hpp"
+#include "examples.h"
 
-int main(int argc, wchar_t* argv[])
+void user_trace_001::start()
 {
     // user_trace instances should be used for any non-kernel traces that are defined
     // by components or programs in Windows.
@@ -56,6 +57,4 @@ int main(int argc, wchar_t* argv[])
     // begin listening for events. This call blocks, so if you want to do other things
     // while this runs, you'll need to call this on another thread.
     trace.start();
-
-    return 0;
 }

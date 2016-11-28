@@ -68,7 +68,7 @@
     <Compile Include="describe_OnError.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\O365.Security.Native.ETW\O365.Security.Native.ETW.vcxproj">
+    <ProjectReference Include="..\..\O365.Security.Native.ETW\O365.Security.Native.ETW.vcxproj">
       <Project>{ed4e6027-541f-440a-a5ee-15dbb7b89423}</Project>
       <Name>O365.Security.Native.ETW</Name>
     </ProjectReference>
