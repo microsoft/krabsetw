@@ -22,6 +22,7 @@ Important Notes
 * Throwing exceptions in the event handler callback or krabsetw or O365.Security.Native.ETW will cause the trace to stop processing events.
 * The call to "start" on the trace object is blocking so thread management may be necessary.
 * The Visual Studio solution is krabs\krabs.sln.
+* When building a native code binary using the `krabsetw` package, please refer to the [compilation readme](krabs/Readme.txt) for notes about the TYPEASSERT and NDEBUG compilation flags.
 
 NuGet Packages
 ==============
