@@ -7,11 +7,11 @@
 using System;
 using O365.Security.ETW;
 
-namespace Example
+namespace ManagedExamples
 {
-    class Program
+    public static class UserTrace001
     {
-        static void Main(string[] args)
+        public static void Start()
         {
             // UserTrace instances should be used for any non-kernel traces that are defined
             // by components or programs in Windows.
@@ -29,26 +29,18 @@ namespace Example
 
             // Providers should be wired up to functions that are called when
             // events from that provider are fired.
-            powershellProvider.OnEvent += (EventRecord record) =>
+            powershellProvider.OnEvent += (record) =>
             {
-                // Once an event is received, if we want krabs to help us analyze it, we need
-                // to snap in a schema to ask it for information.
-                var schema = new Schema(record);
+                // Records have general properties that are applicable to every ETW
+                // record regardless of schema. They give us general information.
+                Console.WriteLine("Event " + record.Id + " (" + record.Name + ") received.");
 
-                // We then have the ability to ask a few questions of the event.
-                Console.WriteLine("Event " + schema.Id + " (" + schema.Name + ") received.");
-
-                if (schema.Id == 7937)
+                if (record.Id == 7937)
                 {
-                    // The event we're interested in has a field that contains a bunch of
-                    // info about what it's doing. We can snap in a parser to help us get
-                    // the property information out.
-                    var parser = new Parser(schema);
-
                     // We need to call the specific method to parse the type we expect.
                     // If we don't want to deal with the possibility of failure, we can
                     // provide a default if parsing fails.
-                    var context = parser.ParseWStringWithDefault("ContextInfo", "None.");
+                    var context = record.GetUnicodeString("ContextInfo", "None.");
                     Console.WriteLine("Context: " + context);
                 }
             };

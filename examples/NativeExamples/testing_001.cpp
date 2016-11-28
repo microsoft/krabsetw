@@ -7,9 +7,10 @@
 #include <iostream>
 #include <cassert>
 
-#include <krabs/krabs.hpp>
+#include "..\..\krabs\krabs.hpp"
+#include "examples.h"
 
-int main(int argc, wchar_t* argv[])
+void testing_001::start()
 {
     krabs::user_trace trace(L"My Named Trace");
 
@@ -59,5 +60,4 @@ int main(int argc, wchar_t* argv[])
 
     // Now that we've got an event, we can push it through the trace.
     proxy.push_event(record);
-    return 0;
 }

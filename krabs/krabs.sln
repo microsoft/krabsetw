@@ -12,9 +12,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{5C9E22
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "O365.Security.Native.ETW", "..\O365.Security.Native.ETW\O365.Security.Native.ETW.vcxproj", "{ED4E6027-541F-440A-A5EE-15DBB7B89423}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleKrabsCSharpExe", "..\SampleKrabsCSharpExe\SampleKrabsCSharpExe.csproj", "{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "krabstests", "..\krabstests\krabstests.vcxproj", "{880977B8-15CA-421B-BF48-D01626A530A2}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "krabstests", "..\tests\krabstests\krabstests.vcxproj", "{880977B8-15CA-421B-BF48-D01626A530A2}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E583602B-48AC-46A6-B0F0-343CE0B6AE33}"
 	ProjectSection(SolutionItems) = preProject
@@ -70,9 +68,15 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "testing", "testing", "{9ED1
 		krabs\testing\synth_record.hpp = krabs\testing\synth_record.hpp
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtwTestsCS", "..\ManagedETWTests\EtwTestsCS.csproj", "{600CFE03-FD84-4323-9439-839D81C31972}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtwTestsCS", "..\tests\ManagedETWTests\EtwTestsCS.csproj", "{600CFE03-FD84-4323-9439-839D81C31972}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C4AB7F5F-2FB3-4C16-A1F3-F6700C655B02}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{2E00634C-7E8B-4656-9505-78FF2F5D0EDD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ManagedExamples", "..\examples\ManagedExamples\ManagedExamples.csproj", "{32E71DD0-D11A-44DE-8CA8-572995AF2373}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NativeExamples", "..\examples\NativeExamples\NativeExamples.vcxproj", "{D31B1A4B-8282-4AED-99FC-9AA5974B9134}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -84,10 +88,6 @@ Global
 		{ED4E6027-541F-440A-A5EE-15DBB7B89423}.Debug|x64.Build.0 = Debug|x64
 		{ED4E6027-541F-440A-A5EE-15DBB7B89423}.Release|x64.ActiveCfg = Release|x64
 		{ED4E6027-541F-440A-A5EE-15DBB7B89423}.Release|x64.Build.0 = Release|x64
-		{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}.Debug|x64.Build.0 = Debug|Any CPU
-		{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}.Release|x64.ActiveCfg = Release|Any CPU
-		{DB4FF120-F6CA-4FA6-91F7-223C4435C40D}.Release|x64.Build.0 = Release|Any CPU
 		{880977B8-15CA-421B-BF48-D01626A530A2}.Debug|x64.ActiveCfg = Debug|x64
 		{880977B8-15CA-421B-BF48-D01626A530A2}.Debug|x64.Build.0 = Debug|x64
 		{880977B8-15CA-421B-BF48-D01626A530A2}.Release|x64.ActiveCfg = Release|x64
@@ -96,6 +96,14 @@ Global
 		{600CFE03-FD84-4323-9439-839D81C31972}.Debug|x64.Build.0 = Debug|x64
 		{600CFE03-FD84-4323-9439-839D81C31972}.Release|x64.ActiveCfg = Release|x64
 		{600CFE03-FD84-4323-9439-839D81C31972}.Release|x64.Build.0 = Release|x64
+		{32E71DD0-D11A-44DE-8CA8-572995AF2373}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{32E71DD0-D11A-44DE-8CA8-572995AF2373}.Debug|x64.Build.0 = Debug|Any CPU
+		{32E71DD0-D11A-44DE-8CA8-572995AF2373}.Release|x64.ActiveCfg = Release|Any CPU
+		{32E71DD0-D11A-44DE-8CA8-572995AF2373}.Release|x64.Build.0 = Release|Any CPU
+		{D31B1A4B-8282-4AED-99FC-9AA5974B9134}.Debug|x64.ActiveCfg = Debug|x64
+		{D31B1A4B-8282-4AED-99FC-9AA5974B9134}.Debug|x64.Build.0 = Debug|x64
+		{D31B1A4B-8282-4AED-99FC-9AA5974B9134}.Release|x64.ActiveCfg = Release|x64
+		{D31B1A4B-8282-4AED-99FC-9AA5974B9134}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -106,5 +114,7 @@ Global
 		{96FA58B5-A1F6-4107-9FB4-226290F9D696} = {371361C8-96EC-4D6D-B80B-2E47E3453264}
 		{9ED1AE76-2EAA-4CCF-8F01-458BDC8BCD53} = {371361C8-96EC-4D6D-B80B-2E47E3453264}
 		{600CFE03-FD84-4323-9439-839D81C31972} = {C4AB7F5F-2FB3-4C16-A1F3-F6700C655B02}
+		{32E71DD0-D11A-44DE-8CA8-572995AF2373} = {2E00634C-7E8B-4656-9505-78FF2F5D0EDD}
+		{D31B1A4B-8282-4AED-99FC-9AA5974B9134} = {2E00634C-7E8B-4656-9505-78FF2F5D0EDD}
 	EndGlobalSection
 EndGlobal

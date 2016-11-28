@@ -8,11 +8,11 @@ using System;
 using O365.Security.ETW;
 using Kernel = O365.Security.ETW.Kernel;
 
-namespace Example
+namespace ManagedExamples
 {
-    class Program
+    public static class KernelTrace001
     {
-        static void Main(string[] args)
+        public static void Start()
         {
             // Kernel traces use the KernelTrace class, which looks and acts
             // a lot like the UserTrace class. A strange quirk about kernel
@@ -27,29 +27,27 @@ namespace Example
             // represent these. If other providers were enabled without an
             // update to Lobster, the same thing could be achieved with:
             //    var provider = new KernelProvider(SOME_BITMASK_VALUE, SOME_GUID);
-            var imageProvider = new Kernel.ImageLoadProvider();
+            var processProvider = new Kernel.ProcessProvider();
 
             // Kernel providers accept callbacks and event filters, as user
             // providers do.
-            imageProvider.OnEvent += (EventRecord record) =>
+            processProvider.OnEvent += (record) =>
             {
-                var schema = new Schema(record);
-                if (schema.Name == "Load")
+                if (record.Opcode == 0x01)
                 {
-                    var parser = new Parser(schema);
-                    Console.WriteLine(parser.ParseWStringWithDefault("FileName", "Unknown"));
+                    var image = record.GetAnsiString("ImageFileName", "Unknown");
+                    var pid = record.GetUInt32("ProcessId", 0);
+                    Console.WriteLine($"{image} started with PID {pid}");
                 }
             };
 
             // From here, a KernelTrace is indistinguishable from a UserTrace
             // in how it's used.
-            trace.Enable(imageProvider);
+            trace.Enable(processProvider);
 
             // Another quirk here is that kernel traces can only be done by
             // administrators. :( :( :(
             trace.Start();
-
         }
-
     }
 }
