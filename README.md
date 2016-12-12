@@ -28,6 +28,7 @@ NuGet Packages
 ==============
 NuGet packages are available both for the krabsetw C++ headers and the O365.Security.Native.ETW .NET library:
 * https://www.nuget.org/packages/O365.Security.Native.ETW/
+* https://www.nuget.org/packages/O365.Security.Native.ETW.Debug/ (for development - provides type asserts)
 * https://www.nuget.org/packages/krabsetw/
 
 Community & Contact
