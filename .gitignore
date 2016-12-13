@@ -31,3 +31,6 @@ githooks/*.dll
 
 # ignore SNK files
 *.snk
+
+# ignore Mac stuff
+.DS_Store
