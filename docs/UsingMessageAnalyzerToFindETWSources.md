@@ -10,22 +10,22 @@ the link.
 When you open Message Analyzer, you should see a screen similar to the
 following:
 
-![](img/message-analyzer/1.png)
+![](img/message-analyzer/1.PNG)
 
 Click the **New Session** button, as highlighted in the image above. You should
 then be presented with a dialog that looks like this:
 
-![](img/message-analyzer/2.png)
+![](img/message-analyzer/2.PNG)
 
 Click the **Live Trace** button, as highlighted in the image above. You should
 then be presented with a dialog that looks like this:
 
-![](img/message-analyzer/3.png)
+![](img/message-analyzer/3.PNG)
 
 Click the **Add Providers** button, as highlighted in the image above. You
 should then be presented with a dialog that looks like this:
 
-![](img/message-analyzer/4.png)
+![](img/message-analyzer/4.PNG)
 
 This dialog allows you to select the provider you're interested in. Typically,
 when searching for new sources of ETW events, we'll enter in keywords like
@@ -36,7 +36,7 @@ Microsoft-Windows-PowerShell provider, select it and click the "Add To" button.
 After clicking ok, you should then have a provider added and have a window that
 looks as follows:
 
-![](img/message-analyzer/5.png)
+![](img/message-analyzer/5.PNG)
 
 In the window above, there's an option to configure the provider. This is a bit
 of a tricky area with providers. There is no predefined standard on how the
@@ -55,7 +55,7 @@ window.
 
 You should roughly have something that looks like the following:
 
-![](img/message-analyzer/6.png)
+![](img/message-analyzer/6.PNG)
 
 Look for events in the Message Analyzer window where the summary says "Command
 invoke-mimikatz is Started". These are the events generated that we're
@@ -64,7 +64,7 @@ interested.
 When you select that line in Message Analyzer, you should see a window like
 this:
 
-![](img/message-analyzer/7.png)
+![](img/message-analyzer/7.PNG)
 
 Let's talk about the three sections at the bottom now:
 
