@@ -8,12 +8,13 @@ Overview
 
 **O365.Security.Native.ETW** is a C++ CLI (.NET) wrapper around **Krabs**. It provides the same functionality as **Krabs** to .NET applications and is used in production by the ODSP Security team. It's affectionately referred to as **Lobsters**.
 
-Examples
+Examples & Documentation
 ========
 
 * Simple examples can be found in the `examples` folder.
 * Please refer to [KrabsExample.md](docs/KrabsExample.md) and [LobstersExample.md](docs/LobstersExample.md) for detailed examples.
 * SampleKrabsCSharpExe is a non-trivial example demonstrating how to manage the trace objects.
+* [Using Message Analyzer to find new ETW event sources.](docs/UsingMessageAnalyzerToFindETWSources.md)
 
 Important Notes
 ==============
