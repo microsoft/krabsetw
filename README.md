@@ -11,6 +11,7 @@ Overview
 Examples & Documentation
 ========
 
+* An [ETW Primer](docs/EtwPrimer.md).
 * Simple examples can be found in the `examples` folder.
 * Please refer to [KrabsExample.md](docs/KrabsExample.md) and [LobstersExample.md](docs/LobstersExample.md) for detailed examples.
 * SampleKrabsCSharpExe is a non-trivial example demonstrating how to manage the trace objects.
