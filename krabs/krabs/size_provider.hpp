@@ -89,6 +89,10 @@ namespace krabs {
         // The following _very_ common property types can be short-circuited
         // to prevent the expensive call.
 
+        // We don't handle array types for heuristic sizing.
+        if (propertyInfo.Flags & PropertyParamCount)
+            return propertyLength;
+
         // Be careful! Check IN and OUT types before making an assumption.
 
         if (propertyInfo.nonStructType.OutType == TDH_OUTTYPE_STRING)
