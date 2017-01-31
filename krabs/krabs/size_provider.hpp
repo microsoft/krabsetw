@@ -69,9 +69,19 @@ namespace krabs {
         }
 
         ULONG propertyLength = 0;
-        propertyLength = get_heuristic_size(propertyStart, propertyInfo);
 
-        // didn't have a heuristic for size, ask Tdh
+        // If no flags are set on the property, attempt to use the length
+        // field. If that field is 0, try using our heuristic.
+        if (propertyInfo.Flags == 0)
+        {
+            if (propertyInfo.length > 0)
+                propertyLength = propertyInfo.length;
+            else
+                propertyLength = get_heuristic_size(propertyStart, propertyInfo);
+        }
+
+        // Couldn't get the length from the 'length' field or
+        // the heuristic for size failed -> ask Tdh.
         if (propertyLength == 0)
             propertyLength = get_tdh_size(propertyName, record);
 
@@ -88,10 +98,6 @@ namespace krabs {
         // included in a managed assembly as this call will be a thunk.
         // The following _very_ common property types can be short-circuited
         // to prevent the expensive call.
-
-        // We don't handle array types for heuristic sizing.
-        if (propertyInfo.Flags & PropertyParamCount)
-            return propertyLength;
 
         // Be careful! Check IN and OUT types before making an assumption.
 
