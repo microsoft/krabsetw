@@ -257,7 +257,8 @@ namespace krabs {
 
         krabs::debug::assert_valid_assignment<std::wstring>(name, propInfo);
 
-        return std::wstring(reinterpret_cast<const wchar_t*>(propInfo.pPropertyIndex_));
+        return std::wstring(reinterpret_cast<const wchar_t*>(
+            propInfo.pPropertyIndex_), propInfo.length_ / sizeof(wchar_t));
     }
 
     template <>
@@ -269,7 +270,8 @@ namespace krabs {
 
         krabs::debug::assert_valid_assignment<std::string>(name, propInfo);
 
-        return std::string(reinterpret_cast<const char*>(propInfo.pPropertyIndex_));
+        return std::string(reinterpret_cast<const char*>(
+            propInfo.pPropertyIndex_), propInfo.length_);
     }
 
     template<>
