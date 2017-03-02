@@ -207,7 +207,7 @@ namespace krabs {
     template <typename T>
     size_t get_string_content_length(const T* string, size_t lengthBytes)
     {
-        // for some string types, the length includes the null terminator
+        // for some string types the length includes the null terminator
         // so we need to find the length of just the content part
 
         T nullChar {0};
