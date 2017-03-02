@@ -204,6 +204,21 @@ namespace krabs {
         }
     }
 
+    template <typename T>
+    size_t get_string_content_length(const T* string, size_t lengthBytes)
+    {
+        // for some string types the length includes the null terminator
+        // so we need to find the length of just the content part
+
+        T nullChar {0};
+        auto length = lengthBytes / sizeof(T);
+
+        for (auto i = length; i >= 1; --i)
+            if (string[i - 1] != nullChar) return i;
+
+        return 0;
+    }
+
     // try_parse
     // ------------------------------------------------------------------------
 
@@ -249,29 +264,31 @@ namespace krabs {
     }
 
     template <>
-    inline std::wstring parser::parse<std::wstring>(
-        const std::wstring &name)
+    inline std::wstring parser::parse<std::wstring>(const std::wstring &name)
     {
         auto propInfo = find_property(name);
         throw_if_property_not_found(propInfo);
 
         krabs::debug::assert_valid_assignment<std::wstring>(name, propInfo);
 
-        return std::wstring(reinterpret_cast<const wchar_t*>(
-            propInfo.pPropertyIndex_), propInfo.length_ / sizeof(wchar_t));
+        auto string = reinterpret_cast<const wchar_t*>(propInfo.pPropertyIndex_);
+        auto length = get_string_content_length(string, propInfo.length_);
+
+        return std::wstring(string, length);
     }
 
     template <>
-    inline std::string parser::parse<std::string>(
-        const std::wstring &name)
+    inline std::string parser::parse<std::string>(const std::wstring &name)
     {
         auto propInfo = find_property(name);
         throw_if_property_not_found(propInfo);
 
         krabs::debug::assert_valid_assignment<std::string>(name, propInfo);
 
-        return std::string(reinterpret_cast<const char*>(
-            propInfo.pPropertyIndex_), propInfo.length_);
+        auto string = reinterpret_cast<const char*>(propInfo.pPropertyIndex_);
+        auto length = get_string_content_length(string, propInfo.length_);
+
+        return std::string(string, length);
     }
 
     template<>
