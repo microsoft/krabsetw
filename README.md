@@ -33,6 +33,17 @@ NuGet packages are available both for the krabsetw C++ headers and the O365.Secu
 * https://www.nuget.org/packages/O365.Security.Native.ETW.Debug/ (for development - provides type asserts)
 * https://www.nuget.org/packages/krabsetw/
 
+For verifying the .NET binaries, you can use the following command:
+`sn -T O365.Security.Native.ETW.dll`
+
+The expected output is:
+```
+Microsoft (R) .NET Framework Strong Name Utility  Version 4.0.30319.0
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Public key token is bc3a2e4ba4c5fbd5
+```
+
 Community & Contact
 ==============
 Please feel free to file issues through GitHub for bugs and feature requests and we'll respond to them as quickly as we're able.
