@@ -6,6 +6,7 @@
 #include <string>
 
 #include "../compiler_check.hpp"
+#include "../parser.hpp"
 
 namespace krabs { namespace predicates {
 
@@ -27,10 +28,10 @@ namespace krabs { namespace predicates {
         };
         
         /**
-         * View adapter for null-terminated strings
+         * View adapter for fixed width and null-terminated strings
          */
         template <typename ElemT>
-        struct null_string
+        struct basic_string
         {
             using value_type = ElemT;
             using const_iterator = const value_type*;
@@ -38,10 +39,9 @@ namespace krabs { namespace predicates {
             collection_view<const_iterator> operator()(const property_info& propInfo)
             {
                 auto pString = reinterpret_cast<const value_type*>(propInfo.pPropertyIndex_);
-                auto length = propInfo.length_ / sizeof(value_type);
+                auto length = get_string_content_length(pString, propInfo.length_);
 
-                // -1 because the view should not include the null terminator
-                return krabs::view(pString, length - 1);
+                return krabs::view(pString, length);
             }
         };
 
