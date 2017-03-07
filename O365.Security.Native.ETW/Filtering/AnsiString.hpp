@@ -31,7 +31,7 @@ namespace O365 { namespace Security { namespace ETW {
         /// <returns>a predicate that accepts an event if the value matches the specified string</returns>
         static Predicate^ Is(String^ name, String^ value)
         {
-            return gcnew Predicate(krabs::predicates::property_equals<adapt::basic_string<char>>(
+            return gcnew Predicate(krabs::predicates::property_equals<adapt::generic_string<char>>(
                 msclr::interop::marshal_as<std::wstring>(name),
                 msclr::interop::marshal_as<std::string>(value)));
         }
@@ -44,7 +44,7 @@ namespace O365 { namespace Security { namespace ETW {
         /// <returns>a predicate that accepts an event if the value matches (case invariant) the specified string</returns>
         static Predicate^ IEquals(String^ name, String^ value)
         {
-            return gcnew Predicate(krabs::predicates::property_iequals<adapt::basic_string<char>>(
+            return gcnew Predicate(krabs::predicates::property_iequals<adapt::generic_string<char>>(
                 msclr::interop::marshal_as<std::wstring>(name),
                 msclr::interop::marshal_as<std::string>(value)));
         }
@@ -57,7 +57,7 @@ namespace O365 { namespace Security { namespace ETW {
         /// <returns>a predicate that accepts an event if the value contains the specified string</returns>
         static Predicate^ Contains(String^ name, String^ value)
         {
-            return gcnew Predicate(krabs::predicates::property_contains<adapt::basic_string<char>>(
+            return gcnew Predicate(krabs::predicates::property_contains<adapt::generic_string<char>>(
                 msclr::interop::marshal_as<std::wstring>(name),
                 msclr::interop::marshal_as<std::string>(value)));
         }
@@ -70,7 +70,7 @@ namespace O365 { namespace Security { namespace ETW {
         /// <returns>a predicate that accepts an event if the value contains (case invariant) the specified string</returns>
         static Predicate^ IContains(String^ name, String^ value)
         {
-            return gcnew Predicate(krabs::predicates::property_icontains<adapt::basic_string<char>>(
+            return gcnew Predicate(krabs::predicates::property_icontains<adapt::generic_string<char>>(
                 msclr::interop::marshal_as<std::wstring>(name),
                 msclr::interop::marshal_as<std::string>(value)));
         }
@@ -83,7 +83,7 @@ namespace O365 { namespace Security { namespace ETW {
         /// <returns>a predicate that accepts an event if the value starts with the specified string</returns>
         static Predicate^ StartsWith(String^ name, String^ value)
         {
-            return gcnew Predicate(krabs::predicates::property_starts_with<adapt::basic_string<char>>(
+            return gcnew Predicate(krabs::predicates::property_starts_with<adapt::generic_string<char>>(
                 msclr::interop::marshal_as<std::wstring>(name),
                 msclr::interop::marshal_as<std::string>(value)));
         }
@@ -96,7 +96,7 @@ namespace O365 { namespace Security { namespace ETW {
         /// <returns>a predicate that accepts an event if the value starts with (case invariant) the specified string</returns>
         static Predicate^ IStartsWith(String^ name, String^ value)
         {
-            return gcnew Predicate(krabs::predicates::property_istarts_with<adapt::basic_string<char>>(
+            return gcnew Predicate(krabs::predicates::property_istarts_with<adapt::generic_string<char>>(
                 msclr::interop::marshal_as<std::wstring>(name),
                 msclr::interop::marshal_as<std::string>(value)));
         }

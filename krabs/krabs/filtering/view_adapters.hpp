@@ -31,7 +31,7 @@ namespace krabs { namespace predicates {
          * View adapter for fixed width and null-terminated strings
          */
         template <typename ElemT>
-        struct basic_string
+        struct generic_string
         {
             using value_type = ElemT;
             using const_iterator = const value_type*;

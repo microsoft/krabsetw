@@ -305,7 +305,7 @@ namespace krabs { namespace predicates {
      * Accepts events if property exactly matches the expected value
      */
     template <
-        typename Adapter = adapters::basic_string<wchar_t>,
+        typename Adapter = adapters::generic_string<wchar_t>,
         typename T,
         typename Comparer = equals<std::equal_to<typename Adapter::value_type>>>
     details::property_view_predicate<T, Adapter, Comparer> property_equals(
@@ -319,7 +319,7 @@ namespace krabs { namespace predicates {
      * Accepts events if property case insensitive matches the expected value
      */
     template <
-        typename Adapter = adapters::basic_string<wchar_t>,
+        typename Adapter = adapters::generic_string<wchar_t>,
         typename T,
         typename Comparer = equals<iequal_to<typename Adapter::value_type>>>
     details::property_view_predicate<T, Adapter, Comparer> property_iequals(
@@ -333,7 +333,7 @@ namespace krabs { namespace predicates {
      * Accepts events if property contains expected value
      */
     template <
-        typename Adapter = adapters::basic_string<wchar_t>,
+        typename Adapter = adapters::generic_string<wchar_t>,
         typename T,
         typename Comparer = contains<std::equal_to<typename Adapter::value_type>>>
     details::property_view_predicate<T, Adapter, Comparer> property_contains(
@@ -347,7 +347,7 @@ namespace krabs { namespace predicates {
      * Accepts events if property case insensitive contains expected value
      */
     template <
-        typename Adapter = adapters::basic_string<wchar_t>,
+        typename Adapter = adapters::generic_string<wchar_t>,
         typename T,
         typename Comparer = contains<iequal_to<typename Adapter::value_type>>>
     details::property_view_predicate<T, Adapter, Comparer> property_icontains(
@@ -361,7 +361,7 @@ namespace krabs { namespace predicates {
      * Accepts events if property starts with expected value
      */
     template <
-        typename Adapter = adapters::basic_string<wchar_t>,
+        typename Adapter = adapters::generic_string<wchar_t>,
         typename T,
         typename Comparer = starts_with<std::equal_to<typename Adapter::value_type>>>
     details::property_view_predicate<T, Adapter, Comparer> property_starts_with(
@@ -375,7 +375,7 @@ namespace krabs { namespace predicates {
      * Accepts events if property case insensitive starts with expected value
      */
     template <
-        typename Adapter = adapters::basic_string<wchar_t>,
+        typename Adapter = adapters::generic_string<wchar_t>,
         typename T,
         typename Comparer = starts_with<iequal_to<typename Adapter::value_type>>>
     details::property_view_predicate<T, Adapter, Comparer> property_istarts_with(
