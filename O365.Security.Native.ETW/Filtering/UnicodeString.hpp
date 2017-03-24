@@ -100,5 +100,31 @@ namespace O365 { namespace Security { namespace ETW {
                 msclr::interop::marshal_as<std::wstring>(name),
                 msclr::interop::marshal_as<std::wstring>(value)));
         }
+
+        /// <summary>
+        /// Accept event if unicode string property ends with the specified string
+        /// </summary>
+        /// <param name="name">name of the property to match against</param>
+        /// <param name="value">the value to match against</param>
+        /// <returns>a predicate representing that the named property ends with the specified value</returns>
+        static Predicate^ EndsWith(String^ name, String^ value)
+        {
+            return gcnew Predicate(krabs::predicates::property_ends_with(
+                msclr::interop::marshal_as<std::wstring>(name),
+                msclr::interop::marshal_as<std::wstring>(value)));
+        }
+
+        /// <summary>
+        /// Accept event if unicode string property ends with (case invariant) the specified string
+        /// </summary>
+        /// <param name="name">name of the property to match against</param>
+        /// <param name="value">the value to match against</param>
+        /// <returns>a predicate representing that the named property ends with (case invariant) the specified value</returns>
+        static Predicate^ IEndsWith(String^ name, String^ value)
+        {
+            return gcnew Predicate(krabs::predicates::property_iends_with(
+                msclr::interop::marshal_as<std::wstring>(name),
+                msclr::interop::marshal_as<std::wstring>(value)));
+        }
     };
 } } }

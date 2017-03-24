@@ -71,6 +71,22 @@ namespace krabs { namespace predicates {
             }
         };
 
+        /**
+        * Iterator based ends_with
+        */
+        template <typename Comparer>
+        struct ends_with
+        {
+            template <typename Iter1, typename Iter2>
+            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2)
+            {
+                auto r1 = boost::make_iterator_range(begin1, end1);
+                auto r2 = boost::make_iterator_range(begin2, end2);
+
+                return boost::ends_with(r1, r2, Comparer());
+            }
+        };
+
         // Custom Comparison
         // --------------------------------------------------------------------
 
