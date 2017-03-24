@@ -386,6 +386,34 @@ namespace krabs { namespace predicates {
     }
 
     /**
+    * Accepts events if property ends with expected value
+    */
+    template <
+        typename Adapter = adapters::generic_string<wchar_t>,
+        typename T,
+        typename Comparer = ends_with<std::equal_to<typename Adapter::value_type>>>
+        details::property_view_predicate<T, Adapter, Comparer> property_ends_with(
+            const std::wstring &prop,
+            const T& expected)
+    {
+        return{ prop, expected, Adapter(), Comparer() };
+    }
+
+    /**
+    * Accepts events if property case insensitive ends with expected value
+    */
+    template <
+        typename Adapter = adapters::generic_string<wchar_t>,
+        typename T,
+        typename Comparer = ends_with<iequal_to<typename Adapter::value_type>>>
+        details::property_view_predicate<T, Adapter, Comparer> property_iends_with(
+            const std::wstring &prop,
+            const T& expected)
+    {
+        return{ prop, expected, Adapter(), Comparer() };
+    }
+
+    /**
      * <summary>
      *   Accepts an event if its two component filters both accept the event.
      * </summary>

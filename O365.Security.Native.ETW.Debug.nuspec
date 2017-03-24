@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>O365.Security.Native.ETW.Debug</id>
-        <version>1.0.4</version>
+        <version>1.0.5</version>
         <title>O365.Security.Native.ETW Debug - managed wrappers for krabsetw</title>
         <authors>Microsoft Corporation,OneDrive/SharePoint Security</authors>
         <owners>Microsoft Corporation,OneDrive/SharePoint Security</owners>
@@ -11,7 +11,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. Also known as "Lobsters." This is the Debug build.</description>
         <summary>O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. Also known as "Lobsters." This is the Debug build.</summary>
-        <releaseNotes>Support fixed-length strings in collection_view.</releaseNotes>
+        <releaseNotes>Add support for EndsWith/IEndsWith property value matching.</releaseNotes>
         <copyright>Copyright 2016 Microsoft Corporation</copyright>
         <language />
         <tags>ETW krabs lobsters managed cppcli</tags>

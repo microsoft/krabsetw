@@ -309,7 +309,10 @@ namespace krabstests
             Assert::IsTrue(filter(record));
         }
 
-        TEST_METHOD(property_istarts_with_should_not_match_counted_string_with_events__that_start_with_expected)
+        /* the ">" unicode character at the start corresponds to 0x003E, or 62. Therefore this function should only compare
+        * the first 31 characters of the string, which ends at "... is 31 chara", and therefore should not match "charac"
+        */
+        TEST_METHOD(property_istarts_with_should_not_match_counted_string_with_events_that_start_with_expected)
         {
             auto filter = krabs::predicates::property_istarts_with<adpt::counted_string>(L"UserData", std::wstring(L"stRING is"));
             Assert::IsFalse(filter(record));
@@ -324,6 +327,66 @@ namespace krabstests
         TEST_METHOD(property_istarts_with_should_not_match_events_that_go_past_given_counted_string_len)
         {
             auto filter = krabs::predicates::property_istarts_with<adpt::counted_string>(L"UserData", std::wstring(L"thIS coUNteD stRINg is 31 chArac"));
+            Assert::IsFalse(filter(record));
+        }
+
+        TEST_METHOD(property_ends_with_should_match_properties_that_ends_with_expected)
+        {
+            auto filter = krabs::predicates::property_ends_with(L"ContextInfo", std::wstring(L"baz bingo"));
+            Assert::IsTrue(filter(record));
+        }
+
+        TEST_METHOD(property_ends_with_should_not_match_properties_that_doesnt_ends_with_expected)
+        {
+            auto filter = krabs::predicates::property_ends_with(L"ContextInfo", std::wstring(L"Foo bar"));
+            Assert::IsFalse(filter(record));
+        }
+
+        TEST_METHOD(property_ends_with_should_match_counted_string_properties_that_ends_with_expected)
+        {
+            auto filter = krabs::predicates::property_ends_with<adpt::counted_string>(L"UserData", std::wstring(L"is 31 chara"));
+            Assert::IsTrue(filter(record));
+        }
+
+        TEST_METHOD(property_ends_with_should_not_match_counted_string_properties_that_ends_with_expected)
+        {
+            auto filter = krabs::predicates::property_ends_with<adpt::counted_string>(L"UserData", std::wstring(L"a lot after"));
+            Assert::IsFalse(filter(record));
+        }
+
+        TEST_METHOD(property_ends_with_should_not_match_events_that_go_past_given_counted_string_len)
+        {
+            auto filter = krabs::predicates::property_ends_with<adpt::counted_string>(L"UserData", std::wstring(L"this counted string is 31 charac"));
+            Assert::IsFalse(filter(record));
+        }
+
+        TEST_METHOD(property_iends_with_should_match_events_that_start_with_expected)
+        {
+            auto filter = krabs::predicates::property_iends_with(L"ContextInfo", std::wstring(L"baZ bINgo"));
+            Assert::IsTrue(filter(record));
+        }
+
+        TEST_METHOD(property_iends_with_should_not_match_events_that_do_not_match_expected)
+        {
+            auto filter = krabs::predicates::property_iends_with(L"ContextInfo", std::wstring(L"fOo BAr"));
+            Assert::IsFalse(filter(record));
+        }
+
+        TEST_METHOD(property_iends_with_should_match_counted_string_with_events_that_end_with_expected)
+        {
+            auto filter = krabs::predicates::property_iends_with<adpt::counted_string>(L"UserData", std::wstring(L"iS 31 chaRa"));
+            Assert::IsTrue(filter(record));
+        }
+
+        TEST_METHOD(property_iends_with_should_not_match_counted_string_with_events_that_with_with_expected)
+        {
+            auto filter = krabs::predicates::property_iends_with<adpt::counted_string>(L"UserData", std::wstring(L"a LOT aFteR"));
+            Assert::IsFalse(filter(record));
+        }
+
+        TEST_METHOD(property_iends_with_should_not_match_events_that_go_past_given_counted_string_len)
+        {
+            auto filter = krabs::predicates::property_iends_with<adpt::counted_string>(L"UserData", std::wstring(L"thIS coUNteD stRINg is 31 chArac"));
             Assert::IsFalse(filter(record));
         }
 

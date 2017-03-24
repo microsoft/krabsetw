@@ -102,19 +102,19 @@ namespace krabstests
 
         TEST_METHOD(pack_incomplete_should_fill_enough_bytes_for_nonstring_types_when_incomplete)
         {
-            krabs::guid group_policy(L"{AEA1B4FA-97D1-45F2-A64C-4D69FFFD92C9}");
-            krabs::testing::record_builder builder(group_policy, krabs::id(1500), krabs::version(0));
+            krabs::guid wininet(L"{43D1A55C-76D6-4F7E-995C-64C711E5CAFE}");
+            krabs::testing::record_builder builder(wininet, krabs::id(1057), krabs::version(0));
 
             builder.add_properties()
-                (L"SupportInfo2", (unsigned int)3921)
-                (L"DCName", L"www.microsoft.com");
+                (L"URL", "https://microsoft.com")
+                (L"Status", (unsigned int)300);
 
             auto record = builder.pack_incomplete();
             krabs::schema schema(record);
             krabs::parser parser(schema);
 
-            Assert::AreEqual(parser.parse<unsigned int>(L"SupportInfo2"), (unsigned int)3921);
-            Assert::AreEqual(parser.parse<std::wstring>(L"DCName"), std::wstring(L"www.microsoft.com"));
+            Assert::AreEqual(parser.parse<unsigned int>(L"Status"), (unsigned int)300);
+            Assert::AreEqual(parser.parse<std::string>(L"URL"), std::string("https://microsoft.com"));
         }
 
         TEST_METHOD(pack_incomplete_should_correctly_handle_no_set_props)
