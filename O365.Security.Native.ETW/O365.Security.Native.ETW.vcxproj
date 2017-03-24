@@ -41,8 +41,8 @@
     <EmbedManifest>false</EmbedManifest>
     <IncludePath>$(SolutionDir);$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LinkIncremental>true</LinkIncremental>
-    <LinkKeyFile>
-    </LinkKeyFile>
+    <LinkKeyFile>$(SolutionDir)..\O365.Security.snk</LinkKeyFile>
+    <LinkDelaySign>true</LinkDelaySign>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(SolutionDir);$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
@@ -62,6 +62,15 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AssemblyDebug>true</AssemblyDebug>
     </Link>
+    <PreBuildEvent>
+      <Command>if not exist $(SolutionDir)..\O365.Security.snk sn.exe -k $(SolutionDir)..\O365.Security.snk</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Verify snk file is generated</Message>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message>sign</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -84,9 +93,6 @@
     <PreBuildEvent>
       <Message>Verify snk file is generated</Message>
     </PreBuildEvent>
-    <PostBuildEvent>
-      <Command>sn -R $(TargetPath) $(SolutionDir)..\O365.Security.snk</Command>
-    </PostBuildEvent>
     <PostBuildEvent>
       <Message>sign</Message>
     </PostBuildEvent>
