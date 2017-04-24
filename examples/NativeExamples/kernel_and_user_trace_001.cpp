@@ -97,8 +97,9 @@ void setup_image_load_provider(krabs::kernel::image_load_provider& provider)
     provider.add_on_event_callback([](const EVENT_RECORD &record) {
         krabs::schema schema(record);
 
-        std::wstring event_name = schema.event_name();
-        if (event_name == L"Load") {
+        // Opcodes can be found on the kernel provider's documentation:
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/aa364068(v=vs.85).aspx
+        if (schema.event_opcode() == 10) {
             krabs::parser parser(schema);
             std::wstring filename = parser.parse<std::wstring>(L"FileName");
             std::wcout << L"Loaded image from file " << filename << std::endl;

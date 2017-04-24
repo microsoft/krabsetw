@@ -33,6 +33,9 @@ namespace ManagedExamples
             // providers do.
             processProvider.OnEvent += (record) =>
             {
+                // We consult against the opcode for kernel providers.
+                // The opcodes are documented here:
+                // https://msdn.microsoft.com/en-us/library/windows/desktop/aa364083(v=vs.85).aspx
                 if (record.Opcode == 0x01)
                 {
                     var image = record.GetAnsiString("ImageFileName", "Unknown");

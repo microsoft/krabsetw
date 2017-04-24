@@ -25,8 +25,13 @@ void kernel_trace_001::start()
     provider.add_on_event_callback([](const EVENT_RECORD &record) {
         krabs::schema schema(record);
 
-        std::wstring event_name = schema.event_name();
-        if (event_name == L"Load") {
+        // To filter our events, we want to compare against the
+        // event opcode. For kernel traces, you can consult this page
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/aa364083(v=vs.85).aspx
+        //
+        // The documentation specific to the image load provider is here:
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/aa364068(v=vs.85).aspx
+        if (schema.event_opcode() == 10) {
             krabs::parser parser(schema);
             std::wstring filename = parser.parse<std::wstring>(L"FileName");
             std::wcout << L"Loaded image from file " << filename << std::endl;
