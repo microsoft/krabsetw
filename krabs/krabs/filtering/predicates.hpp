@@ -7,7 +7,6 @@
 #include <functional>
 #include <algorithm>
 #include <string>
-#include <boost/algorithm/string.hpp>
 
 #include "../compiler_check.hpp"
 #include "comparers.hpp"
