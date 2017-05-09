@@ -29,17 +29,20 @@ namespace krabs {
     {
         guid      provider;
         uint16_t  id;
+        uint8_t   opcode;
         uint8_t   version;
 
         schema_key(const EVENT_RECORD& record)
             : provider(record.EventHeader.ProviderId)
             , id(record.EventHeader.EventDescriptor.Id)
+            , opcode(record.EventHeader.EventDescriptor.Opcode)
             , version(record.EventHeader.EventDescriptor.Version) { }
 
         bool operator==(const schema_key& rhs) const
         {
             return provider == rhs.provider &&
                    id == rhs.id &&
+                   opcode == rhs.opcode &&
                    version == rhs.version;
         }
 
