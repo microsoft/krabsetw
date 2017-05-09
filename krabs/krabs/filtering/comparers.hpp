@@ -14,6 +14,9 @@
 
 #if(_MANAGED)
 #pragma warning(pop)
+
+// Turn off managed compilation for this file.
+#pragma managed(push, off)
 #endif
 
 namespace krabs { namespace predicates {
@@ -133,3 +136,7 @@ namespace krabs { namespace predicates {
     } /* namespace comparers */
 
 } /* namespace predicates */ } /* namespace krabs */
+
+#if(_MANAGED)
+#pragma managed(pop)
+#endif
