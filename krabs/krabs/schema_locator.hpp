@@ -31,11 +31,13 @@ namespace krabs {
         uint16_t  id;
         uint8_t   opcode;
         uint8_t   version;
+        uint8_t   level;
 
         schema_key(const EVENT_RECORD& record)
             : provider(record.EventHeader.ProviderId)
             , id(record.EventHeader.EventDescriptor.Id)
             , opcode(record.EventHeader.EventDescriptor.Opcode)
+            , level(record.EventHeader.EventDescriptor.Level)
             , version(record.EventHeader.EventDescriptor.Version) { }
 
         bool operator==(const schema_key& rhs) const
@@ -43,6 +45,7 @@ namespace krabs {
             return provider == rhs.provider &&
                    id == rhs.id &&
                    opcode == rhs.opcode &&
+                   level == rhs.level &&
                    version == rhs.version;
         }
 
