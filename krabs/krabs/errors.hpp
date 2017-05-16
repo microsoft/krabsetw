@@ -12,28 +12,28 @@ namespace krabs {
     class trace_already_registered : public std::runtime_error {
     public:
         trace_already_registered()
-        : std::runtime_error("The trace session has already been registered")
+            : std::runtime_error("The trace session has already been registered")
         {}
     };
 
     class invalid_parameter : public std::logic_error {
     public:
         invalid_parameter()
-        : std::logic_error("Invalid parameter given")
+            : std::logic_error("Invalid parameter given")
         {}
     };
 
     class start_trace_failure : public std::runtime_error {
     public:
         start_trace_failure()
-        : std::runtime_error("Failure to start trace")
+            : std::runtime_error("Failure to start trace")
         {}
     };
 
     class need_to_be_admin_failure : public std::runtime_error {
     public:
         need_to_be_admin_failure()
-        : std::runtime_error("Need to be an admin")
+            : std::runtime_error("Need to be an admin")
         {}
     };
 
@@ -55,6 +55,13 @@ namespace krabs {
         {}
     };
 
+    class no_trace_sessions_remaining : public std::runtime_error {
+    public:
+        no_trace_sessions_remaining()
+            : std::runtime_error("No more trace sessions available.")
+        {}
+    };
+
     /**
      * <summary>Checks for common ETW API error codes.</summary>
      */
@@ -65,19 +72,16 @@ namespace krabs {
         }
 
         switch (status) {
-
             case ERROR_ALREADY_EXISTS:
                 throw krabs::trace_already_registered();
-                break;
             case ERROR_INVALID_PARAMETER:
                 throw krabs::invalid_parameter();
-                break;
             case ERROR_ACCESS_DENIED:
                 throw krabs::need_to_be_admin_failure();
-                break;
             case ERROR_NOT_FOUND:
                 throw krabs::could_not_find_schema();
-                break;
+            case ERROR_NO_SYSTEM_RESOURCES:
+                throw krabs::no_trace_sessions_remaining();
             default:
                 throw std::runtime_error("Unexpected error");
         }

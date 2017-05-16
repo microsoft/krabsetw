@@ -42,4 +42,9 @@ namespace O365 { namespace Security { namespace ETW {
         TypeMismatchAssert(System::String^ msg) : System::Exception(msg) { }
     };
 
+    /// <summary>
+    /// Thrown when no trace sessions remaining to register. An existing trace
+    /// session must be deleted first.
+    /// </summary>
+    public ref struct NoTraceSessionsRemaining : public System::Exception {};
 } } }
