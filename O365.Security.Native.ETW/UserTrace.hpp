@@ -155,18 +155,19 @@ namespace O365 { namespace Security { namespace ETW {
         }
         catch (const krabs::trace_already_registered &)
         {
-            TraceAlreadyRegistered ^err = gcnew TraceAlreadyRegistered;
-            throw err;
+            throw gcnew TraceAlreadyRegistered;
         }
         catch (const krabs::invalid_parameter &)
         {
-            InvalidParameter ^err = gcnew InvalidParameter;
-            throw err;
+            throw gcnew InvalidParameter;
         }
         catch (const krabs::start_trace_failure &)
         {
-            StartTraceFailure ^err = gcnew StartTraceFailure;
-            throw err;
+            throw gcnew StartTraceFailure;
+        }
+        catch (const krabs::no_trace_sessions_remaining &)
+        {
+            throw gcnew NoTraceSessionsRemaining;
         }
     }
 
