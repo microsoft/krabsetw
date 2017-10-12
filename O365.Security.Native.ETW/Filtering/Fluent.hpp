@@ -80,5 +80,15 @@ namespace O365 { namespace Security { namespace ETW {
         {
             return Predicate::make_predicate<krabs::predicates::version_is>(version);
         }
+
+        /// <summary>
+        /// Used to verify that an event was emitted by a specific PID.
+        /// </summary>
+        /// <param name="processId">the PID to match on</param>
+        /// <returns>a predicate that matches events of the specified PID</returns>
+        static Predicate ^ProcessIdIs(int processId)
+        {
+            return Predicate::make_predicate<krabs::predicates::process_id_is>(processId);
+        }
     };
 } } }
