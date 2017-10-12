@@ -47,7 +47,7 @@ namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ Name
         {
-            String^ get() { return gcnew String(schema_->provider_name()); }
+            String^ get() { return gcnew String(schema_->event_name()); }
         }
 
         /// <summary>
