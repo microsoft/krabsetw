@@ -20,7 +20,7 @@ namespace O365 { namespace Security { namespace ETW {
 
     // Flags as documented here:
     //  https://msdn.microsoft.com/en-us/library/windows/desktop/dd392306(v=vs.85).aspx
-    public enum class UserTraceFlags
+    public enum class TraceFlags
     {
         // User SID for the event is included in the ExtendedData field
         IncludeUserSid = 0x00000001,
@@ -121,8 +121,8 @@ namespace O365 { namespace Security { namespace ETW {
         /// "level" determines events in what categories are 
         /// enabled for notification.
         /// </summary>
-        property UserTraceFlags TraceFlags {
-            void set(UserTraceFlags value) {
+        property TraceFlags TraceFlags {
+            void set(O365::Security::ETW::TraceFlags value) {
                 provider_->trace_flags((UCHAR)value);
             }
         }
