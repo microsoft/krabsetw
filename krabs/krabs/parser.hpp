@@ -313,7 +313,7 @@ namespace krabs {
         return binary(propInfo.pPropertyIndex_, propInfo.length_);
     }
 
-    template <>
+    template<>
     inline ip_address parser::parse<ip_address>(
         const std::wstring &name)
     {
@@ -334,6 +334,18 @@ namespace krabs {
         default:
             throw std::runtime_error("IP Address was not IPV4 or IPV6");
         }
+    }
+
+    template<>
+    inline socket_address parser::parse<socket_address>(
+        const std::wstring &name)
+    {
+        auto propInfo = find_property(name);
+        throw_if_property_not_found(propInfo);
+
+        krabs::debug::assert_valid_assignment<socket_address>(name, propInfo);
+
+        return socket_address::from_bytes(propInfo.pPropertyIndex_, propInfo.length_);
     }
 
     // view_of
