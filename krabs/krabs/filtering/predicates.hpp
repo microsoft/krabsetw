@@ -256,6 +256,25 @@ namespace krabs { namespace predicates {
     };
 
     /**
+    * <summary>
+    *   Accepts an event if its PID matches the expected value.
+    * </summary>
+    */
+    struct process_id_is {
+        process_id_is(size_t expected)
+        : expected_(ULONG(expected))
+        {}
+
+        bool operator()(const EVENT_RECORD &record)
+        {
+            return (record.EventHeader.ProcessId == expected_);
+        }
+
+    private:
+        ULONG expected_;
+    };
+
+    /**
      * <summary>
      *   Accepts an event if the named property matches the expected value.
      * </summary>

@@ -163,6 +163,18 @@ namespace krabs {
             }
         }
 
+        template <>
+        inline void assert_valid_assignment<socket_address>(
+            const std::wstring&, const property_info& info)
+        {
+            auto outType = info.pEventPropertyInfo_->nonStructType.OutType;
+
+            if (outType != TDH_OUTTYPE_SOCKETADDRESS) {
+                throw std::runtime_error(
+                    "Requested a socket address from property that does not contain a socket address");
+            }
+        }
+
 #endif // NDEBUG
 
     } /* namespace debug */

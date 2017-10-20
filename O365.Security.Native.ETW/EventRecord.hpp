@@ -47,7 +47,7 @@ namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ Name
         {
-            String^ get() { return gcnew String(schema_->provider_name()); }
+            String^ get() { return gcnew String(schema_->event_name()); }
         }
 
         /// <summary>
@@ -254,6 +254,53 @@ namespace O365 { namespace Security { namespace ETW {
             return success;
         }
 
+#pragma endregion
+
+#pragma region Socket Address
+        /// <summary>
+        /// Get an SocketAddress from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <returns>the SocketAddress value associated with the specified property</returns>
+        virtual SocketAddress^ GetSocketAddress(String^ name)
+        {
+            const auto& addr = GetValue<krabs::socket_address>(name);
+            return ConvertToSocketAddress(addr);
+        }
+
+        /// <summary>
+        /// Get an SocketAddress from the specified property name or returns
+        /// the specified default value.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="defaultValue">the default value to return if the property lookup fails</param>
+        /// <returns>the SocketAddress value associated with the specified property or the specified default value</returns>
+        virtual SocketAddress^ GetSocketAddress(String^ name, SocketAddress^ defaultValue)
+        {
+            SocketAddress^ addr;
+
+            if (TryGetSocketAddress(name, addr))
+                return addr;
+
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// Attempt to get an SocketAddress from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="result">the resulting SocketAddress</param>
+        /// <returns>true if fetching the SocketAddress succeeded, false otherwise</returns>
+        virtual bool TryGetSocketAddress(String^ name, [Out] SocketAddress^% result)
+        {
+            krabs::socket_address addr;
+            bool success = TryGetValue(name, addr);
+
+            if (success)
+                result = ConvertToSocketAddress(addr);
+
+            return success;
+        }
 #pragma endregion
 
 #pragma region Integers
@@ -632,6 +679,19 @@ namespace O365 { namespace Security { namespace ETW {
             Marshal::Copy(IntPtr((void*)&addr), bytes, 0, size);
 
             return gcnew IPAddress(bytes);
+        }
+
+        SocketAddress^ ConvertToSocketAddress(const krabs::socket_address& addr)
+        {
+            auto managed = gcnew SocketAddress((Sockets::AddressFamily)addr.sa_stor.ss_family);
+            BYTE* ptr = (BYTE*)&(addr.sa_stor);
+
+            int size = addr.sa_stor.ss_family == AF_INET ? sizeof addr.sa_in : sizeof addr.sa_in6;
+
+            for (int ii = 0; ii < size; ii++)
+                managed[ii] = ptr[ii];
+
+            return managed;
         }
 
         String^ ConvertToString(const krabs::counted_string& value)

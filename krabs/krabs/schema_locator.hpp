@@ -3,6 +3,10 @@
 
 #pragma once
 
+#ifndef  WIN32_LEAN_AND_MEAN
+#define  WIN32_LEAN_AND_MEAN
+#endif
+
 #define INITGUID
 
 #include <windows.h>

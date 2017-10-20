@@ -18,6 +18,33 @@ namespace O365 { namespace Security { namespace ETW {
 
     ref class UserTrace;
 
+    // Flags as documented here:
+    //  https://msdn.microsoft.com/en-us/library/windows/desktop/dd392306(v=vs.85).aspx
+    public enum class TraceFlags
+    {
+        // User SID for the event is included in the ExtendedData field
+        IncludeUserSid = 0x00000001,
+
+        // Terminal Session ID for the event is included in the ExtendedData field
+        IncludeTerminalSessionId = 0x00000002,
+
+        // Stack trace for the event is included in the ExtendedData field
+        IncludeStackTrace = 0x00000004,
+
+        // Filters out all events that do not have a non-zero keyword specified.
+        IgnoreKeyword0 = 0x00000010,
+
+        // Indicates that EnableTraceEx2 should enable a provider group rather
+        // than an individual provider. See https://msdn.microsoft.com/en-us/library/windows/desktop/mt772485(v=vs.85).aspx
+        EnableProviderGroup = 0x00000020,
+
+        // Include the Process Start Key in the extended data.
+        // The Process Start Key is a sequence number that identifies the process.
+        // While the Process ID may be reused within a session, the Process Start Key
+        // is guaranteed uniqueness in the current boot session.
+        IncludeProcessStartKey = 0x00000080
+    };
+
     /// <summary>
     /// Represents a user trace provider and its configuration.
     /// </summary>
@@ -82,11 +109,21 @@ namespace O365 { namespace Security { namespace ETW {
         /// Represents the "level" value on the provider's options, where
         /// "level" determines events in what categories are 
         /// enabled for notification.
-
         /// </summary>
         property UCHAR Level {
             void set(UCHAR value) {
                 provider_->level(value);
+            }
+        }
+
+        /// <summary>
+        /// Represents the "level" value on the provider's options, where
+        /// "level" determines events in what categories are 
+        /// enabled for notification.
+        /// </summary>
+        property TraceFlags TraceFlags {
+            void set(O365::Security::ETW::TraceFlags value) {
+                provider_->trace_flags((UCHAR)value);
             }
         }
 

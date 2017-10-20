@@ -99,7 +99,7 @@ namespace krabs { namespace details {
     inline void ut::enable_providers(
         const krabs::trace<krabs::details::ut> &trace)
     {
-        std::map<krabs::guid, std::tuple<UCHAR, ULONGLONG, ULONGLONG>> providerFlags;
+        std::map<krabs::guid, std::tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR>> providerFlags;
 
         // This function essentially takes the union of all the provider flags
         // for a given provider GUID. This comes about when multiple providers
@@ -107,16 +107,26 @@ namespace krabs { namespace details {
         // TODO: Only forward the calls that are requested to each provider.
         for (auto &provider : trace.providers_) {
             if (providerFlags.find(provider.get().guid_) != providerFlags.end()) {
-                providerFlags[provider.get().guid_] = std::make_tuple (0, 0, 0);
+                providerFlags[provider.get().guid_] = std::make_tuple (0, 0, 0, 0);
             }
 
             std::get<0>(providerFlags[provider.get().guid_]) |= provider.get().level_;
             std::get<1>(providerFlags[provider.get().guid_]) |= provider.get().any_;
             std::get<2>(providerFlags[provider.get().guid_]) |= provider.get().all_;
+            std::get<3>(providerFlags[provider.get().guid_]) |= provider.get().trace_flags_;
         }
 
         for (auto &provider : providerFlags) {
             GUID guid = provider.first;
+
+            ENABLE_TRACE_PARAMETERS parameters;
+            parameters.Version = ENABLE_TRACE_PARAMETERS_VERSION_2;
+            parameters.SourceId = provider.first;
+            parameters.EnableProperty = std::get<3>(provider.second);
+            parameters.ControlFlags = 0;
+            parameters.EnableFilterDesc = nullptr;
+            parameters.FilterDescCount = 0;
+
             ULONG status = EnableTraceEx2(trace.registrationHandle_,
                                           &guid,
                                           EVENT_CONTROL_CODE_ENABLE_PROVIDER,
@@ -124,7 +134,7 @@ namespace krabs { namespace details {
                                           std::get<1>(provider.second),
                                           std::get<2>(provider.second),
                                           0,
-                                          nullptr);
+                                          &parameters);
             UNREFERENCED_PARAMETER(status);
         }
     }

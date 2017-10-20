@@ -127,7 +127,32 @@ namespace O365 { namespace Security { namespace ETW {
         /// <param name="name">property name</param>
         /// <param name="result">the resulting IPAddress</param>
         /// <returns>true if fetching the IPAddress succeeded, false otherwise</returns>
-        bool    TryGetIPAddress(String^ name, [Out] IPAddress^% result);
+        bool TryGetIPAddress(String^ name, [Out] IPAddress^% result);
+
+        /// <summary>
+        /// Get an SocketAddress from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <returns>the SocketAddress value associated with the specified property</returns>
+        SocketAddress^ GetSocketAddress(String^ name);
+
+        /// <summary>
+        /// Get an SocketAddress from the specified property name or returns
+        /// the specified default value.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="defaultValue">the default value to return if the property lookup fails</param>
+        /// <returns>the SocketAddress value associated with the specified property or the specified default value</returns>
+        SocketAddress^ GetSocketAddress(String^ name, SocketAddress^ defaultValue);
+
+        /// <summary>
+        /// Attempt to get an SocketAddress from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="result">the resulting SocketAddress</param>
+        /// <returns>true if fetching the SocketAddress succeeded, false otherwise</returns>
+        bool TryGetSocketAddress(String^ name, [Out] SocketAddress^% result);
+
 
         // Integers
 

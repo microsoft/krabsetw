@@ -196,7 +196,7 @@ namespace krabs {
         * Sets the "level" flag of the provider. Valid values are 0~255 (0xFF).
         * </summary>
         *
-        * <param name="value">the value to set <c>all</c> to.</param>
+        * <param name="value">the value to set <c>level</c> to.</param>
         * <example>
         *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
         *    provider<> powershell(id);
@@ -204,6 +204,23 @@ namespace krabs {
         * </example>
         */
         void level(T level);
+
+        /**
+        * <summary>
+        * Sets the "EnableProperty" flag on the ENABLE_TRACE_PARAMETER struct.
+        * These properties configure behaviours for a specified user-mode provider.
+        * Valid values can be found here:
+        *   https://msdn.microsoft.com/en-us/library/windows/desktop/dd392306(v=vs.85).aspx
+        * </summary>
+        *
+        * <param name="value">the value to set</param>
+        * <example>
+        *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+        *    provider<> powershell(id);
+        *    powershell.trace_flags(EVENT_ENABLE_PROPERTY_STACK_TRACE);
+        * </example>
+        */
+        void trace_flags(T trace_flags);
 
         /**
          * <summary>
@@ -224,6 +241,7 @@ namespace krabs {
         T any_;
         T all_;
         T level_;
+        T trace_flags_;
 
     private:
         template <typename T>
@@ -349,6 +367,7 @@ namespace krabs {
     , any_(0)
     , all_(0)
     , level_(5)
+    , trace_flags_(0)
     {}
 
     template <typename T>
@@ -413,6 +432,7 @@ namespace krabs {
             any_ = 0;
             all_ = 0;
             level_ = 5;
+            trace_flags_ = 0;
         }
 
         CoUninitialize();
@@ -461,13 +481,20 @@ namespace krabs {
     }
 
     template <typename T>
+    void provider<T>::trace_flags(T trace_flags)
+    {
+        trace_flags_ = trace_flags;
+    }
+
+    template <typename T>
     provider<T>::operator provider<>() const
     {
         provider<> tmp(guid_);
-        tmp.any_       = static_cast<ULONGLONG>(any_);
-        tmp.all_       = static_cast<ULONGLONG>(all_);
-        tmp.level_     = static_cast<UCHAR>(level_);
-        tmp.callbacks_ = callbacks_;
+        tmp.any_            = static_cast<ULONGLONG>(any_);
+        tmp.all_            = static_cast<ULONGLONG>(all_);
+        tmp.level_          = static_cast<UCHAR>(level_);
+        tmp.trace_flags_    = static_cast<UCHAR>(trace_flags_);
+        tmp.callbacks_      = callbacks_;
 
         return tmp;
     }
