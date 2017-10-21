@@ -303,6 +303,55 @@ namespace O365 { namespace Security { namespace ETW {
         }
 #pragma endregion
 
+#pragma region DateTime
+        /// <summary>
+        /// Get a DateTime from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <returns>the DateTime value associated with the specified property</returns>
+        virtual DateTime^ GetDateTime(String^ name)
+        {
+            const auto& time = GetValue<::FILETIME>(name);
+            int64_t asInt64 = time.dwLowDateTime | (time.dwHighDateTime << 8);
+            return DateTime::FromFileTimeUtc(asInt64);
+        }
+
+        /// <summary>
+        /// Get an DateTime from the specified property name or returns
+        /// the specified default value.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="defaultValue">the default value to return if the property lookup fails</param>
+        /// <returns>the DateTime value associated with the specified property or the specified default value</returns>
+        virtual DateTime^ GetDateTime(String^ name, DateTime^ defaultValue)
+        {
+            DateTime^ time;
+
+            if (TryGetDateTime(name, time))
+                return time;
+
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// Attempt to get an DateTime from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="result">the resulting DateTime</param>
+        /// <returns>true if fetching the DateTime succeeded, false otherwise</returns>
+        virtual bool TryGetDateTime(String^ name, [Out] DateTime^% result)
+        {
+            ::FILETIME time;
+            bool success = TryGetValue(name, time);
+            int64_t asInt64 = time.dwLowDateTime | (time.dwHighDateTime << 8);
+
+            if (success)
+                result = DateTime::FromFileTimeUtc(asInt64);
+
+            return success;
+        }
+#pragma endregion
+
 #pragma region Integers
 
         /// <summary>

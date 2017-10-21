@@ -148,6 +148,10 @@ namespace krabs {
         BUILD_ASSERT(float, TDH_INTYPE_FLOAT);
         BUILD_ASSERT(double, TDH_INTYPE_DOUBLE);
 
+        // FILETIME
+        BUILD_ASSERT(::FILETIME, TDH_INTYPE_FILETIME);
+        BUILD_ASSERT(::SYSTEMTIME, TDH_INTYPE_SYSTEMTIME);
+
 #undef BUILD_ASSERT
 
         template <>
