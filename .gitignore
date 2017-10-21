@@ -35,3 +35,6 @@ githooks/*.dll
 
 # ignore Mac stuff
 .DS_Store
+
+# VS poops
+.vs/
