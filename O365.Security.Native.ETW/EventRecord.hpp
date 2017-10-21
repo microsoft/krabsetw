@@ -312,8 +312,8 @@ namespace O365 { namespace Security { namespace ETW {
         virtual DateTime^ GetDateTime(String^ name)
         {
             const auto& time = GetValue<::FILETIME>(name);
-            int64_t asInt64 = time.dwLowDateTime | (time.dwHighDateTime << 8);
-            return DateTime::FromFileTimeUtc(asInt64);
+            LARGE_INTEGER *largeInt = (LARGE_INTEGER*)&time;
+            return DateTime::FromFileTimeUtc(largeInt->QuadPart);
         }
 
         /// <summary>
@@ -343,10 +343,10 @@ namespace O365 { namespace Security { namespace ETW {
         {
             ::FILETIME time;
             bool success = TryGetValue(name, time);
-            int64_t asInt64 = time.dwLowDateTime | (time.dwHighDateTime << 8);
+            LARGE_INTEGER *largeInt = (LARGE_INTEGER*)&time;
 
             if (success)
-                result = DateTime::FromFileTimeUtc(asInt64);
+                result = DateTime::FromFileTimeUtc(largeInt->QuadPart);
 
             return success;
         }
