@@ -153,6 +153,29 @@ namespace O365 { namespace Security { namespace ETW {
         /// <returns>true if fetching the SocketAddress succeeded, false otherwise</returns>
         bool TryGetSocketAddress(String^ name, [Out] SocketAddress^% result);
 
+        /// <summary>
+        /// Get a DateTime from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <returns>the DateTime value associated with the specified property</returns>
+        DateTime^ GetDateTime(String^ name);
+
+        /// <summary>
+        /// Get an DateTime from the specified property name or returns
+        /// the specified default value.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="defaultValue">the default value to return if the property lookup fails</param>
+        /// <returns>the DateTime value associated with the specified property or the specified default value</returns>
+        DateTime^ GetDateTime(String^ name, DateTime^ defaultValue);
+
+        /// <summary>
+        /// Attempt to get an DateTime from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="result">the resulting DateTime</param>
+        /// <returns>true if fetching the DateTime succeeded, false otherwise</returns>
+        bool TryGetDateTime(String^ name, [Out] DateTime^% result);
 
         // Integers
 

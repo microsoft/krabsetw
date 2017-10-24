@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>O365.Security.Native.ETW</id>
-        <version>1.0.9</version>
+        <version>1.0.10</version>
         <title>O365.Security.Native.ETW - managed wrappers for krabsetw</title>
         <authors>Microsoft Corporation,OneDrive/SharePoint Security</authors>
         <owners>Microsoft Corporation,OneDrive/SharePoint Security</owners>
@@ -11,7 +11,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library. Also known as "Lobsters."</description>
         <summary>O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library. Also known as "Lobsters."</summary>
-        <releaseNotes>Add parse types for SocketAddress. Fix bug in managed layer with getting event name. Enable ability to specify TraceFlags for providers.</releaseNotes>
+        <releaseNotes>Fix EventUserMetadata::ThreadId implementation.</releaseNotes>
         <copyright>Copyright 2016 Microsoft Corporation</copyright>
         <language />
         <tags>ETW krabs lobsters managed cppcli</tags>

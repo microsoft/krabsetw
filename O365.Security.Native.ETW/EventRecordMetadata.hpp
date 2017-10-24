@@ -97,7 +97,7 @@ namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property unsigned int ThreadId
         {
-            unsigned int get() { return header_->ProcessId; }
+            unsigned int get() { return header_->ThreadId; }
         }
 
         /// <summary>
