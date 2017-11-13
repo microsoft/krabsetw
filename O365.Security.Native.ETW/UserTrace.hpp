@@ -149,36 +149,17 @@ namespace O365 { namespace Security { namespace ETW {
 
     inline void UserTrace::Start()
     {
-        try
-        {
-            return trace_->start();
-        }
-        catch (const krabs::trace_already_registered &)
-        {
-            throw gcnew TraceAlreadyRegistered;
-        }
-        catch (const krabs::invalid_parameter &)
-        {
-            throw gcnew InvalidParameter;
-        }
-        catch (const krabs::start_trace_failure &)
-        {
-            throw gcnew StartTraceFailure;
-        }
-        catch (const krabs::no_trace_sessions_remaining &)
-        {
-            throw gcnew NoTraceSessionsRemaining;
-        }
+        ExecuteAndConvertExceptions(return trace_->start());
     }
 
     inline void UserTrace::Stop()
     {
-        return trace_->stop();
+        ExecuteAndConvertExceptions(return trace_->stop());
     }
 
     inline TraceStats UserTrace::QueryStats()
     {
-        return TraceStats(trace_->query_stats());
+        ExecuteAndConvertExceptions(return TraceStats(trace_->query_stats()));
     }
 
 } } }

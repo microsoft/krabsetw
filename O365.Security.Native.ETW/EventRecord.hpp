@@ -755,6 +755,8 @@ namespace O365 { namespace Security { namespace ETW {
             auto managed = gcnew array<Byte>((int)data.bytes().size());
             IntPtr start((void*)&data.bytes()[0]);
 
+            if (start == IntPtr::Zero) return nullptr;
+
             Marshal::Copy(start, managed, 0, (int)data.bytes().size());
 
             return managed;

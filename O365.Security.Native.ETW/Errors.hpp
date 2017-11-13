@@ -47,4 +47,24 @@ namespace O365 { namespace Security { namespace ETW {
     /// session must be deleted first.
     /// </summary>
     public ref struct NoTraceSessionsRemaining : public System::Exception {};
+
+#define ExecuteAndConvertExceptions(e) \
+        try { e; } \
+        catch (const krabs::trace_already_registered &) \
+        { \
+            throw gcnew TraceAlreadyRegistered; \
+        } \
+        catch (const krabs::invalid_parameter &) \
+        { \
+            throw gcnew InvalidParameter; \
+        } \
+        catch (const krabs::start_trace_failure &) \
+        { \
+            throw gcnew StartTraceFailure; \
+        } \
+        catch (const krabs::no_trace_sessions_remaining &) \
+        { \
+            throw gcnew NoTraceSessionsRemaining; \
+        } \
+
 } } }

@@ -300,6 +300,7 @@ namespace krabs { namespace details {
     void trace_manager<T>::stop_trace()
     {
         if (trace_.sessionHandle_ != INVALID_PROCESSTRACE_HANDLE) {
+            unregister_trace();
             ULONG status = CloseTrace(trace_.sessionHandle_);
             trace_.sessionHandle_ = INVALID_PROCESSTRACE_HANDLE;
 
