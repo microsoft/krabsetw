@@ -2,11 +2,11 @@
 Overview
 ========
 
-**Krabs** is a C++ library that simplifies interacting with ETW. It allows for any number of traces and providers to be enabled and for client code to register for event notifications from these traces.
+**krabsetw** is a C++ library that simplifies interacting with ETW. It allows for any number of traces and providers to be enabled and for client code to register for event notifications from these traces.
 
-**Krabs** also provides code to simplify parsing generic event data into strongly typed data types.
+**krabsetw** also provides code to simplify parsing generic event data into strongly typed data types.
 
-**O365.Security.Native.ETW** is a C++ CLI (.NET) wrapper around **Krabs**. It provides the same functionality as **Krabs** to .NET applications and is used in production by the ODSP Security team. It's affectionately referred to as **Lobsters**.
+**O365.Security.Native.ETW** is a C++ CLI (.NET) wrapper around **krabsetw**. It provides the same functionality as **krabsetw** to .NET applications and is used in production by the ODSP Security team. It's affectionately referred to as **Lobsters**.
 
 Examples & Documentation
 ========
