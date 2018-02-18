@@ -4,6 +4,10 @@ Krabs Readme.txt
 
 Important Preprocessor Definitions:
 
+* UNICODE - krabsetw expects the UNICODE preproessor definition to be defined. The code will
+not successfully compile without this flag. There is no plan to support non-UNICODE defined
+compilation.
+
 
 
 * NDEBUG - Set this varible in release builds to disable runtime type assertions.
