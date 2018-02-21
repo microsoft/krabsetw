@@ -201,7 +201,7 @@ namespace krabs { namespace details {
         info.properties.Wnode.ClientContext = 1; // QPC clock resolution
         info.properties.FlushTimer          = 1; // flush every second
         info.properties.LogFileMode         = EVENT_TRACE_REAL_TIME_MODE
-                                            | PROCESS_TRACE_MODE_EVENT_RECORD
+                                            | EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING
                                             | T::trace_type::augment_file_mode();
         info.properties.LoggerNameOffset    = offsetof(trace_info, logfileName);
         info.properties.EnableFlags         = T::trace_type::construct_enable_flags(trace_);
