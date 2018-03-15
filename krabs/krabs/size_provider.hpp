@@ -39,7 +39,8 @@ namespace krabs {
     private:
         static ULONG get_heuristic_size(
             const BYTE*,
-            const EVENT_PROPERTY_INFO&);
+            const EVENT_PROPERTY_INFO&,
+            const EVENT_RECORD&);
 
         static ULONG get_tdh_size(
             const wchar_t*,
@@ -81,7 +82,7 @@ namespace krabs {
             if (propertyInfo.length > 0)
                 propertyLength = propertyInfo.length;
             else
-                propertyLength = get_heuristic_size(propertyStart, propertyInfo);
+                propertyLength = get_heuristic_size(propertyStart, propertyInfo, record);
         }
 
         // Couldn't get the length from the 'length' field or
@@ -94,9 +95,11 @@ namespace krabs {
 
     inline ULONG size_provider::get_heuristic_size(
         const BYTE* propertyStart,
-        const EVENT_PROPERTY_INFO& propertyInfo)
+        const EVENT_PROPERTY_INFO& propertyInfo,
+        const EVENT_RECORD& record)
     {
         ULONG propertyLength = 0;
+        PBYTE pRecordEnd = (PBYTE)record.UserData + record.UserDataLength;
 
         // The calls to Tdh are kind of expensive, especially when krabs is
         // included in a managed assembly as this call will be a thunk.
@@ -105,18 +108,35 @@ namespace krabs {
 
         // Be careful! Check IN and OUT types before making an assumption.
 
+        // Strings that appear at the end of a record may not be null-terminated.
+        // If a string is null-terminated, propertyLength includes the null character.
+        // If a string is not-null terminated, propertyLength includes all bytes up
+        // to the end of the record buffer.
+
         if (propertyInfo.nonStructType.OutType == TDH_OUTTYPE_STRING)
         {
             if (propertyInfo.nonStructType.InType == TDH_INTYPE_UNICODESTRING)
             {
-                // size of unicode string is length + 1 (null byte) * sizeof(wchar)
-                auto chars = (ULONG)wcslen((const wchar_t*)propertyStart) + 1;
-                propertyLength = chars * sizeof(wchar_t);
+                const wchar_t* p = (const wchar_t*)propertyStart;
+                const wchar_t* pEnd = (const wchar_t*)pRecordEnd;
+                while (p < pEnd) {
+                    if (!*p++) {
+                        break;
+                    }
+                }
+                propertyLength = static_cast<ULONG>(((PBYTE)p) - propertyStart);
             }
             else if (propertyInfo.nonStructType.InType == TDH_INTYPE_ANSISTRING)
             {
-                // size of ansi string is length + 1 (null byte)
-                propertyLength = (ULONG)strlen((const char*)propertyStart) + 1;
+                const char* p = (const char*)propertyStart;
+                const char* pEnd = (const char*)pRecordEnd;
+                while (p < pEnd) {
+                    if (!*p++) {
+                        break;
+                    }
+
+                }
+                propertyLength = static_cast<ULONG>(((PBYTE)p) - propertyStart);
             }
         }
 
