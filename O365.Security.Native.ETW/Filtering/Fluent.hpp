@@ -92,19 +92,6 @@ namespace O365 { namespace Security { namespace ETW {
         }
 
 		/// <summary>
-		/// Used to verify that an event was emitted with a specific boolean property.
-		/// </summary>
-		/// <param name="propertyName">the name of the property to match on</param>
-		/// <param name="value">the value of the property to match on</param>
-		/// <returns>a predicate that matches events of the specified boolean property</returns>
-		static Predicate ^IsBoolean(String ^propertyName, Boolean value)
-		{
-			return gcnew Predicate(krabs::predicates::property_is<Boolean>(
-				msclr::interop::marshal_as<std::wstring>(propertyName),
-				value));
-		}
-
-		/// <summary>
 		/// Used to verify that an event was emitted with a specific Int16 property.
 		/// </summary>
 		/// <param name="propertyName">the name of the property to match on</param>
