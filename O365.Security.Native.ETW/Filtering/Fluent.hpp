@@ -90,5 +90,57 @@ namespace O365 { namespace Security { namespace ETW {
         {
             return Predicate::make_predicate<krabs::predicates::process_id_is>(processId);
         }
+
+		/// <summary>
+		/// Used to verify that an event was emitted with a specific boolean property.
+		/// </summary>
+		/// <param name="propertyName">the name of the property to match on</param>
+		/// <param name="value">the value of the property to match on</param>
+		/// <returns>a predicate that matches events of the specified boolean property</returns>
+		static Predicate ^IsBoolean(String ^propertyName, Boolean value)
+		{
+			return gcnew Predicate(krabs::predicates::property_is<Boolean>(
+				msclr::interop::marshal_as<std::wstring>(propertyName),
+				value));
+		}
+
+		/// <summary>
+		/// Used to verify that an event was emitted with a specific Int16 property.
+		/// </summary>
+		/// <param name="propertyName">the name of the property to match on</param>
+		/// <param name="value">the value of the property to match on</param>
+		/// <returns>a predicate that matches events of the specified boolean property</returns>
+		static Predicate ^IsInt16(String ^propertyName, Int16 value)
+		{
+			return gcnew Predicate(krabs::predicates::property_is<Int16>(
+				msclr::interop::marshal_as<std::wstring>(propertyName),
+				value));
+		}
+
+		/// <summary>
+		/// Used to verify that an event was emitted with a specific Int32 property.
+		/// </summary>
+		/// <param name="propertyName">the name of the property to match on</param>
+		/// <param name="value">the value of the property to match on</param>
+		/// <returns>a predicate that matches events of the specified boolean property</returns>
+		static Predicate ^IsInt32(String ^propertyName, Int32 value)
+		{
+			return gcnew Predicate(krabs::predicates::property_is<Int32>(
+				msclr::interop::marshal_as<std::wstring>(propertyName),
+				value));
+		}
+
+		/// <summary>
+		/// Used to verify that an event was emitted with a specific Int64 property.
+		/// </summary>
+		/// <param name="propertyName">the name of the property to match on</param>
+		/// <param name="value">the value of the property to match on</param>
+		/// <returns>a predicate that matches events of the specified boolean property</returns>
+		static Predicate ^IsInt64(String ^propertyName, Int64 value)
+		{
+			return gcnew Predicate(krabs::predicates::property_is<Int64>(
+				msclr::interop::marshal_as<std::wstring>(propertyName),
+				value));
+		}
     };
 } } }
