@@ -92,45 +92,6 @@ namespace O365 { namespace Security { namespace ETW {
         }
 
 		/// <summary>
-		/// Used to verify that an event was emitted with a specific Int16 property.
-		/// </summary>
-		/// <param name="propertyName">the name of the property to match on</param>
-		/// <param name="value">the value of the property to match on</param>
-		/// <returns>a predicate that matches events of the specified Int16 property</returns>
-		static Predicate ^IsInt16(String ^propertyName, Int16 value)
-		{
-			return gcnew Predicate(krabs::predicates::property_is<Int16>(
-				msclr::interop::marshal_as<std::wstring>(propertyName),
-				value));
-		}
-
-		/// <summary>
-		/// Used to verify that an event was emitted with a specific UInt16 property.
-		/// </summary>
-		/// <param name="propertyName">the name of the property to match on</param>
-		/// <param name="value">the value of the property to match on</param>
-		/// <returns>a predicate that matches events of the specified UInt16 property</returns>
-		static Predicate ^IsUInt16(String ^propertyName, UInt16 value)
-		{
-			return gcnew Predicate(krabs::predicates::property_is<UInt16>(
-				msclr::interop::marshal_as<std::wstring>(propertyName),
-				value));
-		}
-
-		/// <summary>
-		/// Used to verify that an event was emitted with a specific Int32 property.
-		/// </summary>
-		/// <param name="propertyName">the name of the property to match on</param>
-		/// <param name="value">the value of the property to match on</param>
-		/// <returns>a predicate that matches events of the specified Int32 property</returns>
-		static Predicate ^IsInt32(String ^propertyName, Int32 value)
-		{
-			return gcnew Predicate(krabs::predicates::property_is<Int32>(
-				msclr::interop::marshal_as<std::wstring>(propertyName),
-				value));
-		}
-
-		/// <summary>
 		/// Used to verify that an event was emitted with a specific UInt32 property.
 		/// </summary>
 		/// <param name="propertyName">the name of the property to match on</param>
@@ -139,32 +100,6 @@ namespace O365 { namespace Security { namespace ETW {
 		static Predicate ^IsUInt32(String ^propertyName, UInt32 value)
 		{
 			return gcnew Predicate(krabs::predicates::property_is<UInt32>(
-				msclr::interop::marshal_as<std::wstring>(propertyName),
-				value));
-		}
-
-		/// <summary>
-		/// Used to verify that an event was emitted with a specific Int64 property.
-		/// </summary>
-		/// <param name="propertyName">the name of the property to match on</param>
-		/// <param name="value">the value of the property to match on</param>
-		/// <returns>a predicate that matches events of the specified Int64 property</returns>
-		static Predicate ^IsInt64(String ^propertyName, Int64 value)
-		{
-			return gcnew Predicate(krabs::predicates::property_is<Int64>(
-				msclr::interop::marshal_as<std::wstring>(propertyName),
-				value));
-		}
-
-		/// <summary>
-		/// Used to verify that an event was emitted with a specific UInt64 property.
-		/// </summary>
-		/// <param name="propertyName">the name of the property to match on</param>
-		/// <param name="value">the value of the property to match on</param>
-		/// <returns>a predicate that matches events of the specified UInt64 property</returns>
-		static Predicate ^IsUInt64(String ^propertyName, UInt64 value)
-		{
-			return gcnew Predicate(krabs::predicates::property_is<UInt64>(
 				msclr::interop::marshal_as<std::wstring>(propertyName),
 				value));
 		}
