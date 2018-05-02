@@ -9,26 +9,20 @@ namespace EtwTestsCS.Events
     public static class LogonEvent
     {
         public readonly static string TargetUserName = "TargetUserName";
-        public readonly static string KeyLength = "KeyLength";
         public readonly static string LogonType = "LogonType";
-        public readonly static string LogonId = "LogonId";
 
         public readonly static Guid ProviderId = Guid.Parse("199FE037-2B82-40A9-82AC-E1D46C792B99");
         public readonly static int EventId = 301;
-        public readonly static int Version = 4;
+        public readonly static int Version = 0;
 
         public static SynthRecord CreateRecord(
             string username,
-            short keyLength,
-            int logonType,
-            long logonId)
+            uint logonType)
         {
             using (var rb = new RecordBuilder(ProviderId, EventId, Version))
             {
-                rb.AddAnsiString(TargetUserName, username);
-                rb.AddValue(KeyLength, keyLength);
+                rb.AddUnicodeString(TargetUserName, username);
                 rb.AddValue(LogonType, logonType);
-                rb.AddValue(LogonId, logonId);
 
                 return rb.PackIncomplete();
             }
