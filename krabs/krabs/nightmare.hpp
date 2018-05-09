@@ -62,6 +62,20 @@ namespace krabs { namespace details {
         void stop();
 
         /**
+        * <summary>
+        * Opens the ETW trace identified by the info in the trace type.
+        * </summary>
+        */
+        EVENT_TRACE_LOGFILE open();
+
+        /**
+        * <summary>
+        * Starts processing the ETW trace. Must be preceeded by a call to open.
+        * </summary>
+        */
+        void process();
+
+        /**
          * <summary>
          * Queries the ETW trace identified by the info in the trace type.
          * </summary>
@@ -90,6 +104,8 @@ namespace krabs { namespace details {
         void start_trace();
         EVENT_TRACE_PROPERTIES query_trace();
         void stop_trace();
+        EVENT_TRACE_LOGFILE open_trace();
+        void process_trace();
         void enable_providers();
 
     private:
@@ -152,6 +168,20 @@ namespace krabs { namespace details {
         register_trace();
         enable_providers();
         start_trace();
+    }
+
+    template <typename T>
+    EVENT_TRACE_LOGFILE trace_manager<T>::open()
+    {
+        register_trace();
+        enable_providers();
+        return open_trace();
+    }
+
+    template <typename T>
+    void trace_manager<T>::process()
+    {
+        process_trace();
     }
 
     template <typename T>
@@ -284,8 +314,24 @@ namespace krabs { namespace details {
     template <typename T>
     void trace_manager<T>::start_trace()
     {
+        (void)open_trace();
+        process_trace();
+    }
+
+    template <typename T>
+    EVENT_TRACE_LOGFILE trace_manager<T>::open_trace()
+    {
         auto file = fill_logfile();
         trace_.sessionHandle_ = OpenTrace(&file);
+        if (trace_.sessionHandle_ == INVALID_PROCESSTRACE_HANDLE) {
+            throw start_trace_failure();
+        }
+        return file;
+    }
+
+    template <typename T>
+    void trace_manager<T>::process_trace()
+    {
         if (trace_.sessionHandle_ == INVALID_PROCESSTRACE_HANDLE) {
             throw start_trace_failure();
         }

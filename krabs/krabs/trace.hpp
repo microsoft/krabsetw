@@ -135,6 +135,34 @@ namespace krabs {
         void stop();
 
         /**
+        * <summary>
+        * Opens a trace session.
+        * </summary>
+        * <example>
+        *    krabs::trace trace;
+        *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+        *    provider<> powershell(id);
+        *    trace.enable(powershell);
+        *    auto logfile = trace.open();
+        * </example>
+        */
+        EVENT_TRACE_LOGFILE open();
+
+        /**
+        * <summary>
+        * Initiates the processing loop for a trace session.
+        * </summary>
+        * <example>
+        *    krabs::trace trace;
+        *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+        *    provider<> powershell(id);
+        *    trace.enable(powershell);
+        *    auto logfile = trace.open();
+        *    trace.process();
+        * </example>
+        */
+        void process();
+        /**
          * <summary>
          * Queries the trace session to get stats about
          * events lost and buffers handled.
@@ -243,6 +271,22 @@ namespace krabs {
     {
         details::trace_manager<trace> manager(*this);
         manager.stop();
+    }
+
+    template <typename T>
+    EVENT_TRACE_LOGFILE trace<T>::open()
+    {
+        eventsHandled_ = 0;
+
+        details::trace_manager<trace> manager(*this);
+        return manager.open();
+    }
+
+    template <typename T>
+    void trace<T>::process()
+    {
+        details::trace_manager<trace> manager(*this);
+        return manager.process();
     }
 
     template <typename T>
