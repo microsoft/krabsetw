@@ -61,6 +61,22 @@ namespace krabs { namespace kernel {
         EVENT_TRACE_FLAG_DISK_IO_INIT,
         krabs::guids::disk_io);
 
+	/**
+	* <summary>A provider that enables file io events</summary>
+	*/
+	CREATE_CONVENIENCE_KERNEL_PROVIDER(
+		file_io_provider,
+		EVENT_TRACE_FLAG_FILE_IO,
+		krabs::guids::file_io);
+
+	/**
+	* <summary>A provider that enables file io events</summary>
+	*/
+	CREATE_CONVENIENCE_KERNEL_PROVIDER(
+		file_init_io_provider,
+		EVENT_TRACE_FLAG_FILE_IO_INIT,
+		krabs::guids::file_io);
+
     /**
      * <summary>A provider that enables thread dispatch events.</summary>
      */
