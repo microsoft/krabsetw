@@ -187,7 +187,7 @@ namespace krabs { namespace kernel {
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         system_call_provider,
         EVENT_TRACE_FLAG_SYSTEMCALL,
-        krabs::guids::system_trace);
+        krabs::guids::perf_info);
 
     /**
      * <summary>A provider that enables thread start and stop events.</summary>
