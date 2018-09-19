@@ -370,6 +370,28 @@ namespace krabs {
     , trace_flags_(0)
     {}
 
+
+    inline void check_com_hr(HRESULT hr) {
+        if (FAILED(hr)) {
+            std::stringstream stream;
+            stream << "Error in creating instance of trace providers";
+            stream << ", hr = 0x";
+            stream << std::hex << hr;
+            throw std::runtime_error(stream.str());
+        }
+    }
+
+    inline void check_provider_hr(HRESULT hr, const std::wstring &providerName) {
+        if (FAILED(hr)) {
+            std::stringstream stream;
+            stream << "Error in constructing guid from provider name (";
+            stream << providerName.c_str();
+            stream << "), hr = 0x";
+            stream << std::hex << hr;
+            throw std::runtime_error(stream.str());
+        }
+    }
+
     template <typename T>
     provider<T>::provider(const std::wstring &providerName)
     {
@@ -438,30 +460,6 @@ namespace krabs {
         CoUninitialize();
     }
 
-    inline void check_com_hr(HRESULT hr)
-    {
-        if (FAILED(hr)) {
-            std::stringstream stream;
-            stream << "Error in creating instance of trace providers";
-            stream << ", hr = 0x";
-            stream << std::hex << hr;
-            throw std::runtime_error(stream.str());
-        }
-    }
-
-    inline void check_provider_hr(HRESULT hr, const std::wstring &providerName)
-    {
-        if (FAILED(hr)) {
-            std::stringstream stream;
-            stream << "Error in constructing guid from provider name (";
-            stream << providerName.c_str();
-            stream << "), hr = 0x";
-            stream << std::hex << hr;
-            throw std::runtime_error(stream.str());
-        }
-    }
-
-
     template <typename T>
     void provider<T>::any(T any)
     {
@@ -494,7 +492,7 @@ namespace krabs {
         tmp.all_            = static_cast<ULONGLONG>(all_);
         tmp.level_          = static_cast<UCHAR>(level_);
         tmp.trace_flags_    = static_cast<UCHAR>(trace_flags_);
-        tmp.callbacks_      = callbacks_;
+        tmp.callbacks_      = this.callbacks_;
 
         return tmp;
     }
