@@ -117,8 +117,8 @@ namespace krabs {
         {
             if (propertyInfo.nonStructType.InType == TDH_INTYPE_UNICODESTRING)
             {
-                const wchar_t* p = (const wchar_t*)propertyStart;
-                const wchar_t* pEnd = (const wchar_t*)pRecordEnd;
+                auto p = (const wchar_t*)propertyStart;
+                auto pEnd = (const wchar_t*)pRecordEnd;
                 while (p < pEnd) {
                     if (!*p++) {
                         break;
@@ -128,8 +128,8 @@ namespace krabs {
             }
             else if (propertyInfo.nonStructType.InType == TDH_INTYPE_ANSISTRING)
             {
-                const char* p = (const char*)propertyStart;
-                const char* pEnd = (const char*)pRecordEnd;
+                auto p = (const char*)propertyStart;
+                auto pEnd = (const char*)pRecordEnd;
                 while (p < pEnd) {
                     if (!*p++) {
                         break;
