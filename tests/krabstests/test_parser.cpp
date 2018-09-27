@@ -121,5 +121,24 @@ namespace krabstests
             Assert::AreEqual((BYTE)'T', data.bytes()[0]);
         }
 #endif
+
+        TEST_METHOD(parse_unicode_string_should_work_when_unicode_string_property_is_last_and_not_null_terminated)
+        {
+            std::wstring expectedUrl(L"https://www.foo.com/api/v1/health/check");
+
+            krabs::guid httpsys(L"{dd5ef90a-6398-47a4-ad34-4dcecdef795f}");
+            // httpsys: parse event
+            krabs::testing::record_builder builder(httpsys, krabs::id(2), 0U, 12, true);
+            builder.add_properties()
+                (L"Url", expectedUrl);
+
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record);
+            krabs::parser parser(schema);
+
+            auto url = parser.parse<std::wstring>(L"Url");
+
+            Assert::AreEqual(expectedUrl, url);
+        }
     };
 }

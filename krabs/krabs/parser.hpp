@@ -179,13 +179,15 @@ namespace krabs {
             property_info propInfo(pBufferIndex_, currentPropInfo, propertyLength);
             cache_property(pName, propInfo);
 
+            // advance the buffer index since we've already processed this property
+            pBufferIndex_ += propertyLength;
+
             // The property was found, return it
             if (name == pName) {
+                // advance the index since we've already processed this property
+                ++i;
                 return propInfo;
             }
-
-            // Not found yet, advance the buffer index and try again
-            pBufferIndex_ += propertyLength;
         }
 
         // property wasn't found, return an empty propInfo
