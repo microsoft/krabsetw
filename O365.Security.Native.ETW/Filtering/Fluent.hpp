@@ -90,5 +90,18 @@ namespace O365 { namespace Security { namespace ETW {
         {
             return Predicate::make_predicate<krabs::predicates::process_id_is>(processId);
         }
+
+		/// <summary>
+		/// Used to verify that an event was emitted with a specific UInt32 property.
+		/// </summary>
+		/// <param name="propertyName">the name of the property to match on</param>
+		/// <param name="value">the value of the property to match on</param>
+		/// <returns>a predicate that matches events of the specified UInt32 property</returns>
+		static Predicate ^IsUInt32(String ^propertyName, UInt32 value)
+		{
+			return gcnew Predicate(krabs::predicates::property_is<UInt32>(
+				msclr::interop::marshal_as<std::wstring>(propertyName),
+				value));
+		}
     };
 } } }

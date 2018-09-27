@@ -107,7 +107,7 @@ namespace krabs { namespace details {
         // TODO: Only forward the calls that are requested to each provider.
         for (auto &provider : trace.providers_) {
             if (providerFlags.find(provider.get().guid_) != providerFlags.end()) {
-                providerFlags[provider.get().guid_] = std::make_tuple (0, 0, 0, 0);
+                providerFlags[provider.get().guid_] = std::make_tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> (0, 0, 0, 0);
             }
 
             std::get<0>(providerFlags[provider.get().guid_]) |= provider.get().level_;

@@ -75,7 +75,9 @@
     <Compile Include="describe_Proxy.cs" />
     <Compile Include="Events\ImageLoadEvent.cs" />
     <Compile Include="Events\PowerShellEvent.cs" />
+    <Compile Include="Events\LogonEvent.cs" />
     <Compile Include="Events\WinINetEvent.cs" />
+    <Compile Include="Filtering\describe_Fluent.cs" />
     <Compile Include="Filtering\describe_AnsiString.cs" />
     <Compile Include="Filtering\describe_Predicate.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -322,7 +322,7 @@ namespace krabs { namespace testing {
                 // properties manually.
                 results.second.emplace_back(prop.name());
                 std::fill_n(std::back_inserter(results.first),
-                            details::how_many_bytes_to_fill(prop.type()), 0);
+                            details::how_many_bytes_to_fill(prop.type()), static_cast<UCHAR>(0));
             }
         }
 
