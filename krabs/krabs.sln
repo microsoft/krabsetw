@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.27428.2027
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{5C9E224B-AEB7-456B-B309-92292ACE1A0D}"
 	ProjectSection(SolutionItems) = preProject
@@ -138,5 +138,8 @@ Global
 		{600CFE03-FD84-4323-9439-839D81C31972} = {C4AB7F5F-2FB3-4C16-A1F3-F6700C655B02}
 		{32E71DD0-D11A-44DE-8CA8-572995AF2373} = {2E00634C-7E8B-4656-9505-78FF2F5D0EDD}
 		{D31B1A4B-8282-4AED-99FC-9AA5974B9134} = {2E00634C-7E8B-4656-9505-78FF2F5D0EDD}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {82BAA012-2EF9-4303-A429-CDA3655D5009}
 	EndGlobalSection
 EndGlobal

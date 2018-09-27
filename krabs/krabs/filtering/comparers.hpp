@@ -96,7 +96,7 @@ namespace krabs { namespace predicates {
             bool operator()(const T& a, const T& b)
             {
                 static_assert(sizeof(T) == 0,
-                    "iequal_to needs a specialized overload for type")
+                    "iequal_to needs a specialized overload for type");
             }
         };
 
