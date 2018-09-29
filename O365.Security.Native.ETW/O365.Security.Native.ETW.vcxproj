@@ -68,7 +68,7 @@
     <EmbedManifest>false</EmbedManifest>
     <IncludePath>$(SolutionDir);$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LinkIncremental>true</LinkIncremental>
-    <LinkKeyFile>$(SolutionDir)..\O365.Security.snk</LinkKeyFile>
+    <LinkKeyFile>$(SolutionDir)..\35MSSharedLib1024.snk</LinkKeyFile>
     <LinkDelaySign>true</LinkDelaySign>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -78,7 +78,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigning|x64'">
     <IncludePath>$(SolutionDir);$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
-    <LinkKeyFile>$(SolutionDir)..\O365.Security.snk</LinkKeyFile>
+    <LinkKeyFile>$(SolutionDir)..\35MSSharedLib1024.snk</LinkKeyFile>
     <LinkDelaySign>true</LinkDelaySign>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -96,7 +96,7 @@
       <AssemblyDebug>true</AssemblyDebug>
     </Link>
     <PreBuildEvent>
-      <Command>if not exist $(SolutionDir)..\O365.Security.snk sn.exe -k $(SolutionDir)..\O365.Security.snk</Command>
+      <Command>if not exist $(SolutionDir)..\35MSSharedLib1024.snk sn.exe -k $(SolutionDir)..\35MSSharedLib1024.snk</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Verify snk file is generated</Message>
@@ -120,7 +120,7 @@
       <AssemblyDebug>true</AssemblyDebug>
     </Link>
     <PreBuildEvent>
-      <Command>if not exist $(SolutionDir)..\O365.Security.snk sn.exe -k $(SolutionDir)..\O365.Security.snk</Command>
+      <Command>if not exist $(SolutionDir)..\35MSSharedLib1024.snk sn.exe -k $(SolutionDir)..\35MSSharedLib1024.snk</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Verify snk file is generated</Message>
@@ -151,7 +151,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>if not exist $(SolutionDir)..\O365.Security.snk sn.exe -k $(SolutionDir)..\O365.Security.snk</Command>
+      <Command>if not exist $(SolutionDir)..\35MSSharedLib1024.snk sn.exe -k $(SolutionDir)..\35MSSharedLib1024.snk</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Verify snk file is generated</Message>
@@ -172,7 +172,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>if not exist $(SolutionDir)..\O365.Security.snk sn.exe -k $(SolutionDir)..\O365.Security.snk</Command>
+      <Command>if not exist $(SolutionDir)..\35MSSharedLib1024.snk sn.exe -k $(SolutionDir)..\35MSSharedLib1024.snk</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Verify snk file is generated</Message>
