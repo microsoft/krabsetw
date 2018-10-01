@@ -41,7 +41,7 @@ The expected output is:
 Microsoft (R) .NET Framework Strong Name Utility  Version 4.0.30319.0
 Copyright (c) Microsoft Corporation.  All rights reserved.
 
-Public key token is bc3a2e4ba4c5fbd5
+Public key token is 31bf3856ad364e35
 ```
 
 Community & Contact
