@@ -5,7 +5,7 @@
 
 #include <krabs.hpp>
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Selected statistics about an ETW trace
@@ -46,4 +46,4 @@ namespace O365 { namespace Security { namespace ETW {
         { }
     };
 
-} } }
+} } } }

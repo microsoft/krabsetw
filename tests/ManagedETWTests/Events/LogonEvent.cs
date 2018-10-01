@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
-using O365.Security.ETW.Testing;
+using Microsoft.O365.Security.ETW.Testing;
 
 namespace EtwTestsCS.Events
 {

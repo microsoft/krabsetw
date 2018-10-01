@@ -10,7 +10,7 @@ using namespace System;
 using namespace System::Net;
 using namespace System::Runtime::InteropServices;
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Interface for handling records in C#. Abstracts
@@ -394,4 +394,4 @@ namespace O365 { namespace Security { namespace ETW {
         bool TryGetBinary(String^ name, [Out] array<Byte>^% result);
     };
 
-} } }
+} } } }

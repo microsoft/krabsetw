@@ -12,11 +12,11 @@ using namespace System::Security::Permissions;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 //
-[assembly:AssemblyTitleAttribute(L"O365.Security.Native.ETW")];
+[assembly:AssemblyTitleAttribute(L"Microsoft.O365.Security.Native.ETW")];
 [assembly:AssemblyDescriptionAttribute(L"")];
 [assembly:AssemblyConfigurationAttribute(L"")];
 [assembly:AssemblyCompanyAttribute(L"Microsoft")];
-[assembly:AssemblyProductAttribute(L"O365.Security.Native.ETW")];
+[assembly:AssemblyProductAttribute(L"Microsoft.O365.Security.Native.ETW")];
 [assembly:AssemblyCopyrightAttribute(L"Copyright (c) 2016")];
 [assembly:AssemblyTrademarkAttribute(L"")];
 [assembly:AssemblyCultureAttribute(L"")];

@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace O365 { namespace Security { namespace ETW { namespace Testing {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW { namespace Testing {
 
     public enum class EventHeaderFlags : uint16_t
     {
@@ -51,4 +51,4 @@ namespace O365 { namespace Security { namespace ETW { namespace Testing {
 
 
 
-} /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */
+} /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */ } /* namespace Microsoft */

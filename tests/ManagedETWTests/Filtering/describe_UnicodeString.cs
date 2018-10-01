@@ -4,7 +4,7 @@
 using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-using O365.Security.ETW;
+using Microsoft.O365.Security.ETW;
 
 namespace EtwTestsCS.Filtering
 {

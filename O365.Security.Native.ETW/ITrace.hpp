@@ -8,7 +8,7 @@
 #include "RawProvider.hpp"
 #include "TraceStats.hpp"
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Represents a instance of an ETW trace session.
@@ -65,4 +65,4 @@ namespace O365 { namespace Security { namespace ETW {
         void Enable(KernelProvider^ provider);
     };
 
-} } }
+} } } }

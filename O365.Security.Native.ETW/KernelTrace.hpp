@@ -18,7 +18,7 @@
 using namespace System;
 using namespace System::Runtime::InteropServices;
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Represents an owned user trace.
@@ -171,4 +171,4 @@ namespace O365 { namespace Security { namespace ETW {
         return TraceStats(trace_->query_stats());
     }
 
-} } }
+} } } }

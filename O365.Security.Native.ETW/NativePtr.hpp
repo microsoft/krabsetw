@@ -15,7 +15,7 @@
 
 using namespace System;
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Wraps an unmanaged ptr in a managed type. This allows unmanaged types
@@ -159,5 +159,5 @@ namespace O365 { namespace Security { namespace ETW {
         }
     };
 
-} } }
+} } } }
 #pragma warning(pop)

@@ -9,7 +9,7 @@
 #include "../NativePtr.hpp"
 #include "SynthRecord.hpp"
 
-namespace O365 { namespace Security { namespace ETW { namespace Testing {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW { namespace Testing {
 
     /// <summary>
     /// Enables creation of synthetic events in order to test client code.
@@ -173,5 +173,4 @@ namespace O365 { namespace Security { namespace ETW { namespace Testing {
         builder_->add_properties()(propName, value);
     }
 
-} /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */
-
+} /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */ } /* namespace Microsoft */

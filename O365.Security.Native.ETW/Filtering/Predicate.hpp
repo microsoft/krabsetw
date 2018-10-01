@@ -6,7 +6,7 @@
 #include <krabs.hpp>
 #include "../Testing/SynthRecord.hpp"
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     namespace KP = krabs::predicates;
     namespace KPD = krabs::predicates::details;
@@ -109,4 +109,4 @@ namespace O365 { namespace Security { namespace ETW {
         NativePtr<krabs::filter_predicate> predicate_;
     };
 
-} } }
+} } } }

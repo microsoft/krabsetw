@@ -5,7 +5,7 @@
 
 #include "IEventRecordMetadata.hpp"
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Item passed to OnError handlers when an error is encountered
@@ -50,4 +50,4 @@ namespace O365 { namespace Security { namespace ETW {
         { }
     };
 
-} } }
+} } } }

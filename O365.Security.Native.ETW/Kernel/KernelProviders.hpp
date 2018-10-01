@@ -5,7 +5,7 @@
 
 #include <krabs/kernel_providers.hpp>
 
-namespace O365 { namespace Security { namespace ETW { namespace Kernel {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW { namespace Kernel {
 
 
 #define CREATE_CONVENIENCE_KERNEL_PROVIDER(__name__, __value__, __guid__)     \
@@ -124,4 +124,4 @@ namespace O365 { namespace Security { namespace ETW { namespace Kernel {
 
 #undef CREATE_CONVENIENCE_KERNEL_PROVIDER
 
-} } } }
+} } } } }

@@ -6,7 +6,7 @@ Overview
 
 **krabsetw** also provides code to simplify parsing generic event data into strongly typed data types.
 
-**O365.Security.Native.ETW** is a C++ CLI (.NET) wrapper around **krabsetw**. It provides the same functionality as **krabsetw** to .NET applications and is used in production by the ODSP Security team. It's affectionately referred to as **Lobsters**.
+**Microsoft.O365.Security.Native.ETW** is a C++ CLI (.NET) wrapper around **krabsetw**. It provides the same functionality as **krabsetw** to .NET applications and is used in production by the Office 365 Security team. It's affectionately referred to as **Lobsters**.
 
 Examples & Documentation
 ========
@@ -19,22 +19,22 @@ Examples & Documentation
 
 Important Notes
 ==============
-* `krabsetw` and `O365.Security.Native.ETW` only support x64. No effort has been made to support x86.
-* `krabsetw` and `O365.Security.Native.ETW` are only supported on Windows 7 or Windows 2008R2 machines and above.
-* Throwing exceptions in the event handler callback or krabsetw or O365.Security.Native.ETW will cause the trace to stop processing events.
+* `krabsetw` and `Microsoft.O365.Security.Native.ETW` only support x64. No effort has been made to support x86.
+* `krabsetw` and `Microsoft.O365.Security.Native.ETW` are only supported on Windows 7 or Windows 2008R2 machines and above.
+* Throwing exceptions in the event handler callback or krabsetw or Microsoft.O365.Security.Native.ETW will cause the trace to stop processing events.
 * The call to "start" on the trace object is blocking so thread management may be necessary.
 * The Visual Studio solution is krabs\krabs.sln.
 * When building a native code binary using the `krabsetw` package, please refer to the [compilation readme](krabs/Readme.txt) for notes about the TYPEASSERT and NDEBUG compilation flags.
 
 NuGet Packages
 ==============
-NuGet packages are available both for the krabsetw C++ headers and the O365.Security.Native.ETW .NET library:
-* https://www.nuget.org/packages/O365.Security.Native.ETW/
-* https://www.nuget.org/packages/O365.Security.Native.ETW.Debug/ (for development - provides type asserts)
-* https://www.nuget.org/packages/krabsetw/
+NuGet packages are available both for the krabsetw C++ headers and the Microsoft.O365.Security.Native.ETW .NET library:
+* https://www.nuget.org/packages/Microsoft.O365.Security.Native.ETW/
+* https://www.nuget.org/packages/Microsoft.O365.Security.Native.ETW.Debug/ (for development - provides type asserts)
+* https://www.nuget.org/packages/Microsoft.O365.Security.Krabsetw/
 
 For verifying the .NET binaries, you can use the following command:
-`sn -T O365.Security.Native.ETW.dll`
+`sn -T Microsoft.O365.Security.Native.ETW.dll`
 
 The expected output is:
 ```

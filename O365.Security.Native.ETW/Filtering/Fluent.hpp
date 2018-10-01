@@ -14,7 +14,7 @@ using namespace System;
 using namespace System::Runtime::InteropServices;
 namespace adpt = krabs::predicates::adapters;
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Enables a more convenient mechanism to specify filters in
@@ -104,4 +104,4 @@ namespace O365 { namespace Security { namespace ETW {
 				value));
 		}
     };
-} } }
+} } } }
