@@ -17,8 +17,8 @@
         <tags>ETW krabs lobsters managed cppcli</tags>
     </metadata>
     <files>
-        <file src="krabs\x64\DebugSigning\O365.Security.Native.ETW.dll" target="lib\net45\O365.Security.Native.ETW.dll" />
-        <file src="krabs\x64\DebugSigning\O365.Security.Native.ETW.pdb" target="lib\net45\O365.Security.Native.ETW.pdb" />
-        <file src="krabs\x64\DebugSigning\O365.Security.Native.ETW.xml" target="lib\net45\O365.Security.Native.ETW.xml" />
+        <file src="krabs\x64\DebugSigning\Microsoft.O365.Security.Native.ETW.dll" target="lib\net45\Microsoft.O365.Security.Native.ETW.dll" />
+        <file src="krabs\x64\DebugSigning\Microsoft.O365.Security.Native.ETW.pdb" target="lib\net45\Microsoft.O365.Security.Native.ETW.pdb" />
+        <file src="krabs\x64\DebugSigning\Microsoft.O365.Security.Native.ETW.xml" target="lib\net45\Microsoft.O365.Security.Native.ETW.xml" />
     </files>
 </package>
