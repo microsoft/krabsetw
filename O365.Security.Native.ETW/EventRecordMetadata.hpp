@@ -10,7 +10,7 @@
 using namespace System;
 using namespace System::Runtime::InteropServices;
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Concrete implementation representing the metadata about an ETW event record.
@@ -156,4 +156,4 @@ namespace O365 { namespace Security { namespace ETW {
 #pragma endregion
     };
 
-} } }
+} } } }

@@ -5,7 +5,7 @@
 
 using namespace System;
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
 
     /// <summary>
@@ -109,4 +109,4 @@ namespace O365 { namespace Security { namespace ETW {
 #pragma endregion
     };
 
-} } }
+} } } }

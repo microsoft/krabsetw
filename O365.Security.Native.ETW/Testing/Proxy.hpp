@@ -8,7 +8,7 @@
 #include "SynthRecord.hpp"
 
 
-namespace O365 { namespace Security { namespace ETW { namespace Testing {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW { namespace Testing {
 
 
     /// <summary>
@@ -85,4 +85,4 @@ namespace O365 { namespace Security { namespace ETW { namespace Testing {
             proxy.push_event(*rec);
         }
     }
-} /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */
+} /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */ } /* namespace Microsoft */

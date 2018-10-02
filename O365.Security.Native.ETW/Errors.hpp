@@ -3,7 +3,7 @@
 
 #pragma once
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Thrown when the ETW trace object is already registered.
@@ -67,4 +67,4 @@ namespace O365 { namespace Security { namespace ETW {
             throw gcnew NoTraceSessionsRemaining; \
         } \
 
-} } }
+} } } }

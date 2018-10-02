@@ -6,7 +6,7 @@
 #include <krabs.hpp>
 #include "../Guid.hpp"
 
-namespace O365 { namespace Security { namespace ETW { namespace Testing {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW { namespace Testing {
 
     /// <summary>
     /// Represents a property that is faked -- one that is built by hand for
@@ -111,4 +111,4 @@ namespace O365 { namespace Security { namespace ETW { namespace Testing {
     : record_(record)
     { }
 
-} /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */
+} /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */ } /* namespace Microsoft */

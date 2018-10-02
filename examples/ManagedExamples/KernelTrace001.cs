@@ -5,8 +5,8 @@
 // a notice whenever a binary image (executable or DLL) is loaded.
 
 using System;
-using O365.Security.ETW;
-using Kernel = O365.Security.ETW.Kernel;
+using Microsoft.O365.Security.ETW;
+using Kernel = Microsoft.O365.Security.ETW.Kernel;
 
 namespace ManagedExamples
 {

@@ -5,7 +5,7 @@
 // invocations.
 
 using System;
-using O365.Security.ETW;
+using Microsoft.O365.Security.ETW;
 
 namespace ManagedExamples
 {

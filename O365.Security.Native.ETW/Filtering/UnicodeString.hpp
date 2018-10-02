@@ -16,7 +16,7 @@ using namespace System;
 using namespace System::Runtime::InteropServices;
 namespace adapt = krabs::predicates::adapters;
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Fluent filters for ANSI String properties
@@ -127,4 +127,4 @@ namespace O365 { namespace Security { namespace ETW {
                 msclr::interop::marshal_as<std::wstring>(value)));
         }
     };
-} } }
+} } } }

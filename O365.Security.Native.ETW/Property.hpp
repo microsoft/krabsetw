@@ -8,7 +8,7 @@
 #include "NativePtr.hpp"
 #include <cassert>
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     using namespace System::Collections::Generic;
 
@@ -179,4 +179,4 @@ namespace O365 { namespace Security { namespace ETW {
     {
     }
 
-} /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */
+} /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */ } /* namespace Microsoft */

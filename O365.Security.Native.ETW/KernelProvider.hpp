@@ -14,7 +14,7 @@
 using namespace System;
 using namespace System::Runtime::InteropServices;
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Represents a kernel trace provider and its configuration.
@@ -134,4 +134,4 @@ namespace O365 { namespace Security { namespace ETW {
         }
     }
 
-} } }
+} } } }

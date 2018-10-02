@@ -4,8 +4,8 @@
 using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-using O365.Security.ETW;
-using O365.Security.ETW.Testing;
+using Microsoft.O365.Security.ETW;
+using Microsoft.O365.Security.ETW.Testing;
 
 namespace EtwTestsCS
 {

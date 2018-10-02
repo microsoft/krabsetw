@@ -18,7 +18,7 @@ using namespace System::Runtime::InteropServices;
 
 using namespace msclr::interop;
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// EventRecord represents a managed instance of an event from ETW.
@@ -763,4 +763,4 @@ namespace O365 { namespace Security { namespace ETW {
         }
     };
 
-} } }
+} } } }

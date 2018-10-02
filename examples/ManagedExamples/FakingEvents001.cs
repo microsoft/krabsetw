@@ -5,8 +5,8 @@
 // for generating fake events that can be used to test client code.
 
 using System;
-using O365.Security.ETW;
-using Testing = O365.Security.ETW.Testing;
+using Microsoft.O365.Security.ETW;
+using Testing = Microsoft.O365.Security.ETW.Testing;
 
 namespace ManagedExamples
 {
@@ -15,10 +15,10 @@ namespace ManagedExamples
         public static void Start()
         {
             // The usual suspects for setting up the trace...
-            var trace = new O365.Security.ETW.UserTrace("My Named Trace");
+            var trace = new Microsoft.O365.Security.ETW.UserTrace("My Named Trace");
 
             var powershellGuid = Guid.Parse("{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
-            var powershellProvider = new O365.Security.ETW.Provider(powershellGuid);
+            var powershellProvider = new Microsoft.O365.Security.ETW.Provider(powershellGuid);
             powershellProvider.Any = Provider.AllBitsSet;
 
             powershellProvider.OnEvent += (record) =>

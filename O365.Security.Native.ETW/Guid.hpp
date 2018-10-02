@@ -5,7 +5,7 @@
 
 #include <krabs.hpp>
 
-namespace O365 { namespace Security { namespace ETW {
+namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     /// <summary>
     /// Converts a native GUID to a System::Guid
@@ -30,4 +30,4 @@ namespace O365 { namespace Security { namespace ETW {
         return *((GUID*)data);
     }
 
-} } }
+} } } }
