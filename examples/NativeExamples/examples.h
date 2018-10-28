@@ -32,3 +32,8 @@ struct user_trace_002
 {
     static void start();
 };
+
+struct user_trace_002_no_predicates
+{
+    static void start();
+};

@@ -12,4 +12,5 @@ int main(void)
     //testing_001::start();
     //user_trace_001::start();
     //user_trace_002::start();
+	user_trace_002_no_predicates::start();
 }
