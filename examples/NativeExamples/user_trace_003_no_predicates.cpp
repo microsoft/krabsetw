@@ -10,7 +10,7 @@
 #include "..\..\krabs\krabs.hpp"
 #include "examples.h"
 
-void user_trace_002_no_predicates::start()
+void user_trace_003_no_predicates::start()
 {
     // user_trace instances should be used for any non-kernel traces that are defined
     // by components or programs in Windows. They can optionally take a name -- if none
@@ -20,8 +20,9 @@ void user_trace_002_no_predicates::start()
     // A trace can have any number of providers, which are identified by GUID. These
     // GUIDs are defined by the components that emit events, and their GUIDs can
     // usually be found with various ETW tools (like wevutil).
-    krabs::provider<> provider(krabs::guid(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}"));
-    provider.any(0xf0010000000003ff);
+
+	//listen for file events
+    krabs::provider<> provider(krabs::guid(L"{EDD08927-9CC4-4E65-B970-C2560FB5C289}"));
 
     // In user_trace_001.cpp, we manually filter events by checking the event information
     // in our callback functions. In this example, we're going to use a provider filter
@@ -34,13 +35,15 @@ void user_trace_002_no_predicates::start()
 
     // krabs provides direct native filtering - that will boost performance and not liesten 
 	//for event which not required. We'll use one of those to filter based on the event id.
-    krabs::event_filter filter(7937); //event id used without predicate, will be forwarded to API
+
+	//listen for file create event
+    krabs::event_filter filter(11); //event id used without predicate, will be forwarded to API
 
     // event_filters can have attached callbacks, just like a regular provider.
     filter.add_on_event_callback([](const EVENT_RECORD &record) {
         krabs::schema schema(record);
-        assert(schema.event_id() == 7937);
-        std::wcout << L"Event 7937 received!" << std::endl;
+        assert(schema.event_id() == 11);
+        std::wcout << L"Event 11 received!" << std::endl;
     });
 
     // event_filters are attached to providers. Events that are attached to a filter will

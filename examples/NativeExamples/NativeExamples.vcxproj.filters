@@ -34,7 +34,7 @@
     <ClCompile Include="..\..\krabs\krabs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="user_trace_002_no_predicates.cpp">
+    <ClCompile Include="user_trace_003_no_predicates.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
