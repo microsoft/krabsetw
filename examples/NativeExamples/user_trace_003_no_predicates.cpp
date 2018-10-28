@@ -36,7 +36,7 @@ void user_trace_003_no_predicates::start()
     // krabs provides direct native filtering - that will boost performance and not liesten 
 	//for event which not required. We'll use one of those to filter based on the event id.
 
-	//listen for file create event
+	//listen for file delete event
     krabs::event_filter filter(11); //event id used without predicate, will be forwarded to API
 
     // event_filters can have attached callbacks, just like a regular provider.
