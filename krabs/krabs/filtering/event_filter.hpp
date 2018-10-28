@@ -6,6 +6,7 @@
 #include <evntcons.h>
 #include <functional>
 #include <deque>
+#include <map>
 
 #include "../compiler_check.hpp"
 
@@ -51,6 +52,14 @@ namespace krabs {
 
         /**
          * <summary>
+         *   Constructs an event_filter that is setting trace native filters
+         *   events.
+         * </summary>
+         */
+		event_filter(unsigned short origEventId);
+
+        /**
+         * <summary>
          * Adds a function to call when an event for this filter is fired.
          * </summary>
          */
@@ -61,6 +70,11 @@ namespace krabs {
 
         template <typename U>
         void add_on_event_callback(const U &callback);
+
+		unsigned short OrigEventId()const
+		{
+			return m_OrigEventId;
+		}
 
     private:
 
@@ -74,7 +88,8 @@ namespace krabs {
 
     private:
         std::deque<provider_callback> callbacks_;
-        filter_predicate predicate_;
+		filter_predicate predicate_{ nullptr };
+		unsigned short m_OrigEventId{ 0 };
 
     private:
         template <typename T>
@@ -86,8 +101,12 @@ namespace krabs {
     // Implementation
     // ------------------------------------------------------------------------
 
-    inline event_filter::event_filter(filter_predicate predicate)
-    : predicate_(predicate)
+    inline event_filter::event_filter(filter_predicate predicate): 
+		predicate_(predicate)
+    {}
+
+    inline event_filter::event_filter(unsigned short origEventId): 
+		m_OrigEventId(origEventId)
     {}
 
     inline void event_filter::add_on_event_callback(c_provider_callback callback)
@@ -123,9 +142,14 @@ namespace krabs {
             return;
         }
 
-        if (!predicate_(record)) {
-            return;
-        }
+		if(predicate_ != nullptr) //only if predicate exists... else trust the native filtering
+		{
+			//software filtering is on 
+			if(!predicate_(record))
+			{
+				return; 
+			}
+		}//else this filter is set using native etw filtering...
 
         for (auto &callback : callbacks_) {
             callback(record);
