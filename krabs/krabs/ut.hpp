@@ -125,7 +125,7 @@ namespace krabs { namespace details {
 
 			for(const auto& filter : provider.get().filters_)
 			{
-				if(filter.OrigEventId() > 0)
+				if (filter.OrigEventId() > 0)
 				{
 					//native id existing, set native filters
 					providerFlags[provider.get().guid_].m_OrigEventIds.push_back(filter.OrigEventId());
@@ -147,7 +147,7 @@ namespace krabs { namespace details {
 			EVENT_FILTER_DESCRIPTOR filterDesc;
 			std::unique_ptr<BYTE[]> filterMemoryPtr;
 
-			if(provider.second.m_OrigEventIds.size() > 0)
+			if (provider.second.m_OrigEventIds.size() > 0)
 			{
 				//event filters existing, se native filters using API
 				parameters.FilterDescCount = 1;  

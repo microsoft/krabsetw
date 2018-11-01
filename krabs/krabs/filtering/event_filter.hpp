@@ -142,10 +142,10 @@ namespace krabs {
             return;
         }
 
-		if(predicate_ != nullptr) //only if predicate exists... else trust the native filtering
+		if (predicate_ != nullptr) //only if predicate exists... else trust the native filtering
 		{
 			//software filtering is on 
-			if(!predicate_(record))
+			if (!predicate_(record))
 			{
 				return; 
 			}
