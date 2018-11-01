@@ -20,13 +20,13 @@ namespace krabs { namespace details {
 
         typedef krabs::provider<> provider_type;
 		
-		struct FilterSettings
+		struct filter_settings
 		{
 			std::vector<unsigned short> provider_filter_event_ids_;
-			std::tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> flagsTuple;
+			std::tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> flags_tuple_;
 		};
 
-		typedef std::map<krabs::guid, FilterSettings> ProvidersFilterSettings;
+		typedef std::map<krabs::guid, filter_settings> provider_filter_settings;
         /**
          * <summary>
          *   Used to assign a name to the trace instance that is being
@@ -106,33 +106,33 @@ namespace krabs { namespace details {
 	inline void ut::enable_providers(
 		const krabs::trace<krabs::details::ut> &trace)
     {
-		ProvidersFilterSettings	providerFlags;
+		provider_filter_settings provider_flags;
 
 		// This function essentially takes the union of all the provider flags
 		// for a given provider GUID. This comes about when multiple providers
 		// for the same GUID are provided and request different provider flags.
 		// TODO: Only forward the calls that are requested to each provider.
         for (auto &provider : trace.providers_) {
-            if (providerFlags.find(provider.get().guid_) != providerFlags.end()) {
-                providerFlags[provider.get().guid_].flagsTuple = std::make_tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> (0, 0, 0, 0);
+            if (provider_flags.find(provider.get().guid_) != provider_flags.end()) {
+                provider_flags[provider.get().guid_].flags_tuple_ = std::make_tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> (0, 0, 0, 0);
             }
 
-			std::get<0>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().level_;
-			std::get<1>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().any_;
-			std::get<2>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().all_;
-			std::get<3>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().trace_flags_;
+			std::get<0>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().level_;
+			std::get<1>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().any_;
+			std::get<2>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().all_;
+			std::get<3>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().trace_flags_;
 
 			for(const auto& filter : provider.get().filters_)
 			{
 				if (filter.OrigEventId() > 0)
 				{
 					//native id existing, set native filters
-					providerFlags[provider.get().guid_].provider_filter_event_ids_.push_back(filter.OrigEventId());
+					provider_flags[provider.get().guid_].provider_filter_event_ids_.push_back(filter.OrigEventId());
 				}
 			}
 		}
 
-		for (auto &provider : providerFlags) {
+		for (auto &provider : provider_flags) {
 			//compose native event params by native events ids 
 			ENABLE_TRACE_PARAMETERS parameters;
 			ZeroMemory(&parameters, sizeof(parameters));
@@ -140,7 +140,7 @@ namespace krabs { namespace details {
 			parameters.SourceId = provider.first;
 
 			GUID guid = provider.first;
-			parameters.EnableProperty = std::get<3>(provider.second.flagsTuple);
+			parameters.EnableProperty = std::get<3>(provider.second.flags_tuple_);
 			parameters.EnableFilterDesc = nullptr;
 			parameters.FilterDescCount = 0;
 			EVENT_FILTER_DESCRIPTOR filterDesc;
@@ -174,9 +174,9 @@ namespace krabs { namespace details {
 			ULONG status = EnableTraceEx2(trace.registrationHandle_,
 										&guid,
 										EVENT_CONTROL_CODE_ENABLE_PROVIDER,
-										std::get<0>(provider.second.flagsTuple),
-										std::get<1>(provider.second.flagsTuple),
-										std::get<2>(provider.second.flagsTuple),
+										std::get<0>(provider.second.flags_tuple_),
+										std::get<1>(provider.second.flags_tuple_),
+										std::get<2>(provider.second.flags_tuple_),
 										0,
 										&parameters);
 			UNREFERENCED_PARAMETER(status);
