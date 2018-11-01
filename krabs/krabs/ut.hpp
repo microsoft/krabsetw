@@ -20,8 +20,7 @@ namespace krabs { namespace details {
 
         typedef krabs::provider<> provider_type;
 		
-		struct filter_settings
-		{
+		struct filter_settings{
 			std::vector<unsigned short> provider_filter_event_ids_;
 			std::tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> flags_tuple_;
 		};
