@@ -1,7 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-// This example doing the same as user_trace_002 but using native events filtering (not a predicates)
+// Krabs supports provider filtering based on ETW API filtering features.
+// This example listening for file delete event.
 //
 
 #include <iostream>
@@ -24,20 +25,13 @@ void user_trace_003_no_predicates::start()
 	//listen for file events
     krabs::provider<> provider(krabs::guid(L"{EDD08927-9CC4-4E65-B970-C2560FB5C289}"));
 
-    // In user_trace_001.cpp, we manually filter events by checking the event information
-    // in our callback functions. In this example, we're going to use a provider filter
-    // to do this for us.
+    // In user_trace_001.cpp we manually filter events by checking the event information
+	// In user_trace_002.cpp we filter events using provider predicates
+    // In this example, we're going to use a provider filter based on ETW filtering features
 
-    // We instantiate an event_filter first. An event_filter is created with a
-    // predicate -- literally just a function that does some check on an EVENT_RECORD
-    // and returns a boolean -- true when the event should be passed on to callbacks,
-    // and false otherwise.
-
-    // krabs provides direct native filtering - that will boost performance and not liesten 
-	//for event which not required. We'll use one of those to filter based on the event id.
-
-	//listen for file delete event
-    krabs::event_filter filter(11); //event id used without predicate, will be forwarded to API
+	// We instantiate an event_filter first. An event_filter is created with a
+    // event id which will be forwarded as filter to etw tracing api
+    krabs::event_filter filter(11);
 
     // event_filters can have attached callbacks, just like a regular provider.
     filter.add_on_event_callback([](const EVENT_RECORD &record) {
