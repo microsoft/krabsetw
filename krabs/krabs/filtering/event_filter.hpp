@@ -48,7 +48,7 @@ namespace krabs {
          *   events.
          * </summary>
          */
-        event_filter(filter_predicate predicate);
+		event_filter(filter_predicate predicate);
 
         /**
          * <summary>
@@ -105,9 +105,9 @@ namespace krabs {
 		predicate_(predicate)
     {}
 
-    inline event_filter::event_filter(unsigned short origEventId): 
+	inline event_filter::event_filter(unsigned short origEventId):
 		m_OrigEventId(origEventId)
-    {}
+	{}
 
     inline void event_filter::add_on_event_callback(c_provider_callback callback)
     {

@@ -99,29 +99,29 @@ namespace krabs { namespace details {
     }
 
     inline const unsigned long ut::construct_enable_flags(
-        const krabs::trace<krabs::details::ut> &)
+		const krabs::trace<krabs::details::ut> &)
     {
-        return 0;
-    }
+		return 0;
+	}
 
-    inline void ut::enable_providers(
-        const krabs::trace<krabs::details::ut> &trace)
+	inline void ut::enable_providers(
+		const krabs::trace<krabs::details::ut> &trace)
     {
-        ProvidersFilterSettings	providerFlags;
+		ProvidersFilterSettings	providerFlags;
 
-        // This function essentially takes the union of all the provider flags
-        // for a given provider GUID. This comes about when multiple providers
-        // for the same GUID are provided and request different provider flags.
-        // TODO: Only forward the calls that are requested to each provider.
+		// This function essentially takes the union of all the provider flags
+		// for a given provider GUID. This comes about when multiple providers
+		// for the same GUID are provided and request different provider flags.
+		// TODO: Only forward the calls that are requested to each provider.
         for (auto &provider : trace.providers_) {
             if (providerFlags.find(provider.get().guid_) != providerFlags.end()) {
                 providerFlags[provider.get().guid_].flagsTuple = std::make_tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> (0, 0, 0, 0);
             }
 
-            std::get<0>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().level_;
-            std::get<1>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().any_;
-            std::get<2>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().all_;
-            std::get<3>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().trace_flags_;
+			std::get<0>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().level_;
+			std::get<1>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().any_;
+			std::get<2>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().all_;
+			std::get<3>(providerFlags[provider.get().guid_].flagsTuple) |= provider.get().trace_flags_;
 
 			for(const auto& filter : provider.get().filters_)
 			{
@@ -131,19 +131,19 @@ namespace krabs { namespace details {
 					providerFlags[provider.get().guid_].m_OrigEventIds.push_back(filter.OrigEventId());
 				}
 			}
-        }
+		}
 
-        for (auto &provider : providerFlags) {
+		for (auto &provider : providerFlags) {
 			//compose native event params by native events ids 
 			ENABLE_TRACE_PARAMETERS parameters;
 			ZeroMemory(&parameters, sizeof(parameters));
-            parameters.Version = ENABLE_TRACE_PARAMETERS_VERSION_2;
-            parameters.SourceId = provider.first;
+			parameters.Version = ENABLE_TRACE_PARAMETERS_VERSION_2;
+			parameters.SourceId = provider.first;
 
-            GUID guid = provider.first;
-            parameters.EnableProperty = std::get<3>(provider.second.flagsTuple);
-            parameters.EnableFilterDesc = nullptr;
-            parameters.FilterDescCount = 0;
+			GUID guid = provider.first;
+			parameters.EnableProperty = std::get<3>(provider.second.flagsTuple);
+			parameters.EnableFilterDesc = nullptr;
+			parameters.FilterDescCount = 0;
 			EVENT_FILTER_DESCRIPTOR filterDesc;
 			std::unique_ptr<BYTE[]> filterMemoryPtr;
 
@@ -172,17 +172,17 @@ namespace krabs { namespace details {
 				parameters.EnableFilterDesc = &filterDesc;
 			}
 			
-            ULONG status = EnableTraceEx2(trace.registrationHandle_,
-                                          &guid,
-                                          EVENT_CONTROL_CODE_ENABLE_PROVIDER,
-                                          std::get<0>(provider.second.flagsTuple),
-                                          std::get<1>(provider.second.flagsTuple),
-                                          std::get<2>(provider.second.flagsTuple),
-                                          0,
-                                          &parameters);
-            UNREFERENCED_PARAMETER(status);
-        }
-    }
+			ULONG status = EnableTraceEx2(trace.registrationHandle_,
+										&guid,
+										EVENT_CONTROL_CODE_ENABLE_PROVIDER,
+										std::get<0>(provider.second.flagsTuple),
+										std::get<1>(provider.second.flagsTuple),
+										std::get<2>(provider.second.flagsTuple),
+										0,
+										&parameters);
+			UNREFERENCED_PARAMETER(status);
+		}
+	}
 
     inline void ut::forward_events(
         const EVENT_RECORD &record,
