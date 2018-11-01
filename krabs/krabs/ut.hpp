@@ -26,8 +26,7 @@ namespace krabs { namespace details {
 			std::tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> flagsTuple;
 		};
 
-		using ProvidersFilterSettings = std::map<krabs::guid, FilterSettings>;
-
+		typedef std::map<krabs::guid, FilterSettings> ProvidersFilterSettings;
         /**
          * <summary>
          *   Used to assign a name to the trace instance that is being
