@@ -144,13 +144,8 @@ namespace krabs {
             return;
         }
 
-		if (predicate_ != nullptr) //only if predicate exists... else trust the etw filtering
-		{
-			//software filtering is on 
-			if (!predicate_(record))
-			{
-				return; 
-			}
+		if (predicate_ != nullptr && !predicate_(record)) {
+			return; 
 		}
 
         for (auto &callback : callbacks_) {
