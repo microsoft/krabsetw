@@ -2,7 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 // Krabs supports provider filtering based on ETW API filtering features.
-// This example listening for file delete event.
+// This example listening for file delete event together with predicate which we post
+// process event id filter with other filtering
 //
 
 #include <iostream>
@@ -11,7 +12,7 @@
 #include "..\..\krabs\krabs.hpp"
 #include "examples.h"
 
-void user_trace_003_no_predicates::start()
+void user_trace_004::start()
 {
     // user_trace instances should be used for any non-kernel traces that are defined
     // by components or programs in Windows. They can optionally take a name -- if none
@@ -33,12 +34,17 @@ void user_trace_003_no_predicates::start()
 
     // We instantiate an event_filter first. An event_filter is created with a
     // event id which will be forwarded as filter to etw tracing api
-    krabs::event_filter filter(11);
+    // predicate filtering is taking in consideration only system process
+    krabs::event_filter filter(11, krabs::predicates::process_id_is(4)); 
 
     auto cb = [](const EVENT_RECORD &record) {
         krabs::schema schema(record);
         assert(schema.event_id() == 11);
-        std::wcout << L"Event " + std::to_wstring(schema.event_id()) +  L" received!" << std::endl;
+        assert(schema.process_id() == 4);
+        std::wcout << L"Event " + 
+            std::to_wstring(schema.event_id()) +  
+            L" received for pid " + 
+            std::to_wstring(schema.process_id()) << std::endl;
     };
 
     filter.add_on_event_callback(cb);
