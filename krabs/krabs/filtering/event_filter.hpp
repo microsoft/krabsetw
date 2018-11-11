@@ -103,14 +103,14 @@ namespace krabs {
     // Implementation
     // ------------------------------------------------------------------------
 
-    inline event_filter::event_filter(filter_predicate predicate): 
-		predicate_(predicate)
+    inline event_filter::event_filter(filter_predicate predicate)
+    : predicate_(predicate)
     {}
 
-	inline event_filter::event_filter(unsigned short event_id, filter_predicate predicate/*=nullptr*/):
-		provider_filter_event_id_(event_id),
-		predicate_(predicate)
-	{}
+	inline event_filter::event_filter(unsigned short event_id, filter_predicate predicate/*=nullptr*/)
+    : provider_filter_event_id_(event_id),
+      predicate_(predicate)
+    {}
 
     inline void event_filter::add_on_event_callback(c_provider_callback callback)
     {
@@ -145,9 +145,9 @@ namespace krabs {
             return;
         }
 
-		if (predicate_ != nullptr && !predicate_(record)) {
-			return; 
-		}
+        if (predicate_ != nullptr && !predicate_(record)) {
+            return; 
+        }
 
         for (auto &callback : callbacks_) {
             callback(record);
