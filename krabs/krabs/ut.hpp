@@ -100,7 +100,7 @@ namespace krabs { namespace details {
         const krabs::trace<krabs::details::ut> &)
     {
         return 0;
-	}
+    }
 
     inline void ut::enable_providers(
         const krabs::trace<krabs::details::ut> &trace)
