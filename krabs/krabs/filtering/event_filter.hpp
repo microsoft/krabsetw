@@ -48,17 +48,17 @@ namespace krabs {
          *   events.
          * </summary>
          */
-		event_filter(filter_predicate predicate);
+        event_filter(filter_predicate predicate);
 
         /**
          * <summary>
          *   Constructs an event_filter that applies event id filtering by event_id
-		 *	 which will be added to list of filtered event 
-		 *   ids in ETW API. This way is more effective from performance point of view.
-		 *	 Given optional predicate will be applied to ETW API filtered results
+         *	 which will be added to list of filtered event 
+         *   ids in ETW API. This way is more effective from performance point of view.
+         *	 Given optional predicate will be applied to ETW API filtered results
          * </summary>
          */
-		event_filter(unsigned short event_id, filter_predicate predicate=nullptr);
+        event_filter(unsigned short event_id, filter_predicate predicate=nullptr);
 
         /**
          * <summary>
