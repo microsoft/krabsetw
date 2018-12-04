@@ -124,7 +124,7 @@ namespace krabs { namespace details {
             for (const auto& filter : provider.get().filters_) {
                 if (filter.provider_filter_event_id() > 0) {
                 	//native id existing, set native filters
-					auto provider_filter_event_ids = provider_flags[provider.get().guid_].provider_filter_event_ids_;
+					auto& provider_filter_event_ids = provider_flags[provider.get().guid_].provider_filter_event_ids_;
 					provider_filter_event_ids.push_back(filter.provider_filter_event_id()); 
                 }
             }
