@@ -28,9 +28,9 @@ void user_trace_004::start()
 
     // In user_trace_001.cpp we manually filter events by checking the event information
     // In user_trace_002.cpp we filter events using provider predicates
-    // In user_trace_003.cpp we filter with ETW filtering only without predicate
-    // In this example, we're going to use a provider filter based on ETW filtering features
-    // combined with predicate which does additional filtering
+    // In user_trace_003_no_predicates.cpp we filter with ETW filtering only without predicate
+    // In this example (user_trace_004), we're going to use both provider filter based on ETW filtering features
+    // and predicate which does additional filtering
 
     // We instantiate an event_filter first. An event_filter is created with a
     // event id which will be forwarded as filter to etw tracing api

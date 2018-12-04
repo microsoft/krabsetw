@@ -73,7 +73,7 @@ namespace std {
             const char* p = (const char*)&key;
             size_t h = 2166136261;
 
-            for(auto i = 0; i < sizeof(key); ++i)
+            for (auto i = 0; i < sizeof(key); ++i)
             {
                 h ^= (h << 5) + (h >> 2) + p[i];
             }

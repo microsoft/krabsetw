@@ -121,20 +121,18 @@ namespace krabs { namespace details {
             std::get<2>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().all_;
             std::get<3>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().trace_flags_;
 
-            for(const auto& filter : provider.get().filters_)
-            {
-                if (filter.provider_filter_event_id() > 0)
-                {
+            for (const auto& filter : provider.get().filters_) {
+                if (filter.provider_filter_event_id() > 0) {
                 	//native id existing, set native filters
-                	provider_flags[provider.get().guid_].provider_filter_event_ids_.push_back(filter.provider_filter_event_id());
+					auto provider_filter_event_ids = provider_flags[provider.get().guid_].provider_filter_event_ids_;
+					provider_filter_event_ids.push_back(filter.provider_filter_event_id()); 
                 }
             }
         }
 
         for (auto &provider : provider_flags) {
-            //compose native event params by native events ids 
             ENABLE_TRACE_PARAMETERS parameters;
-            ZeroMemory(&parameters, sizeof(parameters));
+            parameters.ControlFlags = 0;
             parameters.Version = ENABLE_TRACE_PARAMETERS_VERSION_2;
             parameters.SourceId = provider.first;
             
@@ -145,9 +143,8 @@ namespace krabs { namespace details {
             EVENT_FILTER_DESCRIPTOR filterDesc;
             std::unique_ptr<BYTE[]> filterMemoryPtr;
 
-            if (provider.second.provider_filter_event_ids_.size() > 0)
-            {
-                //event filters existing, se native filters using API
+            if (provider.second.provider_filter_event_ids_.size() > 0) {
+                //event filters existing, set native filters using API
                 parameters.FilterDescCount = 1;  
 
                 ZeroMemory(&filterDesc, sizeof(filterDesc));
@@ -160,8 +157,7 @@ namespace krabs { namespace details {
                 auto filterEventIds = reinterpret_cast<PEVENT_FILTER_EVENT_ID>(filterMemoryPtr.get());
                 filterEventIds->FilterIn = TRUE;
                 filterEventIds->Count = static_cast<USHORT>(provider.second.provider_filter_event_ids_.size());
-                for(int index=0;index<filterEventIds->Count;++index)
-                {
+                for (int index=0;index<filterEventIds->Count;++index) {
                 	filterEventIds->Events[index] = provider.second.provider_filter_event_ids_[index];
                 }
                 filterDesc.Ptr = reinterpret_cast<ULONGLONG>(filterEventIds);
