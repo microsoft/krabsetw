@@ -157,7 +157,7 @@ namespace krabs { namespace details {
                 auto filterEventIds = reinterpret_cast<PEVENT_FILTER_EVENT_ID>(filterMemoryPtr.get());
                 filterEventIds->FilterIn = TRUE;
                 filterEventIds->Count = static_cast<USHORT>(provider.second.provider_filter_event_ids_.size());
-                for (int index=0;index<filterEventIds->Count;++index) {
+                for (int index = 0; index < filterEventIds->Count; ++index) {
                 	filterEventIds->Events[index] = provider.second.provider_filter_event_ids_[index];
                 }
                 filterDesc.Ptr = reinterpret_cast<ULONGLONG>(filterEventIds);
