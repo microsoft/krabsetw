@@ -167,13 +167,13 @@ namespace krabs { namespace details {
             }
 
             ULONG status = EnableTraceEx2(trace.registrationHandle_,
-                                        &guid,
-                                        EVENT_CONTROL_CODE_ENABLE_PROVIDER,
-                                        std::get<0>(provider.second.flags_tuple_),
-                                        std::get<1>(provider.second.flags_tuple_),
-                                        std::get<2>(provider.second.flags_tuple_),
-                                        0,
-                                        &parameters);
+                                          &guid,
+                                          EVENT_CONTROL_CODE_ENABLE_PROVIDER,
+                                          std::get<0>(provider.second.flags_tuple_),
+                                          std::get<1>(provider.second.flags_tuple_),
+                                          std::get<2>(provider.second.flags_tuple_),
+                                          0,
+                                          &parameters);
             UNREFERENCED_PARAMETER(status);
         }
     }
