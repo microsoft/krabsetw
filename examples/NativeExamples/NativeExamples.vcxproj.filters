@@ -34,6 +34,12 @@
     <ClCompile Include="..\..\krabs\krabs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="user_trace_003_no_predicates.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="user_trace_004.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="examples.h">

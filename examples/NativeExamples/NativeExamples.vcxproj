@@ -160,6 +160,8 @@
     <ClCompile Include="testing_001.cpp" />
     <ClCompile Include="user_trace_001.cpp" />
     <ClCompile Include="user_trace_002.cpp" />
+    <ClCompile Include="user_trace_003_no_predicates.cpp" />
+    <ClCompile Include="user_trace_004.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="examples.h" />
