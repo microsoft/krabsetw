@@ -123,9 +123,9 @@ namespace krabs { namespace details {
 
             for (const auto& filter : provider.get().filters_) {
                 if (filter.provider_filter_event_id() > 0) {
-                	//native id existing, set native filters
-					auto& provider_filter_event_ids = provider_flags[provider.get().guid_].provider_filter_event_ids_;
-					provider_filter_event_ids.push_back(filter.provider_filter_event_id()); 
+                    //native id existing, set native filters
+                    auto& provider_filter_event_ids = provider_flags[provider.get().guid_].provider_filter_event_ids_;
+                    provider_filter_event_ids.push_back(filter.provider_filter_event_id()); 
                 }
             }
         }
@@ -158,7 +158,7 @@ namespace krabs { namespace details {
                 filterEventIds->FilterIn = TRUE;
                 filterEventIds->Count = static_cast<USHORT>(provider.second.provider_filter_event_ids_.size());
                 for (int index = 0; index < filterEventIds->Count; ++index) {
-                	filterEventIds->Events[index] = provider.second.provider_filter_event_ids_[index];
+                    filterEventIds->Events[index] = provider.second.provider_filter_event_ids_[index];
                 }
                 filterDesc.Ptr = reinterpret_cast<ULONGLONG>(filterEventIds);
                 filterDesc.Size = size;
