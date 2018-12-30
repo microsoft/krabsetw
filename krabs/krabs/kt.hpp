@@ -133,7 +133,7 @@ namespace krabs { namespace details {
         if (IsWindows8OrGreater()) {
             return EVENT_TRACE_SYSTEM_LOGGER_MODE;
         }
-        
+
         return 0;
     }
 

@@ -75,7 +75,7 @@ namespace krabs {
 
         unsigned short provider_filter_event_id() const
         {
-             return provider_filter_event_id_;
+            return provider_filter_event_id_;
         }
 
     private:
@@ -146,7 +146,7 @@ namespace krabs {
         }
 
         if (predicate_ != nullptr && !predicate_(record)) {
-            return; 
+            return;
         }
 
         for (auto &callback : callbacks_) {

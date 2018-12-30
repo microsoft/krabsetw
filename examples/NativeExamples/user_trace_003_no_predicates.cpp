@@ -17,7 +17,7 @@ void user_trace_003_no_predicates::start()
     // by components or programs in Windows. They can optionally take a name -- if none
     // is provided, a random GUID is assigned as the name.
     krabs::user_trace trace(L"My Named Trace");
-    
+
     // A trace can have any number of providers, which are identified by GUID. These
     // GUIDs are defined by the components that emit events, and their GUIDs can
     // usually be found with various ETW tools (like wevutil).
