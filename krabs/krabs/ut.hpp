@@ -125,10 +125,11 @@ namespace krabs { namespace details {
                 provider_flags[provider.get().guid_].filter_flags_ = {};
             }
 
-            provider_flags[provider.get().guid_].filter_flags_.level_ |= provider.get().level_;
-            provider_flags[provider.get().guid_].filter_flags_.any_ |= provider.get().any_;
-            provider_flags[provider.get().guid_].filter_flags_.all_ |= provider.get().all_;
-            provider_flags[provider.get().guid_].filter_flags_.trace_flags_ |= provider.get().trace_flags_;
+            auto& flags = provider_flags[provider.get().guid_];
+            flags.filter_flags_.level_ |= provider.get().level_;
+            flags.filter_flags_.any_ |= provider.get().any_;
+            flags.filter_flags_.all_ |= provider.get().all_;
+            flags.filter_flags_.trace_flags_ |= provider.get().trace_flags_;
 
             for (const auto& filter : provider.get().filters_) {
                 if (filter.provider_filter_event_ids().size() > 0) {
