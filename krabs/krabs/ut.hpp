@@ -167,12 +167,8 @@ namespace krabs { namespace details {
                 filterEventIds->Count = static_cast<USHORT>(provider.second.provider_filter_event_ids_.size());
 
                 auto index = 0;
-                std::set<unsigned short>::iterator provider_filter_iterator;
-                for (provider_filter_iterator = provider.second.provider_filter_event_ids_.begin();
-                     provider_filter_iterator != provider.second.provider_filter_event_ids_.end();
-                     ++provider_filter_iterator)
-                {
-                    filterEventIds->Events[index] = *provider_filter_iterator;
+                for (auto filter : provider.second.provider_filter_event_ids_) {
+                    filterEventIds->Events[index] = filter;
                     index++;
                 }
 

@@ -100,7 +100,7 @@ namespace krabs {
     private:
         std::deque<provider_callback> callbacks_;
         filter_predicate predicate_{ nullptr };
-        std::vector<unsigned short> provider_filter_event_ids_{ 0 };
+        std::vector<unsigned short> provider_filter_event_ids_;
 
     private:
         template <typename T>
