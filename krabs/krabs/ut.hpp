@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <set>
+
 #include "compiler_check.hpp"
 #include "trace.hpp"
 #include "provider.hpp"
@@ -20,9 +22,16 @@ namespace krabs { namespace details {
 
         typedef krabs::provider<> provider_type;
         
+        struct filter_flags {
+            UCHAR level_;
+            ULONGLONG any_;
+            ULONGLONG all_;
+            UCHAR trace_flags_;
+        };
+
         struct filter_settings{
-            std::vector<unsigned short> provider_filter_event_ids_;
-            std::tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> flags_tuple_;
+            std::set<unsigned short> provider_filter_event_ids_;
+            filter_flags filter_flags_;
         };
 
         typedef std::map<krabs::guid, filter_settings> provider_filter_settings;
@@ -113,19 +122,19 @@ namespace krabs { namespace details {
         // TODO: Only forward the calls that are requested to each provider.
         for (auto &provider : trace.providers_) {
             if (provider_flags.find(provider.get().guid_) != provider_flags.end()) {
-                provider_flags[provider.get().guid_].flags_tuple_ = std::make_tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> (0, 0, 0, 0);
+                provider_flags[provider.get().guid_].filter_flags_ = {};
             }
 
-            std::get<0>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().level_;
-            std::get<1>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().any_;
-            std::get<2>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().all_;
-            std::get<3>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().trace_flags_;
+            provider_flags[provider.get().guid_].filter_flags_.level_ |= provider.get().level_;
+            provider_flags[provider.get().guid_].filter_flags_.any_ |= provider.get().any_;
+            provider_flags[provider.get().guid_].filter_flags_.all_ |= provider.get().all_;
+            provider_flags[provider.get().guid_].filter_flags_.trace_flags_ |= provider.get().trace_flags_;
 
             for (const auto& filter : provider.get().filters_) {
-                if (filter.provider_filter_event_id() > 0) {
+                if (filter.provider_filter_event_ids().size() > 0) {
                     //native id existing, set native filters
                     auto& provider_filter_event_ids = provider_flags[provider.get().guid_].provider_filter_event_ids_;
-                    provider_filter_event_ids.push_back(filter.provider_filter_event_id()); 
+                    provider_filter_event_ids.insert(filter.provider_filter_event_ids().begin(), filter.provider_filter_event_ids().end());
                 }
             }
         }
@@ -137,11 +146,10 @@ namespace krabs { namespace details {
             parameters.SourceId = provider.first;
             
             GUID guid = provider.first;
-            parameters.EnableProperty = std::get<3>(provider.second.flags_tuple_);
+            parameters.EnableProperty = provider.second.filter_flags_.trace_flags_;
             parameters.EnableFilterDesc = nullptr;
             parameters.FilterDescCount = 0;
             EVENT_FILTER_DESCRIPTOR filterDesc;
-            std::unique_ptr<BYTE[]> filterMemoryPtr;
 
             if (provider.second.provider_filter_event_ids_.size() > 0) {
                 //event filters existing, set native filters using API
@@ -152,14 +160,22 @@ namespace krabs { namespace details {
 
                 //allocate + size of expected events in filter
                 DWORD size = FIELD_OFFSET(EVENT_FILTER_EVENT_ID, Events[provider.second.provider_filter_event_ids_.size()]);
-                filterMemoryPtr = std::make_unique<BYTE[]>(size);
+                std::vector<BYTE> filterMemoryPtr(size);
 
-                auto filterEventIds = reinterpret_cast<PEVENT_FILTER_EVENT_ID>(filterMemoryPtr.get());
+                auto filterEventIds = reinterpret_cast<PEVENT_FILTER_EVENT_ID>(&(filterMemoryPtr[0]));
                 filterEventIds->FilterIn = TRUE;
                 filterEventIds->Count = static_cast<USHORT>(provider.second.provider_filter_event_ids_.size());
-                for (int index = 0; index < filterEventIds->Count; ++index) {
-                    filterEventIds->Events[index] = provider.second.provider_filter_event_ids_[index];
+
+                auto index = 0;
+                std::set<unsigned short>::iterator provider_filter_iterator;
+                for (provider_filter_iterator = provider.second.provider_filter_event_ids_.begin();
+                     provider_filter_iterator != provider.second.provider_filter_event_ids_.end();
+                     ++provider_filter_iterator)
+                {
+                    filterEventIds->Events[index] = *provider_filter_iterator;
+                    index++;
                 }
+
                 filterDesc.Ptr = reinterpret_cast<ULONGLONG>(filterEventIds);
                 filterDesc.Size = size;
 
@@ -169,9 +185,9 @@ namespace krabs { namespace details {
             ULONG status = EnableTraceEx2(trace.registrationHandle_,
                                           &guid,
                                           EVENT_CONTROL_CODE_ENABLE_PROVIDER,
-                                          std::get<0>(provider.second.flags_tuple_),
-                                          std::get<1>(provider.second.flags_tuple_),
-                                          std::get<2>(provider.second.flags_tuple_),
+                                          provider.second.filter_flags_.level_,
+                                          provider.second.filter_flags_.any_,
+                                          provider.second.filter_flags_.all_,
                                           0,
                                           &parameters);
             UNREFERENCED_PARAMETER(status);
