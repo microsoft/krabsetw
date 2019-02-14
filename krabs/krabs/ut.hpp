@@ -31,7 +31,7 @@ namespace krabs { namespace details {
 
         struct filter_settings{
             std::set<unsigned short> provider_filter_event_ids_;
-            filter_flags filter_flags_;
+            filter_flags filter_flags_{};
         };
 
         typedef std::map<krabs::guid, filter_settings> provider_filter_settings;
@@ -121,10 +121,6 @@ namespace krabs { namespace details {
         // for the same GUID are provided and request different provider flags.
         // TODO: Only forward the calls that are requested to each provider.
         for (auto &provider : trace.providers_) {
-            if (provider_flags.find(provider.get().guid_) != provider_flags.end()) {
-                provider_flags[provider.get().guid_].filter_flags_ = {};
-            }
-
             auto& settings = provider_flags[provider.get().guid_];
             settings.filter_flags_.level_       |= provider.get().level_;
             settings.filter_flags_.any_         |= provider.get().any_;
@@ -132,11 +128,9 @@ namespace krabs { namespace details {
             settings.filter_flags_.trace_flags_ |= provider.get().trace_flags_;
 
             for (const auto& filter : provider.get().filters_) {
-                if (filter.provider_filter_event_ids().size() > 0) {
-                    //native id existing, set native filters
-                    auto& provider_filter_event_ids = settings.provider_filter_event_ids_;
-                    provider_filter_event_ids.insert(filter.provider_filter_event_ids().begin(), filter.provider_filter_event_ids().end());
-                }
+                settings.provider_filter_event_ids_.insert(
+                    filter.provider_filter_event_ids().begin(),
+                    filter.provider_filter_event_ids().end());
             }
         }
 
