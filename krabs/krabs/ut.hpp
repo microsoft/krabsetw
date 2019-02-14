@@ -125,16 +125,16 @@ namespace krabs { namespace details {
                 provider_flags[provider.get().guid_].filter_flags_ = {};
             }
 
-            auto& flags = provider_flags[provider.get().guid_];
-            flags.filter_flags_.level_ |= provider.get().level_;
-            flags.filter_flags_.any_ |= provider.get().any_;
-            flags.filter_flags_.all_ |= provider.get().all_;
-            flags.filter_flags_.trace_flags_ |= provider.get().trace_flags_;
+            auto& settings = provider_flags[provider.get().guid_];
+            settings.filter_flags_.level_       |= provider.get().level_;
+            settings.filter_flags_.any_         |= provider.get().any_;
+            settings.filter_flags_.all_         |= provider.get().all_;
+            settings.filter_flags_.trace_flags_ |= provider.get().trace_flags_;
 
             for (const auto& filter : provider.get().filters_) {
                 if (filter.provider_filter_event_ids().size() > 0) {
                     //native id existing, set native filters
-                    auto& provider_filter_event_ids = provider_flags[provider.get().guid_].provider_filter_event_ids_;
+                    auto& provider_filter_event_ids = settings.provider_filter_event_ids_;
                     provider_filter_event_ids.insert(filter.provider_filter_event_ids().begin(), filter.provider_filter_event_ids().end());
                 }
             }
@@ -147,28 +147,30 @@ namespace krabs { namespace details {
             parameters.SourceId = provider.first;
             
             GUID guid = provider.first;
-            parameters.EnableProperty = provider.second.filter_flags_.trace_flags_;
+            auto& settings = provider.second;
+
+            parameters.EnableProperty = settings.filter_flags_.trace_flags_;
             parameters.EnableFilterDesc = nullptr;
             parameters.FilterDescCount = 0;
-            EVENT_FILTER_DESCRIPTOR filterDesc;
+            EVENT_FILTER_DESCRIPTOR filterDesc{};
+            std::vector<BYTE> filterEventIdBuffer;
+            auto filterEventIdCount = settings.provider_filter_event_ids_.size();
 
-            if (provider.second.provider_filter_event_ids_.size() > 0) {
+            if (filterEventIdCount > 0) {
                 //event filters existing, set native filters using API
-                parameters.FilterDescCount = 1;  
-
-                ZeroMemory(&filterDesc, sizeof(filterDesc));
+                parameters.FilterDescCount = 1;
                 filterDesc.Type = EVENT_FILTER_TYPE_EVENT_ID;
 
                 //allocate + size of expected events in filter
-                DWORD size = FIELD_OFFSET(EVENT_FILTER_EVENT_ID, Events[provider.second.provider_filter_event_ids_.size()]);
-                std::vector<BYTE> filterMemoryPtr(size);
+                DWORD size = FIELD_OFFSET(EVENT_FILTER_EVENT_ID, Events[filterEventIdCount]);
+                filterEventIdBuffer.resize(size, 0);
 
-                auto filterEventIds = reinterpret_cast<PEVENT_FILTER_EVENT_ID>(&(filterMemoryPtr[0]));
+                auto filterEventIds = reinterpret_cast<PEVENT_FILTER_EVENT_ID>(&(filterEventIdBuffer[0]));
                 filterEventIds->FilterIn = TRUE;
-                filterEventIds->Count = static_cast<USHORT>(provider.second.provider_filter_event_ids_.size());
+                filterEventIds->Count = static_cast<USHORT>(filterEventIdCount);
 
                 auto index = 0;
-                for (auto filter : provider.second.provider_filter_event_ids_) {
+                for (auto filter : settings.provider_filter_event_ids_) {
                     filterEventIds->Events[index] = filter;
                     index++;
                 }
@@ -182,9 +184,9 @@ namespace krabs { namespace details {
             ULONG status = EnableTraceEx2(trace.registrationHandle_,
                                           &guid,
                                           EVENT_CONTROL_CODE_ENABLE_PROVIDER,
-                                          provider.second.filter_flags_.level_,
-                                          provider.second.filter_flags_.any_,
-                                          provider.second.filter_flags_.all_,
+                                          settings.filter_flags_.level_,
+                                          settings.filter_flags_.any_,
+                                          settings.filter_flags_.all_,
                                           0,
                                           &parameters);
             UNREFERENCED_PARAMETER(status);

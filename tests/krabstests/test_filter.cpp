@@ -57,6 +57,13 @@ namespace krabstests
             Assert::IsFalse(was_called2);
         }
 
+        TEST_METHOD(should_resolve_multiple_constructors_without_conflicts)
+        {
+            krabs::event_filter provider_filter_single_event_id(1);
+            krabs::event_filter provider_filter_array_of_single_event_id({ 1 });
+            krabs::event_filter provider_filter_array_of_multiple_event_ids({ 1, 2 });
+        }
+
         TEST_METHOD(id_is_should_match_events_that_have_matching_ids)
         {
             krabs::predicates::id_is filter(7937);

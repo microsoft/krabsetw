@@ -82,7 +82,7 @@ namespace krabs {
         template <typename U>
         void add_on_event_callback(const U &callback);
 
-        std::vector<unsigned short> provider_filter_event_ids() const
+        const std::vector<unsigned short>& provider_filter_event_ids() const
         {
             return provider_filter_event_ids_;
         }
@@ -117,7 +117,7 @@ namespace krabs {
     {}
 
     inline event_filter::event_filter(std::vector<unsigned short> event_ids, filter_predicate predicate/*=nullptr*/)
-    : provider_filter_event_ids_(event_ids.begin(), event_ids.end()),
+    : provider_filter_event_ids_{ event_ids },
       predicate_(predicate)
     {}
 
