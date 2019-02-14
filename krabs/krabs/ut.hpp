@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <set>
+
 #include "compiler_check.hpp"
 #include "trace.hpp"
 #include "provider.hpp"
@@ -20,9 +22,16 @@ namespace krabs { namespace details {
 
         typedef krabs::provider<> provider_type;
         
+        struct filter_flags {
+            UCHAR level_;
+            ULONGLONG any_;
+            ULONGLONG all_;
+            UCHAR trace_flags_;
+        };
+
         struct filter_settings{
-            std::vector<unsigned short> provider_filter_event_ids_;
-            std::tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> flags_tuple_;
+            std::set<unsigned short> provider_filter_event_ids_;
+            filter_flags filter_flags_{};
         };
 
         typedef std::map<krabs::guid, filter_settings> provider_filter_settings;
@@ -112,21 +121,16 @@ namespace krabs { namespace details {
         // for the same GUID are provided and request different provider flags.
         // TODO: Only forward the calls that are requested to each provider.
         for (auto &provider : trace.providers_) {
-            if (provider_flags.find(provider.get().guid_) != provider_flags.end()) {
-                provider_flags[provider.get().guid_].flags_tuple_ = std::make_tuple<UCHAR, ULONGLONG, ULONGLONG, UCHAR> (0, 0, 0, 0);
-            }
-
-            std::get<0>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().level_;
-            std::get<1>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().any_;
-            std::get<2>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().all_;
-            std::get<3>(provider_flags[provider.get().guid_].flags_tuple_) |= provider.get().trace_flags_;
+            auto& settings = provider_flags[provider.get().guid_];
+            settings.filter_flags_.level_       |= provider.get().level_;
+            settings.filter_flags_.any_         |= provider.get().any_;
+            settings.filter_flags_.all_         |= provider.get().all_;
+            settings.filter_flags_.trace_flags_ |= provider.get().trace_flags_;
 
             for (const auto& filter : provider.get().filters_) {
-                if (filter.provider_filter_event_id() > 0) {
-                    //native id existing, set native filters
-                    auto& provider_filter_event_ids = provider_flags[provider.get().guid_].provider_filter_event_ids_;
-                    provider_filter_event_ids.push_back(filter.provider_filter_event_id()); 
-                }
+                settings.provider_filter_event_ids_.insert(
+                    filter.provider_filter_event_ids().begin(),
+                    filter.provider_filter_event_ids().end());
             }
         }
 
@@ -137,29 +141,34 @@ namespace krabs { namespace details {
             parameters.SourceId = provider.first;
             
             GUID guid = provider.first;
-            parameters.EnableProperty = std::get<3>(provider.second.flags_tuple_);
+            auto& settings = provider.second;
+
+            parameters.EnableProperty = settings.filter_flags_.trace_flags_;
             parameters.EnableFilterDesc = nullptr;
             parameters.FilterDescCount = 0;
-            EVENT_FILTER_DESCRIPTOR filterDesc;
-            std::unique_ptr<BYTE[]> filterMemoryPtr;
+            EVENT_FILTER_DESCRIPTOR filterDesc{};
+            std::vector<BYTE> filterEventIdBuffer;
+            auto filterEventIdCount = settings.provider_filter_event_ids_.size();
 
-            if (provider.second.provider_filter_event_ids_.size() > 0) {
+            if (filterEventIdCount > 0) {
                 //event filters existing, set native filters using API
-                parameters.FilterDescCount = 1;  
-
-                ZeroMemory(&filterDesc, sizeof(filterDesc));
+                parameters.FilterDescCount = 1;
                 filterDesc.Type = EVENT_FILTER_TYPE_EVENT_ID;
 
                 //allocate + size of expected events in filter
-                DWORD size = FIELD_OFFSET(EVENT_FILTER_EVENT_ID, Events[provider.second.provider_filter_event_ids_.size()]);
-                filterMemoryPtr = std::make_unique<BYTE[]>(size);
+                DWORD size = FIELD_OFFSET(EVENT_FILTER_EVENT_ID, Events[filterEventIdCount]);
+                filterEventIdBuffer.resize(size, 0);
 
-                auto filterEventIds = reinterpret_cast<PEVENT_FILTER_EVENT_ID>(filterMemoryPtr.get());
+                auto filterEventIds = reinterpret_cast<PEVENT_FILTER_EVENT_ID>(&(filterEventIdBuffer[0]));
                 filterEventIds->FilterIn = TRUE;
-                filterEventIds->Count = static_cast<USHORT>(provider.second.provider_filter_event_ids_.size());
-                for (int index = 0; index < filterEventIds->Count; ++index) {
-                    filterEventIds->Events[index] = provider.second.provider_filter_event_ids_[index];
+                filterEventIds->Count = static_cast<USHORT>(filterEventIdCount);
+
+                auto index = 0;
+                for (auto filter : settings.provider_filter_event_ids_) {
+                    filterEventIds->Events[index] = filter;
+                    index++;
                 }
+
                 filterDesc.Ptr = reinterpret_cast<ULONGLONG>(filterEventIds);
                 filterDesc.Size = size;
 
@@ -169,9 +178,9 @@ namespace krabs { namespace details {
             ULONG status = EnableTraceEx2(trace.registrationHandle_,
                                           &guid,
                                           EVENT_CONTROL_CODE_ENABLE_PROVIDER,
-                                          std::get<0>(provider.second.flags_tuple_),
-                                          std::get<1>(provider.second.flags_tuple_),
-                                          std::get<2>(provider.second.flags_tuple_),
+                                          settings.filter_flags_.level_,
+                                          settings.filter_flags_.any_,
+                                          settings.filter_flags_.all_,
                                           0,
                                           &parameters);
             UNREFERENCED_PARAMETER(status);
