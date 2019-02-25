@@ -437,6 +437,7 @@ namespace krabs {
                 if (wcscmp(name, providerName.c_str()) == 0){
                     hr = provider->get_Guid(&providerGuid);
                     check_provider_hr(hr, providerName);
+                    break;
                 }
             }
 
