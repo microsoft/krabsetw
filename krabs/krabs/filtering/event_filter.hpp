@@ -6,6 +6,7 @@
 #include <evntcons.h>
 #include <functional>
 #include <deque>
+#include <vector>
 
 #include "../compiler_check.hpp"
 
