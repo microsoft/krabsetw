@@ -113,11 +113,22 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline KernelTrace::~KernelTrace()
     {
-        if (disposed_) {
+        if (disposed_)
+        {
             return;
         }
 
-        Stop();
+        try
+        {
+            Stop();
+        }
+        catch (...)
+        {
+            // Stop may throw if the trace has been removed by another process.
+            // We catch and swallow the exception here to avoid an exception from leaking
+            // out of the destructor, which may cause a crash.
+        }
+
         disposed_ = true;
     }
 
