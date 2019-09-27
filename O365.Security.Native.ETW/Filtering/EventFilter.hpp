@@ -106,7 +106,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         GCHandle delegateHandle_;
 
     private:
-        std::vector<unsigned short> CreateFromList(List<unsigned short>^ &listEnumerator);
+        template<typename T>
+        std::vector<T> marshal_as(List<T>^ list);
     };
 
     // Implementation
@@ -146,7 +147,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     }
 
     EventFilter::EventFilter(List<unsigned short>^ eventIds)
-        : filter_(CreateFromList(eventIds))
+        : filter_(marshal_as(eventIds))
     {
         del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);
@@ -157,7 +158,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     }
 
     EventFilter::EventFilter(List<unsigned short>^ eventIds, O365::Security::ETW::Predicate^ pred)
-        : filter_(CreateFromList(eventIds), pred->to_underlying())
+        : filter_(marshal_as(eventIds), pred->to_underlying())
     {
         del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);
@@ -198,16 +199,18 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
     }
 
-    std::vector<unsigned short> EventFilter::CreateFromList(List<unsigned short>^ &list)
+    template<typename T>
+    std::vector<T> EventFilter::marshal_as(List<T>^ list)
     {
-        std::vector<unsigned short> vector;
+        std::vector<T> result;
+        result.reserve(list->Count);
 
-        for each(auto item in list)
+        for each (auto item in list)
         {
-            vector.push_back(item);
+            result.push_back(item);
         }
 
-        return vector;
+        return result;
     }
 
 } } } }
