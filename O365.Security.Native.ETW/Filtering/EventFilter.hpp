@@ -42,6 +42,32 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         EventFilter(O365::Security::ETW::Predicate ^predicate);
 
         /// <summary>
+        /// Constructs an EventFilter with the given event ID.
+        /// </summary>
+        /// <param name="eventId">the event ID to filter using provider-based filtering</param>
+        EventFilter(unsigned short eventId);
+
+        /// <summary>
+        /// Constructs an EventFilter with the given event ID and Predicate.
+        /// </summary>
+        /// <param name="eventId">the event ID to filter using provider-based filtering</param>
+        /// <param name="predicate">the predicate to use to filter an event</param>
+        EventFilter(unsigned short eventId, O365::Security::ETW::Predicate^ predicate);
+
+        /// <summary>
+        /// Constructs an EventFilter with the given event ID and Predicate.
+        /// </summary>
+        /// <param name="eventIds">the event IDs to filter using provider-based filtering</param>
+        EventFilter(List<unsigned short>^ eventIds);
+
+        /// <summary>
+        /// Constructs an EventFilter with the given event ID and Predicate.
+        /// </summary>
+        /// <param name="eventIds">the event IDs to filter using provider-based filtering</param>
+        /// <param name="predicate">the predicate to use to filter an event</param>
+        EventFilter(List<unsigned short>^ eventIds, O365::Security::ETW::Predicate^ predicate);
+
+        /// <summary>
         /// Destructs an EventFilter.
         /// </summary>
         ~EventFilter();
@@ -78,6 +104,9 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         NativePtr<krabs::event_filter> filter_;
         GCHandle delegateHookHandle_;
         GCHandle delegateHandle_;
+
+    private:
+        std::vector<unsigned short> CreateFromList(List<unsigned short>^ &listEnumerator);
     };
 
     // Implementation
@@ -85,6 +114,50 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     EventFilter::EventFilter(O365::Security::ETW::Predicate ^pred)
     : filter_(pred->to_underlying())
+    {
+        del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        filter_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    EventFilter::EventFilter(unsigned short eventId)
+        : filter_(eventId)
+    {
+        del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        filter_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    EventFilter::EventFilter(unsigned short eventId, O365::Security::ETW::Predicate^ pred)
+    : filter_(eventId, pred->to_underlying())
+    {
+        del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        filter_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    EventFilter::EventFilter(List<unsigned short>^ eventIds)
+        : filter_(CreateFromList(eventIds))
+    {
+        del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        filter_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    EventFilter::EventFilter(List<unsigned short>^ eventIds, O365::Security::ETW::Predicate^ pred)
+        : filter_(CreateFromList(eventIds), pred->to_underlying())
     {
         del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);
@@ -123,6 +196,18 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
             OnError(gcnew EventRecordError(msg, metadata));
         }
+    }
+
+    std::vector<unsigned short> EventFilter::CreateFromList(List<unsigned short>^ &list)
+    {
+        std::vector<unsigned short> vector;
+
+        for each(auto item in list)
+        {
+            vector.push_back(item);
+        }
+
+        return vector;
     }
 
 } } } }
