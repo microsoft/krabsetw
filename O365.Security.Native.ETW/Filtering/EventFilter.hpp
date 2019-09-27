@@ -55,13 +55,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         EventFilter(unsigned short eventId, O365::Security::ETW::Predicate^ predicate);
 
         /// <summary>
-        /// Constructs an EventFilter with the given event ID and Predicate.
+        /// Constructs an EventFilter with the given event IDs.
         /// </summary>
         /// <param name="eventIds">the event IDs to filter using provider-based filtering</param>
         EventFilter(List<unsigned short>^ eventIds);
 
         /// <summary>
-        /// Constructs an EventFilter with the given event ID and Predicate.
+        /// Constructs an EventFilter with the given event IDs and Predicate.
         /// </summary>
         /// <param name="eventIds">the event IDs to filter using provider-based filtering</param>
         /// <param name="predicate">the predicate to use to filter an event</param>
