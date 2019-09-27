@@ -5,6 +5,7 @@
 
 #include <krabs.hpp>
 
+#include "../Conversions.hpp"
 #include "../EventRecordError.hpp"
 #include "../EventRecord.hpp"
 #include "../EventRecordMetadata.hpp"
@@ -104,9 +105,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         NativePtr<krabs::event_filter> filter_;
         GCHandle delegateHookHandle_;
         GCHandle delegateHandle_;
-
-    private:
-        std::vector<unsigned short> GetVectorFromList(List<unsigned short>^& list);
     };
 
     // Implementation
@@ -146,7 +144,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     }
 
     EventFilter::EventFilter(List<unsigned short>^ eventIds)
-        : filter_(GetVectorFromList(eventIds))
+        : filter_(convert<unsigned short>(eventIds))
     {
         del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);
@@ -157,7 +155,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     }
 
     EventFilter::EventFilter(List<unsigned short>^ eventIds, O365::Security::ETW::Predicate^ pred)
-        : filter_(GetVectorFromList(eventIds), pred->to_underlying())
+        : filter_(convert<unsigned short>(eventIds), pred->to_underlying())
     {
         del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);
@@ -196,19 +194,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
             OnError(gcnew EventRecordError(msg, metadata));
         }
-    }
-
-    std::vector<unsigned short> EventFilter::GetVectorFromList(List<unsigned short>^& list)
-    {
-        std::vector<unsigned short> vector;
-        vector.reserve(list->Count);
-
-        for each (auto item in list)
-        {
-            vector.push_back(item);
-        }
-
-        return vector;
     }
 
 } } } }

@@ -192,6 +192,7 @@
     <ClCompile Include="ETWLib.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Conversions.hpp" />
     <ClInclude Include="Errors.hpp" />
     <ClInclude Include="EventRecordError.hpp" />
     <ClInclude Include="EventRecordMetadata.hpp" />
