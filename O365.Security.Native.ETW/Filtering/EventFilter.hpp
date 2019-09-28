@@ -144,7 +144,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     }
 
     EventFilter::EventFilter(List<unsigned short>^ eventIds)
-        : filter_(convert<unsigned short>(eventIds))
+        : filter_(to_vector(eventIds))
     {
         del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);
@@ -155,7 +155,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     }
 
     EventFilter::EventFilter(List<unsigned short>^ eventIds, O365::Security::ETW::Predicate^ pred)
-        : filter_(convert<unsigned short>(eventIds), pred->to_underlying())
+        : filter_(to_vector(eventIds), pred->to_underlying())
     {
         del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);
