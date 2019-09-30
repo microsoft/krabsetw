@@ -11,6 +11,8 @@ namespace ManagedExamples
             KernelTrace001.Start();
             //UserTrace001.Start();
             //UserTrace002.Start();
+            //UserTrace003.Start();
+            //UserTrace004.Start();
             //FakingEvents001.Start();
         }
     }

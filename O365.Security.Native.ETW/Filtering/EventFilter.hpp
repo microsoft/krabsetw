@@ -5,6 +5,7 @@
 
 #include <krabs.hpp>
 
+#include "../Conversions.hpp"
 #include "../EventRecordError.hpp"
 #include "../EventRecord.hpp"
 #include "../EventRecordMetadata.hpp"
@@ -40,6 +41,32 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         /// <param name="predicate">the predicate to use to filter an event</param>
         EventFilter(O365::Security::ETW::Predicate ^predicate);
+
+        /// <summary>
+        /// Constructs an EventFilter with the given event ID.
+        /// </summary>
+        /// <param name="eventId">the event ID to filter using provider-based filtering</param>
+        EventFilter(unsigned short eventId);
+
+        /// <summary>
+        /// Constructs an EventFilter with the given event ID and Predicate.
+        /// </summary>
+        /// <param name="eventId">the event ID to filter using provider-based filtering</param>
+        /// <param name="predicate">the predicate to use to filter an event</param>
+        EventFilter(unsigned short eventId, O365::Security::ETW::Predicate^ predicate);
+
+        /// <summary>
+        /// Constructs an EventFilter with the given event IDs.
+        /// </summary>
+        /// <param name="eventIds">the event IDs to filter using provider-based filtering</param>
+        EventFilter(List<unsigned short>^ eventIds);
+
+        /// <summary>
+        /// Constructs an EventFilter with the given event IDs and Predicate.
+        /// </summary>
+        /// <param name="eventIds">the event IDs to filter using provider-based filtering</param>
+        /// <param name="predicate">the predicate to use to filter an event</param>
+        EventFilter(List<unsigned short>^ eventIds, O365::Security::ETW::Predicate^ predicate);
 
         /// <summary>
         /// Destructs an EventFilter.
@@ -85,6 +112,50 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     EventFilter::EventFilter(O365::Security::ETW::Predicate ^pred)
     : filter_(pred->to_underlying())
+    {
+        del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        filter_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    EventFilter::EventFilter(unsigned short eventId)
+        : filter_(eventId)
+    {
+        del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        filter_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    EventFilter::EventFilter(unsigned short eventId, O365::Security::ETW::Predicate^ pred)
+    : filter_(eventId, pred->to_underlying())
+    {
+        del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        filter_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    EventFilter::EventFilter(List<unsigned short>^ eventIds)
+        : filter_(to_vector(eventIds))
+    {
+        del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        filter_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    EventFilter::EventFilter(List<unsigned short>^ eventIds, O365::Security::ETW::Predicate^ pred)
+        : filter_(to_vector(eventIds), pred->to_underlying())
     {
         del_ = gcnew NativeHookDelegate(this, &EventFilter::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);

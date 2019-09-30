@@ -67,6 +67,8 @@
     <Compile Include="KernelTrace001.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="UserTrace001.cs" />
+    <Compile Include="UserTrace004.cs" />
+    <Compile Include="UserTrace003.cs" />
     <Compile Include="UserTrace002.cs" />
   </ItemGroup>
   <ItemGroup>

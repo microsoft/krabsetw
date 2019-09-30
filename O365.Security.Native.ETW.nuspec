@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Native.ETW</id>
-        <version>2.0.1</version>
+        <version>2.0.2</version>
         <title>Microsoft.O365.Security.Native.ETW - managed wrappers for krabsetw</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -11,7 +11,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Microsoft.O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library. Also known as "Lobsters."</description>
         <summary>Microsoft.O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library. Also known as "Lobsters."</summary>
-        <releaseNotes>Support provider-based event filtering.</releaseNotes>
+        <releaseNotes>Support provider-based event filtering for managed callers.</releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs lobsters managed cppcli</tags>
