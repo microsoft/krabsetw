@@ -42,7 +42,7 @@
 #include "krabs/parser.hpp"
 #include "krabs/property.hpp"
 #include "krabs/provider.hpp"
-#include "krabs/nightmare.hpp"
+#include "krabs/etw.hpp"
 #include "krabs/tdh_helpers.hpp"
 #include "krabs/kernel_providers.hpp"
 

@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-// All of the yucky ETW badness is shoved down here.
+// Interface for ETW.
 
 #pragma once
 
@@ -35,12 +35,6 @@ namespace krabs { namespace details {
      * <summary>
      * Used to implement starting and stopping traces.
      * </summary>
-     * <remarks>
-     * This class exists to keep most of the noisy grossness of ETW out of
-     * the higher-level class descriptions and implementations. We shove all
-     * the yucky down here and put a lid on it and hope it doesn't stink up
-     * our kitchens later.
-     * </remarks>
      */
     template <typename T>
     class trace_manager {
