@@ -38,3 +38,8 @@ githooks/*.dll
 
 # VS poops
 .vs/
+
+# Vim files
+*~
+*.swp
+*.swo
