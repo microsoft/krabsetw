@@ -6,7 +6,7 @@ Important Preprocessor Definitions:
   defined. The code will not successfully compile without this flag. There is
   no plan to support compilation without `UNICODE` being set.
 
-* `NDEBUG` - Set this varible in release builds to disable runtime type
+* `NDEBUG` - Set this variable in release builds to disable runtime type
    assertions. You'll still get a runtime error if the size type you're
    requesting is not the same size as the property in the event schema.
 
