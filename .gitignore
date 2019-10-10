@@ -26,7 +26,7 @@ x64/
 # githooks specific
 githooks/*.dll
 
-# VS2015 db poops
+# VS2015 db
 *.VC.db
 
 # ignore cert files
@@ -36,7 +36,7 @@ githooks/*.dll
 # ignore Mac stuff
 .DS_Store
 
-# VS poops
+# Visual Studio files. 
 .vs/
 
 # Vim files
