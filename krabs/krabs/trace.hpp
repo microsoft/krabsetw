@@ -8,7 +8,7 @@
 #include "compiler_check.hpp"
 #include "guid.hpp"
 #include "provider.hpp"
-#include "nightmare.hpp"
+#include "etw.hpp"
 
 
 namespace krabs { namespace details {

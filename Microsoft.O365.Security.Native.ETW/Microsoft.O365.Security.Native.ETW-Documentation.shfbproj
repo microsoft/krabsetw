@@ -15,7 +15,7 @@
     <!-- SHFB properties -->
     <FrameworkVersion>.NET Framework 4.5</FrameworkVersion>
     <OutputPath>..\docs\</OutputPath>
-    <HtmlHelpName>O365.Security.Native.ETW</HtmlHelpName>
+    <HtmlHelpName>Microsoft.O365.Security.Native.ETW</HtmlHelpName>
     <Language>en-US</Language>
     <SaveComponentCacheCapacity>100</SaveComponentCacheCapacity>
     <BuildAssemblerVerbosity>OnlyWarningsAndErrors</BuildAssemblerVerbosity>
@@ -33,25 +33,25 @@
     <PresentationStyle>VS2013</PresentationStyle>
     <Preliminary>False</Preliminary>
     <NamingMethod>MemberName</NamingMethod>
-    <HelpTitle>O365.Security.Native.ETW Documentation</HelpTitle>
+    <HelpTitle>Microsoft.O365.Security.Native.ETW Documentation</HelpTitle>
     <CopyrightText>Copyright 2016 Microsoft Corporation</CopyrightText>
     <ContentPlacement>AboveNamespaces</ContentPlacement>
     <VisibleItems>Attributes, ExplicitInterfaceImplementations, InheritedMembers, InheritedFrameworkMembers, ProtectedInternalAsProtected</VisibleItems>
     <DocumentationSources>
-      <DocumentationSource sourceFile="..\krabs\x64\Debug\O365.Security.Native.ETW.xml" />
-      <DocumentationSource sourceFile="..\krabs\x64\Debug\O365.Security.Native.ETW.dll" />
+      <DocumentationSource sourceFile="..\krabs\x64\Debug\Microsoft.O365.Security.Native.ETW.xml" />
+      <DocumentationSource sourceFile="..\krabs\x64\Debug\Microsoft.O365.Security.Native.ETW.dll" />
     </DocumentationSources>
     <NamespaceSummaries>
-      <NamespaceSummaryItem name="O365.Security.ETW" isDocumented="True" xmlns="">Global namespace for O365.Security.Native.ETW.dll (aka Lobsters).</NamespaceSummaryItem>
-<NamespaceSummaryItem name="O365.Security.ETW.Kernel" isDocumented="True" xmlns="">O365.Security.ETW.Kernel provides convenience wrapper objects for the commonly available kernel ETW traces.</NamespaceSummaryItem>
-<NamespaceSummaryItem name="O365.Security.ETW.Testing" isDocumented="True" xmlns="">O365.Security.ETW.Testing provides objects that can be used in testing Lobsters itself.</NamespaceSummaryItem></NamespaceSummaries>
+      <NamespaceSummaryItem name="Microsoft.O365.Security.ETW" isDocumented="True" xmlns="">Global namespace for Microsoft.O365.Security.Native.ETW.dll (aka Lobsters).</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Microsoft.O365.Security.ETW.Kernel" isDocumented="True" xmlns="">Microsoft.O365.Security.ETW.Kernel provides convenience wrapper objects for the commonly available kernel ETW traces.</NamespaceSummaryItem>
+<NamespaceSummaryItem name="Microsoft.O365.Security.ETW.Testing" isDocumented="True" xmlns="">Microsoft.O365.Security.ETW.Testing provides objects that can be used in testing Lobsters itself.</NamespaceSummaryItem></NamespaceSummaries>
     <ApiFilter>
-      <Filter entryType="Namespace" fullName="O365.Security.ETW" isExposed="True" xmlns="">
-  <Filter entryType="Class" fullName="O365.Security.ETW.Predicate" filterName="Predicate" isExposed="True">
-    <Filter entryType="Method" fullName="O365.Security.ETW.Predicate.Test" filterName="Test" isExposed="False" />
+      <Filter entryType="Namespace" fullName="Microsoft.O365.Security.ETW" isExposed="True" xmlns="">
+  <Filter entryType="Class" fullName="Microsoft.O365.Security.ETW.Predicate" filterName="Predicate" isExposed="True">
+    <Filter entryType="Method" fullName="Microsoft.O365.Security.ETW.Predicate.Test" filterName="Test" isExposed="False" />
   </Filter>
 </Filter>
-<Filter entryType="Namespace" fullName="O365.Security.ETW.Testing" isExposed="False" xmlns="" /></ApiFilter>
+<Filter entryType="Namespace" fullName="Microsoft.O365.Security.ETW.Testing" isExposed="False" xmlns="" /></ApiFilter>
   </PropertyGroup>
   <!-- There are no properties for these groups.  AnyCPU needs to appear in order for Visual Studio to perform
 			 the build.  The others are optional common platform types that may appear. -->

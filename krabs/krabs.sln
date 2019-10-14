@@ -10,7 +10,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{5C9E22
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "O365.Security.Native.ETW", "..\O365.Security.Native.ETW\O365.Security.Native.ETW.vcxproj", "{ED4E6027-541F-440A-A5EE-15DBB7B89423}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Microsoft.O365.Security.Native.ETW", "..\Microsoft.O365.Security.Native.ETW\Microsoft.O365.Security.Native.ETW.vcxproj", "{ED4E6027-541F-440A-A5EE-15DBB7B89423}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "krabstests", "..\tests\krabstests\krabstests.vcxproj", "{880977B8-15CA-421B-BF48-D01626A530A2}"
 EndProject
@@ -31,12 +31,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs", "krabs", "{371361C8
 		krabs\collection_view.hpp = krabs\collection_view.hpp
 		krabs\compiler_check.hpp = krabs\compiler_check.hpp
 		krabs\errors.hpp = krabs\errors.hpp
+		krabs\etw.hpp = krabs\etw.hpp
 		krabs\guid.hpp = krabs\guid.hpp
 		krabs\kernel_guids.hpp = krabs\kernel_guids.hpp
 		krabs\kernel_providers.hpp = krabs\kernel_providers.hpp
 		krabs\kt.hpp = krabs\kt.hpp
 		krabs\lock.hpp = krabs\lock.hpp
-		krabs\nightmare.hpp = krabs\nightmare.hpp
 		krabs\parse_types.hpp = krabs\parse_types.hpp
 		krabs\parser.hpp = krabs\parser.hpp
 		krabs\property.hpp = krabs\property.hpp
