@@ -318,7 +318,7 @@ namespace krabs { namespace details {
         auto file = fill_logfile();
         trace_.sessionHandle_ = OpenTrace(&file);
         if (trace_.sessionHandle_ == INVALID_PROCESSTRACE_HANDLE) {
-            throw start_trace_failure();
+            throw open_trace_failure();
         }
         return file;
     }
@@ -327,7 +327,7 @@ namespace krabs { namespace details {
     void trace_manager<T>::process_trace()
     {
         if (trace_.sessionHandle_ == INVALID_PROCESSTRACE_HANDLE) {
-            throw start_trace_failure();
+            throw open_trace_failure();
         }
 
         ::FILETIME now;

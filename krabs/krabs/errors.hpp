@@ -23,10 +23,10 @@ namespace krabs {
         {}
     };
 
-    class start_trace_failure : public std::runtime_error {
+    class open_trace_failure : public std::runtime_error {
     public:
-        start_trace_failure()
-            : std::runtime_error("Failure to start trace")
+        open_trace_failure()
+            : std::runtime_error("Failure to open trace")
         {}
     };
 
