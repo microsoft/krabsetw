@@ -8,9 +8,20 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace krabstests
 {
+    constexpr auto TEST_TRACE_NAME = L"krabs test named trace";
+
     static DWORD WINAPI threadproc(void*)
     {
         krabs::provider<> foo(L"Microsoft-Windows-WinINet");
+        return 0;
+    }
+
+    static DWORD WINAPI starttrace_threadproc(void*)
+    {
+        krabs::user_trace trace(TEST_TRACE_NAME);
+        krabs::provider<> foo(L"Microsoft-Windows-WinINet");
+        trace.enable(foo);
+        trace.start();
         return 0;
     }
 
@@ -67,6 +78,41 @@ namespace krabstests
             krabs::user_trace trace;
             krabs::provider<> foo(krabs::guid::random_guid());
             trace.enable(foo);
+        }
+
+        TEST_METHOD(should_allow_user_trace_stop_by_name_without_start)
+        {
+            // start a trace in another thread and orphan it
+            DWORD thread_id = 0;
+            HANDLE my_thread = CreateThread(
+                nullptr,
+                0,
+                reinterpret_cast<LPTHREAD_START_ROUTINE>(starttrace_threadproc),
+                nullptr,
+                0,
+                &thread_id);
+            Assert::IsFalse(my_thread == nullptr);
+
+            // wait until the trace has started
+            krabs::details::trace_info info;
+            ZeroMemory(&info, sizeof(info));
+            info.properties.Wnode.BufferSize = sizeof(krabs::details::trace_info);
+            info.properties.LoggerNameOffset = offsetof(krabs::details::trace_info, logfileName);
+            ULONG status;
+            do
+            {
+                Sleep(500);
+                status = ControlTraceW(NULL, TEST_TRACE_NAME, &info.properties, EVENT_TRACE_CONTROL_QUERY);
+            } while (status != ERROR_SUCCESS);
+
+            // create a new user_trace with the same name - and immediately call .stop()
+            krabs::user_trace trace(TEST_TRACE_NAME);
+            trace.stop();
+
+            // wait for the orphaned trace to stop, and its thread to return
+            WaitForSingleObject(my_thread, INFINITE);
+
+            CloseHandle(my_thread);
         }
     };
 }

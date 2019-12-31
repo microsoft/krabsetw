@@ -187,8 +187,8 @@ namespace krabs { namespace details {
     template <typename T>
     void trace_manager<T>::stop()
     {
-        unregister_trace();
         stop_trace();
+        unregister_trace();
     }
 
     template <typename T>
@@ -252,17 +252,15 @@ namespace krabs { namespace details {
     }
 
     template <typename T>
-    void trace_manager<T>::unregister_trace()
+    void trace_manager<T>::stop_trace()
     {
-        if (trace_.registrationHandle_ != INVALID_PROCESSTRACE_HANDLE)
-        {
-            trace_info info = fill_trace_info();
-            ULONG status = ControlTrace(NULL,
-                trace_.name_.c_str(),
-                &info.properties,
-                EVENT_TRACE_CONTROL_STOP);
+        trace_info info = fill_trace_info();
+        ULONG status = ControlTrace(NULL,
+            trace_.name_.c_str(),
+            &info.properties,
+            EVENT_TRACE_CONTROL_STOP);
 
-            trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
+        if (status != ERROR_WMI_INSTANCE_NOT_FOUND) {
             error_check_common_conditions(status);
         }
     }
@@ -297,14 +295,14 @@ namespace krabs { namespace details {
                                   &info.properties);
         if (status == ERROR_ALREADY_EXISTS) {
             try {
-                unregister_trace();  // ControlTrace(STOP)
+                stop_trace();
                 status = StartTrace(&trace_.registrationHandle_,
                     trace_.name_.c_str(),
                     &info.properties);
             }
             catch (need_to_be_admin_failure) {
                 (void)open_trace();
-                stop_trace();  // CloseTrace()
+                close_trace();
                 // insufficient privilege to stop/configure
                 // but if open/close didn't throw also
                 // then we're okay to process events
@@ -350,10 +348,9 @@ namespace krabs { namespace details {
     }
 
     template <typename T>
-    void trace_manager<T>::stop_trace()
+    void trace_manager<T>::unregister_trace()
     {
         if (trace_.sessionHandle_ != INVALID_PROCESSTRACE_HANDLE) {
-            unregister_trace();
             ULONG status = CloseTrace(trace_.sessionHandle_);
             trace_.sessionHandle_ = INVALID_PROCESSTRACE_HANDLE;
 
