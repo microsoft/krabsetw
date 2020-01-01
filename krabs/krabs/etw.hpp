@@ -208,23 +208,18 @@ namespace krabs { namespace details {
     {
         trace_info info;
         ZeroMemory(&info, sizeof(info));
-
-        // TODO: should we override the ETW defaults for
-        // buffer count and buffer size to help ensure
-        // we aren't dropping events on memory-bound machines?
-
-        // Default: 64kb buffers, 1 min and 24 max buffer count
-
-        //info.properties.BufferSize = 64;
-        //info.properties.MinimumBuffers = 16;
-        //info.properties.MaximumBuffers = 64;
-
         info.properties.Wnode.BufferSize    = sizeof(trace_info);
         info.properties.Wnode.Guid          = T::trace_type::get_trace_guid();
         info.properties.Wnode.Flags         = WNODE_FLAG_TRACED_GUID;
         info.properties.Wnode.ClientContext = 1; // QPC clock resolution
-        info.properties.FlushTimer          = 1; // flush every second
-        info.properties.LogFileMode         = EVENT_TRACE_REAL_TIME_MODE
+        info.properties.BufferSize          = trace_.properties_.BufferSize;
+        info.properties.MinimumBuffers      = trace_.properties_.MinimumBuffers;
+        info.properties.MaximumBuffers      = trace_.properties_.MaximumBuffers;
+        info.properties.FlushTimer          = trace_.properties_.FlushTimer;
+		if (trace_.properties_.LogFileMode)
+            info.properties.LogFileMode     = trace_.properties_.LogFileMode;
+        else
+            info.properties.LogFileMode     = EVENT_TRACE_REAL_TIME_MODE
                                             | EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING
                                             | T::trace_type::augment_file_mode();
         info.properties.LoggerNameOffset    = offsetof(trace_info, logfileName);
