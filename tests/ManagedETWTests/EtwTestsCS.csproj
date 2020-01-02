@@ -77,6 +77,7 @@
     <Compile Include="Events\PowerShellEvent.cs" />
     <Compile Include="Events\LogonEvent.cs" />
     <Compile Include="Events\WinINetEvent.cs" />
+    <Compile Include="describe_UserTrace.cs" />
     <Compile Include="Filtering\describe_Fluent.cs" />
     <Compile Include="Filtering\describe_AnsiString.cs" />
     <Compile Include="Filtering\describe_Predicate.cs" />

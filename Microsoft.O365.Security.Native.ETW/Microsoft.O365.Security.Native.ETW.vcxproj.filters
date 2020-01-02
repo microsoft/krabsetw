@@ -119,6 +119,9 @@
     <ClInclude Include="Conversions.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="EventTraceProperties.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".nuget\NuGet.Config">
