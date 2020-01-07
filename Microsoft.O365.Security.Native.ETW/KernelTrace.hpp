@@ -147,9 +147,9 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         {
             throw gcnew InvalidParameter;
         }
-        catch (const krabs::start_trace_failure &)
+        catch (const krabs::open_trace_failure &)
         {
-            throw gcnew StartTraceFailure;
+            throw gcnew OpenTraceFailure;
         }
         catch (const krabs::no_trace_sessions_remaining &)
         {
