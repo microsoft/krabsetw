@@ -93,26 +93,24 @@ namespace krabstests
                 &thread_id);
             Assert::IsFalse(my_thread == nullptr);
 
-            // wait until the trace has started
-            krabs::details::trace_info info;
-            ZeroMemory(&info, sizeof(info));
-            info.properties.Wnode.BufferSize = sizeof(krabs::details::trace_info);
-            info.properties.LoggerNameOffset = offsetof(krabs::details::trace_info, logfileName);
-            ULONG status;
-            do
-            {
-                Sleep(500);
-                status = ControlTraceW(NULL, TEST_TRACE_NAME, &info.properties, EVENT_TRACE_CONTROL_QUERY);
-            } while (status != ERROR_SUCCESS);
-
-            // create a new user_trace with the same name - and immediately call .stop()
+            // create a new user_trace with the same name
+            // we never call open/start for this user_trace ourselves, but
+            // we can still query it to determine if a trace with a
+            // matching name is running
             krabs::user_trace trace(TEST_TRACE_NAME);
+            while (0 == trace.query_stats().buffersCount) {
+				Sleep(500);
+            }
+
+            // and we can stop traces by name
             trace.stop();
 
             // wait for the orphaned trace to stop, and its thread to return
             WaitForSingleObject(my_thread, INFINITE);
-
             CloseHandle(my_thread);
+
+            // no buffers --> trace has stopped
+            Assert::IsTrue(0 == trace.query_stats().buffersCount);
         }
     };
 }

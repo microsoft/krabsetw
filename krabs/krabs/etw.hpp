@@ -93,9 +93,8 @@ namespace krabs { namespace details {
     private:
         trace_info fill_trace_info();
         EVENT_TRACE_LOGFILE fill_logfile();
-        void unregister_trace();
+        void close_trace();
         void register_trace();
-        void start_trace();
         EVENT_TRACE_PROPERTIES query_trace();
         void stop_trace();
         EVENT_TRACE_LOGFILE open_trace();
@@ -159,9 +158,8 @@ namespace krabs { namespace details {
     template <typename T>
     void trace_manager<T>::start()
     {
-        register_trace();
-        enable_providers();
-        start_trace();
+        (void)open();
+        process_trace();
     }
 
     template <typename T>
@@ -188,7 +186,7 @@ namespace krabs { namespace details {
     void trace_manager<T>::stop()
     {
         stop_trace();
-        unregister_trace();
+        close_trace();
     }
 
     template <typename T>
@@ -255,7 +253,8 @@ namespace krabs { namespace details {
     void trace_manager<T>::stop_trace()
     {
         trace_info info = fill_trace_info();
-        ULONG status = ControlTrace(NULL,
+        ULONG status = ControlTrace(
+            NULL,
             trace_.name_.c_str(),
             &info.properties,
             EVENT_TRACE_CONTROL_STOP);
@@ -268,19 +267,18 @@ namespace krabs { namespace details {
     template <typename T>
     EVENT_TRACE_PROPERTIES trace_manager<T>::query_trace()
     {
-        if (trace_.registrationHandle_ != INVALID_PROCESSTRACE_HANDLE)
-        {
-            trace_info info = fill_trace_info();
-            ULONG status = ControlTrace(
-                trace_.registrationHandle_,
-                trace_.name_.c_str(),
-                &info.properties,
-                EVENT_TRACE_CONTROL_QUERY);
+		trace_info info = fill_trace_info();
+		ULONG status = ControlTrace(
+			NULL,
+			trace_.name_.c_str(),
+			&info.properties,
+			EVENT_TRACE_CONTROL_QUERY);
 
-            error_check_common_conditions(status);
+		if (status != ERROR_WMI_INSTANCE_NOT_FOUND) {
+			error_check_common_conditions(status);
 
             return info.properties;
-        }
+		}
 
         return { };
     }
@@ -317,13 +315,6 @@ namespace krabs { namespace details {
     }
 
     template <typename T>
-    void trace_manager<T>::start_trace()
-    {
-        (void)open_trace();
-        process_trace();
-    }
-
-    template <typename T>
     EVENT_TRACE_LOGFILE trace_manager<T>::open_trace()
     {
         auto file = fill_logfile();
@@ -348,7 +339,7 @@ namespace krabs { namespace details {
     }
 
     template <typename T>
-    void trace_manager<T>::unregister_trace()
+    void trace_manager<T>::close_trace()
     {
         if (trace_.sessionHandle_ != INVALID_PROCESSTRACE_HANDLE) {
             ULONG status = CloseTrace(trace_.sessionHandle_);
