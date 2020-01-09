@@ -27,7 +27,7 @@ namespace krabstests
 
             constexpr auto TEST_TRACE_NAME = L"krabs properties test";
             krabs::user_trace trace(TEST_TRACE_NAME);
-            trace.set(&properties);
+            trace.set_trace_properties(&properties);
 			(void)trace.open();
 
             krabs::details::trace_info info;

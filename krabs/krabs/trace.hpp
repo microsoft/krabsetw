@@ -113,14 +113,14 @@ namespace krabs {
          *    properties.MaximumBuffers = 48;
          *    properties.FlushTimer = 1;
          *    properties.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
-         *    trace.set(&properties);
+         *    trace.set_trace_properties(&properties);
          *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
          *    provider<> powershell(id);
          *    trace.enable(powershell);
          *    trace.start();
          * </example>
          */
-        void set(const PEVENT_TRACE_PROPERTIES properties);
+        void set_trace_properties(const PEVENT_TRACE_PROPERTIES properties);
 
         /**
          * <summary>
@@ -280,7 +280,7 @@ namespace krabs {
     }
 
     template <typename T>
-    void trace<T>::set(const PEVENT_TRACE_PROPERTIES properties)
+    void trace<T>::set_trace_properties(const PEVENT_TRACE_PROPERTIES properties)
     {
         properties_.BufferSize = properties->BufferSize;
         properties_.MinimumBuffers = properties->MinimumBuffers;

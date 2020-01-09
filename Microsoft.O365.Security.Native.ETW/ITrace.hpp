@@ -3,11 +3,11 @@
 
 #pragma once
 
+#include "EventTraceProperties.hpp"
 #include "KernelProvider.hpp"
 #include "Provider.hpp"
 #include "RawProvider.hpp"
 #include "TraceStats.hpp"
-#include "EventTraceProperties.hpp"
 
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
@@ -21,7 +21,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// Sets the trace properties for a session.
         /// Must be called before Start().
         /// </summary>
-        void Set(EventTraceProperties^ properties);
+        void SetTraceProperties(EventTraceProperties^ properties);
 
         /// <summary>
         /// Starts listening for events from the enabled providers.

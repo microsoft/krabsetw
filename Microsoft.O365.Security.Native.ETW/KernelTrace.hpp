@@ -65,7 +65,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </example>
         virtual void Enable(O365::Security::ETW::KernelProvider ^provider);
 
-        virtual void Set(EventTraceProperties^ properties);
+        virtual void SetTraceProperties(EventTraceProperties^ properties);
 
         /// <summary>
         /// Starts listening for events from the enabled providers.
@@ -135,7 +135,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         return trace_->enable(*provider->provider_);
     }
 
-    inline void KernelTrace::Set(EventTraceProperties^ properties)
+    inline void KernelTrace::SetTraceProperties(EventTraceProperties^ properties)
     {
         EVENT_TRACE_PROPERTIES _properties;
         _properties.BufferSize = properties->BufferSize;
@@ -143,7 +143,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         _properties.MaximumBuffers = properties->MaximumBuffers;
         _properties.LogFileMode = properties->LogFileMode;
         _properties.FlushTimer = properties->FlushTimer;
-        ExecuteAndConvertExceptions(return trace_->set(&_properties));
+        ExecuteAndConvertExceptions(return trace_->set_trace_properties(&_properties));
     }
 
     inline void KernelTrace::Start()

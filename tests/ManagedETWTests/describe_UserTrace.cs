@@ -50,7 +50,7 @@ namespace EtwTestsCS
                 FlushTimer = 2,
                 LogFileMode = (uint)LogFileModeFlags.FLAG_EVENT_TRACE_REAL_TIME_MODE
             };
-            trace.Set(properties);
+            trace.SetTraceProperties(properties);
             trace.Open();
 
             var info = new TraceInfo

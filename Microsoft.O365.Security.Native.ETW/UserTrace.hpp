@@ -77,7 +77,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// Sets the trace properties for a session.
         /// Must be called before Start().
         /// See https://docs.microsoft.com/en-us/windows/win32/etw/event-trace-properties
-        /// for important detailsand restrictions.
+        /// for important details and restrictions.
         ///
         /// Configurable properties are ->
         ///  - BufferSize. In KB. The maximum buffer size is 1024 KB.
@@ -94,11 +94,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         ///         BufferSize = 256,
         ///         LogFileMode = (uint)LogFileModeFlags.FLAG_EVENT_TRACE_REAL_TIME_MODE
         ///     };
-        ///     trace.Set(properties);
+        ///     trace.SetTraceProperties(properties);
         ///     // ...
         ///     trace.Open();
         /// </example>
-        virtual void Set(EventTraceProperties ^properties);
+        virtual void SetTraceProperties(EventTraceProperties ^properties);
 
         // currently used in test scenarios only
         virtual void Open();
@@ -177,7 +177,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         return trace_->enable(*provider->provider_);
     }
 
-    inline void UserTrace::Set(EventTraceProperties ^properties)
+    inline void UserTrace::SetTraceProperties(EventTraceProperties ^properties)
     {
         EVENT_TRACE_PROPERTIES _properties;
         _properties.BufferSize = properties->BufferSize;
@@ -185,7 +185,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         _properties.MaximumBuffers = properties->MaximumBuffers;
         _properties.LogFileMode = properties->LogFileMode;
         _properties.FlushTimer = properties->FlushTimer;
-        ExecuteAndConvertExceptions(return trace_->set(&_properties));
+        ExecuteAndConvertExceptions(return trace_->set_trace_properties(&_properties));
     }
 
     inline void UserTrace::Open()
