@@ -220,8 +220,8 @@ namespace krabs { namespace details {
             info.properties.LogFileMode     = trace_.properties_.LogFileMode;
         else
             info.properties.LogFileMode     = EVENT_TRACE_REAL_TIME_MODE
-                                            | EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING
-                                            | T::trace_type::augment_file_mode();
+                                            | EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING;
+        info.properties.LogFileMode         |= T::trace_type::augment_file_mode();
         info.properties.LoggerNameOffset    = offsetof(trace_info, logfileName);
         info.properties.EnableFlags         = T::trace_type::construct_enable_flags(trace_);
         assert(info.traceName[0] == '\0');
