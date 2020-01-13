@@ -30,8 +30,7 @@ namespace krabstests
             trace.set_trace_properties(&properties);
 			(void)trace.open();
 
-            krabs::details::trace_info info;
-            ZeroMemory(&info, sizeof(info));
+            krabs::details::trace_info info = {};
             info.properties.Wnode.BufferSize = sizeof(krabs::details::trace_info);
             info.properties.LoggerNameOffset = offsetof(krabs::details::trace_info, logfileName);
             ULONG status = ControlTraceW(NULL, TEST_TRACE_NAME, &info.properties, EVENT_TRACE_CONTROL_QUERY);
@@ -51,8 +50,7 @@ namespace krabstests
             krabs::user_trace trace(TEST_TRACE_NAME);
             (void)trace.open();
 
-            krabs::details::trace_info info;
-            ZeroMemory(&info, sizeof(info));
+            krabs::details::trace_info info = {};
             info.properties.Wnode.BufferSize = sizeof(krabs::details::trace_info);
             info.properties.LoggerNameOffset = offsetof(krabs::details::trace_info, logfileName);
             ULONG status = ControlTraceW(NULL, TEST_TRACE_NAME, &info.properties, EVENT_TRACE_CONTROL_QUERY);

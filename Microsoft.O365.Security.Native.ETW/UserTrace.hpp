@@ -96,7 +96,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         ///     };
         ///     trace.SetTraceProperties(properties);
         ///     // ...
-        ///     trace.Open();
+        ///     trace.Start();
         /// </example>
         virtual void SetTraceProperties(EventTraceProperties ^properties);
 

@@ -206,8 +206,7 @@ namespace krabs { namespace details {
     template <typename T>
     trace_info trace_manager<T>::fill_trace_info()
     {
-        trace_info info;
-        ZeroMemory(&info, sizeof(info));
+        trace_info info = {};
         info.properties.Wnode.BufferSize    = sizeof(trace_info);
         info.properties.Wnode.Guid          = T::trace_type::get_trace_guid();
         info.properties.Wnode.Flags         = WNODE_FLAG_TRACED_GUID;
@@ -216,11 +215,13 @@ namespace krabs { namespace details {
         info.properties.MinimumBuffers      = trace_.properties_.MinimumBuffers;
         info.properties.MaximumBuffers      = trace_.properties_.MaximumBuffers;
         info.properties.FlushTimer          = trace_.properties_.FlushTimer;
-		if (trace_.properties_.LogFileMode)
+
+        if (trace_.properties_.LogFileMode)
             info.properties.LogFileMode     = trace_.properties_.LogFileMode;
         else
             info.properties.LogFileMode     = EVENT_TRACE_REAL_TIME_MODE
                                             | EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING;
+
         info.properties.LogFileMode         |= T::trace_type::augment_file_mode();
         info.properties.LoggerNameOffset    = offsetof(trace_info, logfileName);
         info.properties.EnableFlags         = T::trace_type::construct_enable_flags(trace_);
@@ -233,14 +234,11 @@ namespace krabs { namespace details {
     template <typename T>
     EVENT_TRACE_LOGFILE trace_manager<T>::fill_logfile()
     {
-        EVENT_TRACE_LOGFILE file;
-        ZeroMemory(&file, sizeof(file));
+        EVENT_TRACE_LOGFILE file = {};
         file.LoggerName          = const_cast<wchar_t*>(trace_.name_.c_str());
-        file.LogFileName         = nullptr;
         file.ProcessTraceMode    = PROCESS_TRACE_MODE_EVENT_RECORD |
                                    PROCESS_TRACE_MODE_REAL_TIME;
         file.Context             = (void *)&trace_;
-        file.BufferCallback      = nullptr;
         file.EventRecordCallback = trace_callback_thunk<T>;
         file.BufferCallback      = trace_buffer_callback<T>;
         return file;
