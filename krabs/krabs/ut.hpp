@@ -114,6 +114,9 @@ namespace krabs { namespace details {
     inline void ut::enable_providers(
         const krabs::trace<krabs::details::ut> &trace)
     {
+        if (trace.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE)
+            return;
+
         provider_filter_settings provider_flags;
 
         // This function essentially takes the union of all the provider flags
