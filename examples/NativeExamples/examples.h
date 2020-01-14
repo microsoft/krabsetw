@@ -42,3 +42,8 @@ struct user_trace_004
 {
     static void start();
 };
+
+struct user_trace_005
+{
+    static void start();
+};

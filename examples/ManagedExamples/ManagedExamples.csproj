@@ -70,6 +70,7 @@
     <Compile Include="UserTrace004.cs" />
     <Compile Include="UserTrace003.cs" />
     <Compile Include="UserTrace002.cs" />
+    <Compile Include="UserTrace005.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

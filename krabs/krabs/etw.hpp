@@ -296,10 +296,23 @@ namespace krabs { namespace details {
                                   trace_.name_.c_str(),
                                   &info.properties);
         if (status == ERROR_ALREADY_EXISTS) {
-            unregister_trace();
-            status = StartTrace(&trace_.registrationHandle_,
-                                trace_.name_.c_str(),
-                                &info.properties);
+            try {
+                unregister_trace();  // ControlTrace(STOP)
+                status = StartTrace(&trace_.registrationHandle_,
+                    trace_.name_.c_str(),
+                    &info.properties);
+            }
+            catch (need_to_be_admin_failure) {
+                (void)open_trace();
+                stop_trace();  // CloseTrace()
+                // insufficient privilege to stop/configure
+                // but if open/close didn't throw also
+                // then we're okay to process events
+                status = ERROR_SUCCESS;
+                // we also invalidate the registrationHandle_
+                // StartTrace() actually sets this to 0 on failure
+                trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
+            }
         }
 
         error_check_common_conditions(status);
