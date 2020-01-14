@@ -32,23 +32,47 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
         EVENT_TRACE_FLAG_ALPC,
         FromGuid(krabs::guids::alpc));
 
+    /// <summary>A provider that enables context switch events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        ContextSwitchProvider,
+        EVENT_TRACE_FLAG_CSWITCH,
+        FromGuid(krabs::guids::thread));
+
     /// <summary>A provider that enables debug print events.</summary>
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         DebugPrintProvider,
         EVENT_TRACE_FLAG_DBGPRINT,
         FromGuid(krabs::guids::debug));
 
-    /// <summary>A provider that enables disk io events (like flush).</summary>
+    /// <summary>A provider that enables file I/O name events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        DiskFileIoProvider,
+		EVENT_TRACE_FLAG_DISK_FILE_IO | EVENT_TRACE_FLAG_DISK_IO,
+        FromGuid(krabs::guids::disk_io));
+
+    /// <summary>A provider that enables disk I/O completion events.</summary>
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         DiskIoProvider,
         EVENT_TRACE_FLAG_DISK_IO,
         FromGuid(krabs::guids::disk_io));
 
-    /// <summary>A provider that enables beginning of disk io events.</summary>
+    /// <summary>A provider that enables beginning of disk I/O events.</summary>
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         DiskInitIoProvider,
         EVENT_TRACE_FLAG_DISK_IO_INIT,
         FromGuid(krabs::guids::disk_io));
+
+    /// <summary>A provider that enables file I/O completion events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        FileIoProvider,
+        EVENT_TRACE_FLAG_FILE_IO,
+        FromGuid(krabs::guids::file_io));
+
+    /// <summary>A provider that enables file I/O events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        FileInitIoProvider,
+        EVENT_TRACE_FLAG_FILE_IO_INIT,
+        FromGuid(krabs::guids::file_io));
 
     /// <summary>A provider that enables thread dispatch events.</summary>
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
@@ -56,11 +80,29 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
         EVENT_TRACE_FLAG_DISPATCHER,
         FromGuid(krabs::guids::thread));
 
+    /// <summary>A provider that enables device deferred procedure call events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        DpcProvider,
+        EVENT_TRACE_FLAG_DPC,
+        FromGuid(krabs::guids::perf_info));
+
+    /// <summary>A provider that enables driver events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        DriverProvider,
+        EVENT_TRACE_FLAG_DRIVER,
+        FromGuid(krabs::guids::disk_io));
+
     /// <summary>A provider that enables image load events.</summary>
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         ImageLoadProvider,
         EVENT_TRACE_FLAG_IMAGE_LOAD,
         FromGuid(krabs::guids::image_load));
+
+    /// <summary>A provider that enables interrupt events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        InterruptProvider,
+        EVENT_TRACE_FLAG_INTERRUPT,
+        FromGuid(krabs::guids::perf_info));
 
     /// <summary>A provider that enables memory hard fault events.</summary>
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
@@ -104,7 +146,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
         EVENT_TRACE_FLAG_REGISTRY,
         FromGuid(krabs::guids::registry));
 
-    /// <summary>A provider that enables split IO events.</summary>
+    /// <summary>A provider that enables split I/O events.</summary>
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         SplitIoProvider,
         EVENT_TRACE_FLAG_SPLIT_IO,
@@ -121,6 +163,18 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
         ThreadProvider,
         EVENT_TRACE_FLAG_THREAD,
         FromGuid(krabs::guids::thread));
+
+    /// <summary>A provider that enables file map and unmap (excluding images) events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        VaMapProvider,
+        EVENT_TRACE_FLAG_VAMAP,
+        FromGuid(krabs::guids::file_io));
+
+    /// <summary>A provider that enables VirtualAlloc and VirtualFree events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        VirtualAllocProvider,
+        EVENT_TRACE_FLAG_VIRTUAL_ALLOC,
+        FromGuid(krabs::guids::page_fault));
 
 #undef CREATE_CONVENIENCE_KERNEL_PROVIDER
 
