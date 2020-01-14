@@ -29,13 +29,13 @@ namespace krabs { namespace kernel {
         EVENT_TRACE_FLAG_ALPC,
         krabs::guids::alpc);
 
-    // /**
-    //  * <summary>A provider that enables context switch events.</summary>
-    //  */
-    // CREATE_CONVENIENCE_KERNEL_PROVIDER(
-    //     context_switch_provider,
-    //     EVENT_TRACE_FLAG_CSWITCH,
-    //     krabs::guid::random_guid());
+     /**
+      * <summary>A provider that enables context switch events.</summary>
+      */
+     CREATE_CONVENIENCE_KERNEL_PROVIDER(
+         context_switch_provider,
+         EVENT_TRACE_FLAG_CSWITCH,
+         krabs::guids::thread);
 
     /**
      * <summary>A provider that enables debug print events.</summary>
@@ -46,23 +46,31 @@ namespace krabs { namespace kernel {
         krabs::guids::debug);
 
     /**
-     * <summary>A provider that enables disk io events (like flush).</summary>
+     * <summary>A provider that enables file I/O name events.</summary>
+     */
+    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+        disk_file_io_provider,
+        EVENT_TRACE_FLAG_DISK_FILE_IO | EVENT_TRACE_FLAG_DISK_IO,
+        krabs::guids::disk_io);
+
+    /**
+     * <summary>A provider that enables disk I/O completion events.</summary>
      */
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         disk_io_provider,
         EVENT_TRACE_FLAG_DISK_IO,
         krabs::guids::disk_io);
 
-    /**
-     * <summary>A provider that enables beginning of disk io events.</summary>
-     */
-    CREATE_CONVENIENCE_KERNEL_PROVIDER(
+	/**
+     * <summary>A provider that enables disk I/O start events.</summary>
+    */
+	CREATE_CONVENIENCE_KERNEL_PROVIDER(
         disk_init_io_provider,
         EVENT_TRACE_FLAG_DISK_IO_INIT,
         krabs::guids::disk_io);
 
 	/**
-	* <summary>A provider that enables file io events</summary>
+	* <summary>A provider that enables file I/O completion events.</summary>
 	*/
 	CREATE_CONVENIENCE_KERNEL_PROVIDER(
 		file_io_provider,
@@ -70,7 +78,7 @@ namespace krabs { namespace kernel {
 		krabs::guids::file_io);
 
 	/**
-	* <summary>A provider that enables file io events</summary>
+	* <summary>A provider that enables file I/O start events.</summary>
 	*/
 	CREATE_CONVENIENCE_KERNEL_PROVIDER(
 		file_init_io_provider,
@@ -85,21 +93,21 @@ namespace krabs { namespace kernel {
         EVENT_TRACE_FLAG_DISPATCHER,
         krabs::guids::thread);
 
-    // /**
-    //  * <summary>A provider that enables device deferred procedure call events.</summary>
-    //  */
-    // CREATE_CONVENIENCE_KERNEL_PROVIDER(
-    //     dpc_provider,
-    //     EVENT_TRACE_FLAG_DPC,
-    //     krabs::guid::random_guid());
+     /**
+      * <summary>A provider that enables device deferred procedure call events.</summary>
+      */
+     CREATE_CONVENIENCE_KERNEL_PROVIDER(
+         dpc_provider,
+         EVENT_TRACE_FLAG_DPC,
+         krabs::guids::perf_info);
 
-    // /**
-    //  * <summary>A provider that enables driver events.</summary>
-    //  */
-    // CREATE_CONVENIENCE_KERNEL_PROVIDER(
-    //     driver_provider,
-    //     EVENT_TRACE_FLAG_DRIVER,
-    //     krabs::guid::random_guid());
+     /**
+      * <summary>A provider that enables driver events.</summary>
+      */
+     CREATE_CONVENIENCE_KERNEL_PROVIDER(
+         driver_provider,
+         EVENT_TRACE_FLAG_DRIVER,
+         krabs::guids::disk_io);
 
     /**
      * <summary>A provider that enables image load events.</summary>
@@ -109,13 +117,13 @@ namespace krabs { namespace kernel {
         EVENT_TRACE_FLAG_IMAGE_LOAD,
         krabs::guids::image_load);
 
-    // /**
-    //  * <summary>A provider that enables interrupt events.</summary>
-    //  */
-    // CREATE_CONVENIENCE_KERNEL_PROVIDER(
-    //     interrupt_provider,
-    //     EVENT_TRACE_FLAG_INTERRUPT,
-    //     krabs::guid::random_guid());
+     /**
+      * <summary>A provider that enables interrupt events.</summary>
+      */
+     CREATE_CONVENIENCE_KERNEL_PROVIDER(
+         interrupt_provider,
+         EVENT_TRACE_FLAG_INTERRUPT,
+         krabs::guids::perf_info);
 
     /**
      * <summary>A provider that enables memory hard fault events.</summary>
@@ -174,7 +182,7 @@ namespace krabs { namespace kernel {
         krabs::guids::registry);
 
     /**
-     * <summary>A provider that enables split IO events.</summary>
+     * <summary>A provider that enables split I/O events.</summary>
      */
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         split_io_provider,
@@ -197,21 +205,21 @@ namespace krabs { namespace kernel {
         EVENT_TRACE_FLAG_THREAD,
         krabs::guids::thread);
 
-    // /**
-    //  * <summary>A provider that enables map and unmap events.</summary>
-    //  */
-    // CREATE_CONVENIENCE_KERNEL_PROVIDER(
-    //     vamap_provider,
-    //     EVENT_TRACE_FLAG_VAMAP,
-    //     krabs::guid::random_guid());
-    //
-    // /**
-    //  * <summary>A provider that enables map and unmap events.</summary>
-    //  */
-    // CREATE_CONVENIENCE_KERNEL_PROVIDER(
-    //     virtual_alloc_provider,
-    //     EVENT_TRACE_FLAG_VIRTUAL_ALLOC,
-    //     krabs::guid::random_guid());
+     /**
+      * <summary>A provider that enables file map and unmap (excluding images) events.</summary>
+      */
+     CREATE_CONVENIENCE_KERNEL_PROVIDER(
+         vamap_provider,
+         EVENT_TRACE_FLAG_VAMAP,
+         krabs::guids::file_io);
+
+     /**
+      * <summary>A provider that enables VirtualAlloc and VirtualFree events.</summary>
+      */
+     CREATE_CONVENIENCE_KERNEL_PROVIDER(
+         virtual_alloc_provider,
+         EVENT_TRACE_FLAG_VIRTUAL_ALLOC,
+         krabs::guids::page_fault);
 
 #undef CREATE_CONVENIENCE_KERNEL_PROVIDER
 
