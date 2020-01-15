@@ -47,7 +47,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
     /// <summary>A provider that enables file I/O name events.</summary>
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         DiskFileIoProvider,
-		EVENT_TRACE_FLAG_DISK_FILE_IO | EVENT_TRACE_FLAG_DISK_IO,
+        EVENT_TRACE_FLAG_DISK_FILE_IO | EVENT_TRACE_FLAG_DISK_IO,
         FromGuid(krabs::guids::disk_io));
 
     /// <summary>A provider that enables disk I/O completion events.</summary>
