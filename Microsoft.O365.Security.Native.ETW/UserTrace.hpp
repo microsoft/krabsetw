@@ -75,7 +75,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
         /// <summary>
         /// Sets the trace properties for a session.
-        /// Must be called before Start().
+        /// Must be called before Open()/Start().
         /// See https://docs.microsoft.com/en-us/windows/win32/etw/event-trace-properties
         /// for important details and restrictions.
         ///
@@ -100,8 +100,36 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </example>
         virtual void SetTraceProperties(EventTraceProperties ^properties);
 
-        // currently used in test scenarios only
+        /// <summary>
+        /// Opens a trace session.
+        /// </summary>
+        /// <example>
+        ///     var trace = new UserTrace();
+        ///     // ...
+        ///     trace.Open();
+        ///     // ...
+        ///     trace.Process();
+        /// </example>
         virtual void Open();
+
+        /// <summary>
+        /// Initiates the event processing loop for an open trace session.
+        /// </summary>
+        /// <example>
+        ///     var trace = new UserTrace();
+        ///     // ...
+        ///     trace.Open();
+        ///     // ...
+        ///     trace.Process();
+        /// </example>
+        /// <remarks>
+        /// This function is a blocking call. Whichever thread calls Start() is effectively
+        /// donating itself to the ETW subsystem as the processing thread for events.
+        ///
+        /// A side effect of this is that it is expected that Stop() will be called on
+        /// a different thread.
+        /// </remarks>
+        virtual void Process();
 
         /// <summary>
         /// Starts listening for events from the enabled providers.
@@ -190,7 +218,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void UserTrace::Open()
     {
-        (void)trace_->open();
+        ExecuteAndConvertExceptions((void)trace_->open());
+    }
+
+    inline void UserTrace::Process()
+    {
+        ExecuteAndConvertExceptions(trace_->process());
     }
 
     inline void UserTrace::Start()

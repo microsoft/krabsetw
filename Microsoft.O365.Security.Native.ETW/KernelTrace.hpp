@@ -65,7 +65,63 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </example>
         virtual void Enable(O365::Security::ETW::KernelProvider ^provider);
 
+        /// <summary>
+        /// Sets the trace properties for a session.
+        /// Must be called before Open()/Start().
+        /// See https://docs.microsoft.com/en-us/windows/win32/etw/event-trace-properties
+        /// for important details and restrictions.
+        ///
+        /// Configurable properties are ->
+        ///  - BufferSize. In KB. The maximum buffer size is 1024 KB.
+        ///  - MinimumBuffers. Minimum number of buffers is two per processor* .
+        ///  - MaximumBuffers.
+        ///  - FlushTimer. How often, in seconds, the trace buffers are forcibly flushed.
+        ///  - LogFileMode. EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING simulates a *single* sequential processor.
+        /// </summary>
+        /// <param name="properties">the <see cref="O365::Security::ETW::EventTraceProperties"/> to set on the trace</param>
+        /// <example>
+        ///     var trace = new KernelTrace();
+        ///     var properties = new EventTraceProperties
+        ///     {
+        ///         BufferSize = 256,
+        ///         LogFileMode = (uint)LogFileModeFlags.FLAG_EVENT_TRACE_REAL_TIME_MODE
+        ///     };
+        ///     trace.SetTraceProperties(properties);
+        ///     // ...
+        ///     trace.Start();
+        /// </example>
         virtual void SetTraceProperties(EventTraceProperties^ properties);
+
+        /// <summary>
+        /// Opens a trace session.
+        /// </summary>
+        /// <example>
+        ///     var trace = new KernelTrace();
+        ///     // ...
+        ///     trace.Open();
+        ///     // ...
+        ///     trace.Process();
+        /// </example>
+        virtual void Open();
+
+        /// <summary>
+        /// Initiates the event processing loop for an open trace session.
+        /// </summary>
+        /// <example>
+        ///     var trace = new KernelTrace();
+        ///     // ...
+        ///     trace.Open();
+        ///     // ...
+        ///     trace.Process();
+        /// </example>
+        /// <remarks>
+        /// This function is a blocking call. Whichever thread calls Start() is effectively
+        /// donating itself to the ETW subsystem as the processing thread for events.
+        ///
+        /// A side effect of this is that it is expected that Stop() will be called on
+        /// a different thread.
+        /// </remarks>
+        virtual void Process();
 
         /// <summary>
         /// Starts listening for events from the enabled providers.
@@ -146,42 +202,29 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         ExecuteAndConvertExceptions(return trace_->set_trace_properties(&_properties));
     }
 
+    inline void KernelTrace::Open()
+    {
+        ExecuteAndConvertExceptions((void)trace_->open());
+    }
+
+    inline void KernelTrace::Process()
+    {
+        ExecuteAndConvertExceptions(trace_->process());
+    }
+
     inline void KernelTrace::Start()
     {
-        try
-        {
-            return trace_->start();
-        }
-        catch (const krabs::trace_already_registered &)
-        {
-            throw gcnew TraceAlreadyRegistered;
-        }
-        catch (const krabs::invalid_parameter &)
-        {
-            throw gcnew InvalidParameter;
-        }
-        catch (const krabs::open_trace_failure &)
-        {
-            throw gcnew OpenTraceFailure;
-        }
-        catch (const krabs::no_trace_sessions_remaining &)
-        {
-            throw gcnew NoTraceSessionsRemaining;
-        }
-        catch (const krabs::need_to_be_admin_failure &)
-        {
-            throw gcnew UnauthorizedAccessException("Need to be admin");
-        }
+        ExecuteAndConvertExceptions(return trace_->start());
     }
 
     inline void KernelTrace::Stop()
     {
-        return trace_->stop();
+        ExecuteAndConvertExceptions(return trace_->stop());
     }
 
     inline TraceStats KernelTrace::QueryStats()
     {
-        return TraceStats(trace_->query_stats());
+        ExecuteAndConvertExceptions(return TraceStats(trace_->query_stats()));
     }
 
 } } } }

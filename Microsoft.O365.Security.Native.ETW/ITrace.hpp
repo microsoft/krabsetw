@@ -19,7 +19,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     public:
         /// <summary>
         /// Sets the trace properties for a session.
-        /// Must be called before Start().
+        /// Must be called before Open()/Start().
         /// </summary>
         void SetTraceProperties(EventTraceProperties^ properties);
 

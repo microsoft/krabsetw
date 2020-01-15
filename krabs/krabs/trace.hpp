@@ -180,7 +180,7 @@ namespace krabs {
 
         /**
         * <summary>
-        * Initiates the processing loop for a trace session.
+        * Initiates the processing loop for an open trace session.
         * </summary>
         * <example>
         *    krabs::trace trace;
