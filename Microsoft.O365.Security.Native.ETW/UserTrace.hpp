@@ -74,6 +74,64 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         virtual void Enable(O365::Security::ETW::RawProvider ^provider);
 
         /// <summary>
+        /// Sets the trace properties for a session.
+        /// Must be called before Open()/Start().
+        /// See https://docs.microsoft.com/en-us/windows/win32/etw/event-trace-properties
+        /// for important details and restrictions.
+        ///
+        /// Configurable properties are ->
+        ///  - BufferSize. In KB. The maximum buffer size is 1024 KB.
+        ///  - MinimumBuffers. Minimum number of buffers is two per processor* .
+        ///  - MaximumBuffers.
+        ///  - FlushTimer. How often, in seconds, the trace buffers are forcibly flushed.
+        ///  - LogFileMode. EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING simulates a *single* sequential processor.
+        /// </summary>
+        /// <param name="properties">the <see cref="O365::Security::ETW::EventTraceProperties"/> to set on the trace</param>
+        /// <example>
+        ///     var trace = new UserTrace();
+        ///     var properties = new EventTraceProperties
+        ///     {
+        ///         BufferSize = 256,
+        ///         LogFileMode = (uint)LogFileModeFlags.FLAG_EVENT_TRACE_REAL_TIME_MODE
+        ///     };
+        ///     trace.SetTraceProperties(properties);
+        ///     // ...
+        ///     trace.Start();
+        /// </example>
+        virtual void SetTraceProperties(EventTraceProperties ^properties);
+
+        /// <summary>
+        /// Opens a trace session.
+        /// </summary>
+        /// <example>
+        ///     var trace = new UserTrace();
+        ///     // ...
+        ///     trace.Open();
+        ///     // ...
+        ///     trace.Process();
+        /// </example>
+        virtual void Open();
+
+        /// <summary>
+        /// Initiates the event processing loop for an open trace session.
+        /// </summary>
+        /// <example>
+        ///     var trace = new UserTrace();
+        ///     // ...
+        ///     trace.Open();
+        ///     // ...
+        ///     trace.Process();
+        /// </example>
+        /// <remarks>
+        /// This function is a blocking call. Whichever thread calls Start() is effectively
+        /// donating itself to the ETW subsystem as the processing thread for events.
+        ///
+        /// A side effect of this is that it is expected that Stop() will be called on
+        /// a different thread.
+        /// </remarks>
+        virtual void Process();
+
+        /// <summary>
         /// Starts listening for events from the enabled providers.
         /// </summary>
         /// <example>
@@ -145,6 +203,27 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline void UserTrace::Enable(O365::Security::ETW::RawProvider ^provider)
     {
         return trace_->enable(*provider->provider_);
+    }
+
+    inline void UserTrace::SetTraceProperties(EventTraceProperties ^properties)
+    {
+        EVENT_TRACE_PROPERTIES _properties;
+        _properties.BufferSize = properties->BufferSize;
+        _properties.MinimumBuffers = properties->MinimumBuffers;
+        _properties.MaximumBuffers = properties->MaximumBuffers;
+        _properties.LogFileMode = properties->LogFileMode;
+        _properties.FlushTimer = properties->FlushTimer;
+        ExecuteAndConvertExceptions(return trace_->set_trace_properties(&_properties));
+    }
+
+    inline void UserTrace::Open()
+    {
+        ExecuteAndConvertExceptions((void)trace_->open());
+    }
+
+    inline void UserTrace::Process()
+    {
+        ExecuteAndConvertExceptions(trace_->process());
     }
 
     inline void UserTrace::Start()
