@@ -66,5 +66,9 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         { \
             throw gcnew NoTraceSessionsRemaining; \
         } \
+        catch (const krabs::need_to_be_admin_failure &) \
+        { \
+            throw gcnew UnauthorizedAccessException("Need to be admin"); \
+        } \
 
 } } } }

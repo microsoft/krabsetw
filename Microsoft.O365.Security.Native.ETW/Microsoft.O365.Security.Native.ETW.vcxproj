@@ -196,6 +196,7 @@
     <ClInclude Include="Errors.hpp" />
     <ClInclude Include="EventRecordError.hpp" />
     <ClInclude Include="EventRecordMetadata.hpp" />
+    <ClInclude Include="EventTraceProperties.hpp" />
     <ClInclude Include="Filtering\AnsiString.hpp" />
     <ClInclude Include="Filtering\CountedString.hpp" />
     <ClInclude Include="Filtering\EventFilter.hpp" />
