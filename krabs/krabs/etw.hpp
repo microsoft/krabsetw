@@ -267,18 +267,18 @@ namespace krabs { namespace details {
     template <typename T>
     EVENT_TRACE_PROPERTIES trace_manager<T>::query_trace()
     {
-		trace_info info = fill_trace_info();
-		ULONG status = ControlTrace(
-			NULL,
-			trace_.name_.c_str(),
-			&info.properties,
-			EVENT_TRACE_CONTROL_QUERY);
+        trace_info info = fill_trace_info();
+        ULONG status = ControlTrace(
+            NULL,
+            trace_.name_.c_str(),
+            &info.properties,
+            EVENT_TRACE_CONTROL_QUERY);
 
-		if (status != ERROR_WMI_INSTANCE_NOT_FOUND) {
-			error_check_common_conditions(status);
+        if (status != ERROR_WMI_INSTANCE_NOT_FOUND) {
+            error_check_common_conditions(status);
 
             return info.properties;
-		}
+        }
 
         return { };
     }

@@ -15,17 +15,17 @@ void user_trace_005::start()
     // SYSTEM is required for the Microsoft-Windows-Security-Auditing provider.
     char user_name[128] = { 0 };
     DWORD user_name_length = 128;
-	if (!GetUserNameA(user_name, &user_name_length) || !strcmp(user_name, "SYSTEM") == 0)
+    if (!GetUserNameA(user_name, &user_name_length) || !strcmp(user_name, "SYSTEM") == 0)
     {
         std::wcout << L"Microsoft-Windows-Security-Auditing can only be traced by SYSTEM" << std::endl;
         return;
     }
 
-	// Further, only one trace session is allowed for this provider.
+    // Further, only one trace session is allowed for this provider.
     // This session is created by the OS and is called 'EventLog-Security'.
     // We can't stop() this session, but we can open() a handle to it.
-	krabs::user_trace trace(L"EventLog-Security");
-	krabs::provider<> provider(L"Microsoft-Windows-Security-Auditing");
+    krabs::user_trace trace(L"EventLog-Security");
+    krabs::provider<> provider(L"Microsoft-Windows-Security-Auditing");
 
     // We also can't modify the flags of the trace session.
     // This will silently fail.

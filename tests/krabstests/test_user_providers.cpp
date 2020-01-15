@@ -99,7 +99,7 @@ namespace krabstests
             // matching name is running
             krabs::user_trace trace(TEST_TRACE_NAME);
             while (0 == trace.query_stats().buffersCount) {
-				Sleep(500);
+                Sleep(500);
             }
 
             // and we can stop traces by name
