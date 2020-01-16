@@ -35,12 +35,12 @@
         <file src="krabs\krabs\collection_view.hpp" target="lib\native\include\krabs\collection_view.hpp" />
         <file src="krabs\krabs\compiler_check.hpp" target="lib\native\include\krabs\compiler_check.hpp" />
         <file src="krabs\krabs\errors.hpp" target="lib\native\include\krabs\errors.hpp" />
+        <file src="krabs\krabs\etw.hpp" target="lib\native\include\krabs\etw.hpp" />
         <file src="krabs\krabs\guid.hpp" target="lib\native\include\krabs\guid.hpp" />
         <file src="krabs\krabs\kernel_guids.hpp" target="lib\native\include\krabs\kernel_guids.hpp" />
         <file src="krabs\krabs\kernel_providers.hpp" target="lib\native\include\krabs\kernel_providers.hpp" />
         <file src="krabs\krabs\kt.hpp" target="lib\native\include\krabs\kt.hpp" />
         <file src="krabs\krabs\lock.hpp" target="lib\native\include\krabs\lock.hpp" />
-        <file src="krabs\krabs\nightmare.hpp" target="lib\native\include\krabs\nightmare.hpp" />
         <file src="krabs\krabs\parser.hpp" target="lib\native\include\krabs\parser.hpp" />
         <file src="krabs\krabs\parse_types.hpp" target="lib\native\include\krabs\parse_types.hpp" />
         <file src="krabs\krabs\property.hpp" target="lib\native\include\krabs\property.hpp" />
@@ -54,6 +54,6 @@
         <file src="krabs\krabs\version_helpers.hpp" target="lib\native\include\krabs\version_helpers.hpp" />
         <file src="krabs\krabs.hpp" target="lib\native\include\krabs.hpp" />
         <file src="krabs\krabs.cpp" target="lib\native\src\krabs.cpp" />
-        <file src="krabs\Readme.txt" target="Readme.txt" />
+        <file src="krabs\Readme.md" target="Readme.md" />
     </files>
 </package>
