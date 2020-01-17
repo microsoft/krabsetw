@@ -100,28 +100,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         ///     // ...
         ///     trace.Open();
         ///     // ...
-        ///     trace.Process();
-        /// </example>
-        virtual void Open();
-
-        /// <summary>
-        /// Initiates the event processing loop for an open trace session.
-        /// </summary>
-        /// <example>
-        ///     var trace = new KernelTrace();
-        ///     // ...
-        ///     trace.Open();
-        ///     // ...
-        ///     trace.Process();
+        ///     trace.Start();
         /// </example>
         /// <remarks>
-        /// This function is a blocking call. Whichever thread calls Start() is effectively
-        /// donating itself to the ETW subsystem as the processing thread for events.
-        ///
-        /// A side effect of this is that it is expected that Stop() will be called on
-        /// a different thread.
+        /// This is an optional call before Start() if you need the trace
+        /// registered with the ETW subsystem before you start processing events.
         /// </remarks>
-        virtual void Process();
+        virtual void Open();
 
         /// <summary>
         /// Starts listening for events from the enabled providers.
@@ -205,11 +190,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline void KernelTrace::Open()
     {
         ExecuteAndConvertExceptions((void)trace_->open());
-    }
-
-    inline void KernelTrace::Process()
-    {
-        ExecuteAndConvertExceptions(trace_->process());
     }
 
     inline void KernelTrace::Start()
