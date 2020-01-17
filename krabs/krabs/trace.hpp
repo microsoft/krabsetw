@@ -167,6 +167,8 @@ namespace krabs {
         /**
         * <summary>
         * Opens a trace session.
+        * This is an optional call before start() if you need the trace
+        * registered with the ETW subsystem before you start processing events.
         * </summary>
         * <example>
         *    krabs::trace trace;
@@ -180,17 +182,10 @@ namespace krabs {
 
         /**
         * <summary>
-        * Initiates the processing loop for an open trace session.
+        * This is an alias for start().
         * </summary>
-        * <example>
-        *    krabs::trace trace;
-        *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
-        *    provider<> powershell(id);
-        *    trace.enable(powershell);
-        *    auto logfile = trace.open();
-        *    trace.process();
-        * </example>
         */
+        [[deprecated("use start() instead")]]
         void process();
 
         /**
@@ -330,8 +325,7 @@ namespace krabs {
     template <typename T>
     void trace<T>::process()
     {
-        details::trace_manager<trace> manager(*this);
-        return manager.process();
+        trace<T>::start();
     }
 
     template <typename T>
