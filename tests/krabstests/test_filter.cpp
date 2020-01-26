@@ -25,15 +25,15 @@ namespace krabstests
     public:
         TEST_METHOD(should_forward_calls_to_all_its_callbacks_with_an_identity_filter)
         {
-            krabs::event_filter filter(krabs::predicates::any_event);
+            krabs::threadsafe_event_filter filter(krabs::predicates::any_event);
 
             auto was_called1 = false;
             auto was_called2 = false;
 
-            filter.add_on_event_callback([&](const EVENT_RECORD &) { was_called1 = true; });
-            filter.add_on_event_callback([&](const EVENT_RECORD &) { was_called2 = true; });
+            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) { was_called1 = true; });
+            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) { was_called2 = true; });
 
-            krabs::testing::event_filter_proxy proxy(filter);
+            krabs::testing::threadsafe_event_filter_proxy proxy(filter);
             proxy.push_event(record);
 
             Assert::IsTrue(was_called1);
@@ -42,15 +42,15 @@ namespace krabstests
 
         TEST_METHOD(should_not_forward_calls_that_dont_match_predicate)
         {
-            krabs::event_filter filter(krabs::predicates::no_event);
+            krabs::threadsafe_event_filter filter(krabs::predicates::no_event);
 
             auto was_called1 = false;
             auto was_called2 = false;
 
-            filter.add_on_event_callback([&](const EVENT_RECORD &) { was_called1 = true; });
-            filter.add_on_event_callback([&](const EVENT_RECORD &) { was_called2 = true; });
+            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) { was_called1 = true; });
+            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) { was_called2 = true; });
 
-            krabs::testing::event_filter_proxy proxy(filter);
+            krabs::testing::threadsafe_event_filter_proxy proxy(filter);
             proxy.push_event(record);
 
             Assert::IsFalse(was_called1);
@@ -59,9 +59,9 @@ namespace krabstests
 
         TEST_METHOD(should_resolve_multiple_constructors_without_conflicts)
         {
-            krabs::event_filter provider_filter_single_event_id(1);
-            krabs::event_filter provider_filter_array_of_single_event_id({ 1 });
-            krabs::event_filter provider_filter_array_of_multiple_event_ids({ 1, 2 });
+            krabs::threadsafe_event_filter provider_filter_single_event_id(1);
+            krabs::threadsafe_event_filter provider_filter_array_of_single_event_id({ 1 });
+            krabs::threadsafe_event_filter provider_filter_array_of_multiple_event_ids({ 1, 2 });
         }
 
         TEST_METHOD(id_is_should_match_events_that_have_matching_ids)

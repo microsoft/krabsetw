@@ -74,7 +74,7 @@ namespace krabs { namespace details {
          */
         static void forward_events(
             const EVENT_RECORD &record,
-            const krabs::trace<krabs::details::ut> &trace);
+            krabs::trace<krabs::details::ut> &trace);
 
         /**
          * <summary>
@@ -192,11 +192,11 @@ namespace krabs { namespace details {
 
     inline void ut::forward_events(
         const EVENT_RECORD &record,
-        const krabs::trace<krabs::details::ut> &trace)
+        krabs::trace<krabs::details::ut> &trace)
     {
         for (auto &provider : trace.providers_) {
             if (record.EventHeader.ProviderId == provider.get().guid_) {
-                provider.get().on_event(record);
+                provider.get().on_event(record, trace.schema_locator_);
             }
         }
     }

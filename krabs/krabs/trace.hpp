@@ -212,6 +212,7 @@ namespace krabs {
          */
         size_t buffers_processed() const;
 
+
     private:
 
         /**
@@ -233,6 +234,8 @@ namespace krabs {
 
         EVENT_TRACE_PROPERTIES properties_;
 
+        schema_locator schema_locator_;
+
     private:
         template <typename T>
         friend class details::trace_manager;
@@ -252,6 +255,7 @@ namespace krabs {
     , sessionHandle_(INVALID_PROCESSTRACE_HANDLE)
     , eventsHandled_(0)
     , buffersRead_(0)
+    , schema_locator_()
     {
         name_ = T::enforce_name_policy(name);
         ZeroMemory(&properties_, sizeof(EVENT_TRACE_PROPERTIES));
@@ -263,6 +267,7 @@ namespace krabs {
     , sessionHandle_(INVALID_PROCESSTRACE_HANDLE)
     , eventsHandled_(0)
     , buffersRead_(0)
+    , schema_locator_()
     {
         name_ = T::enforce_name_policy(name);
         ZeroMemory(&properties_, sizeof(EVENT_TRACE_PROPERTIES));

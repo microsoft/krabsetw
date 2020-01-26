@@ -10,6 +10,7 @@
 
 #include "compiler_check.hpp"
 #include "filtering/event_filter.hpp"
+#include "schema_locator.hpp"
 
 #include <evntcons.h>
 #include <guiddef.h>
@@ -37,6 +38,9 @@ namespace krabs {
 
     typedef void(*c_provider_callback)(const EVENT_RECORD &);
     typedef std::function<void(const EVENT_RECORD &)> provider_callback;
+
+    typedef void(*threadsafe_c_provider_callback)(const EVENT_RECORD&, schema_locator&);
+    typedef std::function<void(const EVENT_RECORD&, schema_locator&)> threadsafe_provider_callback;
 
     namespace details {
 
@@ -79,6 +83,15 @@ namespace krabs {
             template <typename U>
             void add_on_event_callback(const U &callback);
 
+
+            void add_on_event_threadsafe_callback(threadsafe_c_provider_callback callback);
+
+            template <typename U>
+            void add_on_event_threadsafe_callback(U& callback);
+
+            template <typename U>
+            void add_on_event_threadsafe_callback(const U& callback);
+
             /**
              * <summary>
              *   Adds a new filter to a provider, where the filter is expected
@@ -93,6 +106,7 @@ namespace krabs {
              * </example>
              */
             void add_filter(const event_filter &f);
+            void add_threadsafe_filter(const threadsafe_event_filter& f);
 
         protected:
 
@@ -101,11 +115,14 @@ namespace krabs {
              *   Called when an event occurs, forwards to callbacks and filters.
              * </summary>
              */
-            void on_event(const EVENT_RECORD &record) const;
+            void on_event(const EVENT_RECORD &record, krabs::schema_locator &schema_locator) const;
 
         protected:
             std::deque<provider_callback> callbacks_;
             std::deque<event_filter> filters_;
+
+            std::deque<threadsafe_provider_callback> threadsafe_callbacks_;
+            std::deque<threadsafe_event_filter> threadsafe_filters_;
 
         private:
             template <typename T>
@@ -344,7 +361,33 @@ namespace krabs {
         }
 
         template <typename T>
-        void base_provider<T>::on_event(const EVENT_RECORD &record) const
+        void base_provider<T>::add_on_event_threadsafe_callback(threadsafe_c_provider_callback callback)
+        {
+            threadsafe_callbacks_.push_back(callback);
+        }
+
+        template <typename T>
+        template <typename U>
+        void base_provider<T>::add_on_event_threadsafe_callback(U& callback)
+        {
+            threadsafe_callbacks_.push_back(std::ref(callback));
+        }
+
+        template <typename T>
+        template <typename U>
+        void base_provider<T>::add_on_event_threadsafe_callback(const U& callback)
+        {
+            threadsafe_callbacks_.push_back(callback);
+        }
+
+        template <typename T>
+        void base_provider<T>::add_threadsafe_filter(const threadsafe_event_filter& f)
+        {
+            threadsafe_filters_.push_back(f);
+        }
+
+        template <typename T>
+        void base_provider<T>::on_event(const EVENT_RECORD &record, krabs::schema_locator &schema_locator) const
         {
             for (auto &callback : callbacks_) {
                 callback(record);
@@ -353,6 +396,15 @@ namespace krabs {
             for (auto &filter : filters_) {
                 filter.on_event(record);
             }
+
+            for (auto& callback : threadsafe_callbacks_) {
+                callback(record, schema_locator);
+            }
+
+            for (auto& filter : threadsafe_filters_) {
+                filter.on_event(record, schema_locator);
+            }
+
         }
 
     } // namespace details

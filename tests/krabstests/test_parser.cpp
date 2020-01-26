@@ -112,7 +112,8 @@ namespace krabstests
             builder.add_properties()(L"ContextInfo", L"Testing");
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema_locator schema_locator;
+            krabs::schema schema(record, schema_locator);
             krabs::parser parser(schema);
 
             // note: binary doesn't type check

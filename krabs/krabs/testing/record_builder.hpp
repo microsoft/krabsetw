@@ -270,7 +270,9 @@ namespace krabs { namespace testing {
     record_builder::pack_impl(const EVENT_RECORD &record) const
     {
         std::pair<std::vector<BYTE>, std::vector<std::wstring>> results;
-        krabs::schema event_schema(record);
+        krabs::schema_locator schema_locator;
+        krabs::schema event_schema(record, schema_locator);
+        // krabs::schema event_schema(record);
         krabs::parser event_parser(event_schema);
 
         // When the last property in a record is of string type (ansi or unicode), 

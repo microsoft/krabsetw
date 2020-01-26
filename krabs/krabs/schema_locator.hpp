@@ -17,6 +17,7 @@
 #include <unordered_map>
 
 #include "compiler_check.hpp"
+#include "errors.hpp"
 #include "guid.hpp"
 #include "lock.hpp"
 
@@ -94,16 +95,11 @@ namespace krabs {
 
     /**
      * <summary>
-     * Fetches and caches schemas from TDH. Also has a singleton
-     * instance. It is preferable to inject the locator, but the
-     * current krabs implementation isn't built in a way that
-     * allows the schema_locator to be injected in all of the
-     * places where Schemas or Parsers are constructed.
+     * Fetches and caches schemas from TDH.
      * </summary>
      */
     class schema_locator {
     public:
-
         /**
          * <summary>
          * Retrieves the event schema from the cache or falls back to
@@ -135,7 +131,6 @@ namespace krabs {
 
     private:
         static schema_locator singleton_;
-        critical_section sync_;
         std::unordered_map<schema_key, std::unique_ptr<char[]>> cache_;
     };
 
@@ -148,19 +143,9 @@ namespace krabs {
         auto key = schema_key(record);
         auto& buffer = cache_[key];
 
-        // return if there's a cache hit
-        if(buffer) return (PTRACE_EVENT_INFO)(&buffer[0]);
-
-        auto temp = get_event_schema_from_tdh(record);
-
-        // multiple threads may end up trying to save their
-        // temp objects to the cache so we need to lock
-        // so only the first entry should be cached.
-
-        if(!buffer)
-        {
-            scope_lock l(sync_);
-            if (!buffer) buffer.swap(temp);
+        if (!buffer) {
+            auto temp = get_event_schema_from_tdh(record);
+            buffer.swap(temp);
         }
 
         return (PTRACE_EVENT_INFO)(&buffer[0]);

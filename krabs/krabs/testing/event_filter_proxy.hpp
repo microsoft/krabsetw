@@ -71,4 +71,27 @@ namespace krabs { namespace testing {
         event_filter_.on_event(record);
     }
 
+    class threadsafe_event_filter_proxy {
+    public:
+        threadsafe_event_filter_proxy(krabs::threadsafe_event_filter& filter);
+        void push_event(const synth_record& record);
+
+    private:
+        krabs::threadsafe_event_filter& event_filter_;
+        krabs::schema_locator schema_locator_;
+    };
+
+    // Implementation
+    // ------------------------------------------------------------------------
+
+    inline threadsafe_event_filter_proxy::threadsafe_event_filter_proxy(krabs::threadsafe_event_filter& event_filter)
+        : event_filter_(event_filter)
+    {
+    }
+
+    inline void threadsafe_event_filter_proxy::push_event(const synth_record& record)
+    {
+        event_filter_.on_event(record, schema_locator_);
+    }
+
 } /* namespace testing */ } /* namespace krabs */
