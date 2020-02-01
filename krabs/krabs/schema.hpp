@@ -54,7 +54,7 @@ namespace krabs {
          */
         schema(const EVENT_RECORD &);
 
-        schema(const EVENT_RECORD &, krabs::schema_locator &);
+        schema(const EVENT_RECORD &, const krabs::schema_locator &);
 
         /**
          * <summary>Compares two schemas for equality.<summary>
@@ -206,7 +206,7 @@ namespace krabs {
         , pSchema_(schema_locator::get_instance().get_event_schema(record))
     { }
 
-    inline schema::schema(const EVENT_RECORD& record, krabs::schema_locator &schema_locator)
+    inline schema::schema(const EVENT_RECORD &record, const krabs::schema_locator &schema_locator)
         : record_(record)
         , pSchema_(schema_locator.get_event_schema(record))
     { }

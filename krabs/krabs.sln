@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
+# Visual Studio Version 15
 VisualStudioVersion = 15.0.27428.2027
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{5C9E224B-AEB7-456B-B309-92292ACE1A0D}"
@@ -46,6 +46,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs", "krabs", "{371361C8
 		krabs\size_provider.hpp = krabs\size_provider.hpp
 		krabs\tdh_helpers.hpp = krabs\tdh_helpers.hpp
 		krabs\trace.hpp = krabs\trace.hpp
+		krabs\trace_context.hpp = krabs\trace_context.hpp
 		krabs\ut.hpp = krabs\ut.hpp
 		krabs\version_helpers.hpp = krabs\version_helpers.hpp
 	EndProjectSection

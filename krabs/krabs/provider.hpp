@@ -10,7 +10,7 @@
 
 #include "compiler_check.hpp"
 #include "filtering/event_filter.hpp"
-#include "schema_locator.hpp"
+#include "trace_context.hpp"
 
 #include <evntcons.h>
 #include <guiddef.h>
@@ -39,8 +39,8 @@ namespace krabs {
     typedef void(*c_provider_callback)(const EVENT_RECORD &);
     typedef std::function<void(const EVENT_RECORD &)> provider_callback;
 
-    typedef void(*threadsafe_c_provider_callback)(const EVENT_RECORD&, schema_locator&);
-    typedef std::function<void(const EVENT_RECORD&, schema_locator&)> threadsafe_provider_callback;
+    typedef void(*threadsafe_c_provider_callback)(const EVENT_RECORD &, const trace_context &);
+    typedef std::function<void(const EVENT_RECORD &, const krabs::trace_context  &)> threadsafe_provider_callback;
 
     namespace details {
 
@@ -115,7 +115,7 @@ namespace krabs {
              *   Called when an event occurs, forwards to callbacks and filters.
              * </summary>
              */
-            void on_event(const EVENT_RECORD &record, krabs::schema_locator &schema_locator) const;
+            void on_event(const EVENT_RECORD &record, const krabs::trace_context &context) const;
 
         protected:
             std::deque<provider_callback> callbacks_;
@@ -387,7 +387,7 @@ namespace krabs {
         }
 
         template <typename T>
-        void base_provider<T>::on_event(const EVENT_RECORD &record, krabs::schema_locator &schema_locator) const
+        void base_provider<T>::on_event(const EVENT_RECORD &record, const krabs::trace_context &context) const
         {
             for (auto &callback : callbacks_) {
                 callback(record);
@@ -397,12 +397,12 @@ namespace krabs {
                 filter.on_event(record);
             }
 
-            for (auto& callback : threadsafe_callbacks_) {
-                callback(record, schema_locator);
+            for (auto &callback : threadsafe_callbacks_) {
+                callback(record, context);
             }
 
             for (auto& filter : threadsafe_filters_) {
-                filter.on_event(record, schema_locator);
+                filter.on_event(record, context);
             }
 
         }

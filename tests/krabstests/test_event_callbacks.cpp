@@ -15,7 +15,7 @@ using namespace std::placeholders;
 
 bool was_c_style_callback_invoked = false;
 
-void c_style_callback(const EVENT_RECORD &, krabs::schema_locator &)
+void c_style_callback(const EVENT_RECORD &, const krabs::trace_context &)
 {
     was_c_style_callback_invoked = true;
 }
@@ -23,12 +23,12 @@ void c_style_callback(const EVENT_RECORD &, krabs::schema_locator &)
 
 struct functor {
 public:
-    void operator()(const EVENT_RECORD &, krabs::schema_locator &)
+    void operator()(const EVENT_RECORD &, const krabs::trace_context &)
     {
         called_ = true;
     }
 
-    void my_member_func(const EVENT_RECORD &, krabs::schema_locator &)
+    void my_member_func(const EVENT_RECORD &, const krabs::trace_context &)
     {
         called_ = true;
     }
@@ -53,7 +53,7 @@ public:
         : called_(b)
     {}
 
-    void operator()(const EVENT_RECORD &, krabs::schema_locator &)
+    void operator()(const EVENT_RECORD &, const krabs::trace_context &)
     {
         called_ = true;
     }
@@ -92,7 +92,7 @@ namespace krabstests
 
         TEST_METHOD(add_callback_should_allow_lambdas_as_callbacks)
         {
-            provider.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) {});
+            provider.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {});
         }
 
         TEST_METHOD(add_callback_should_allow_temporary_objects_as_callbacks)
@@ -120,7 +120,7 @@ namespace krabstests
 
             provider.add_on_event_threadsafe_callback(c_style_callback);
             provider.add_on_event_threadsafe_callback(func1);
-            provider.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) {
+            provider.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {
                 was_lambda_invoked = true;
             });
 

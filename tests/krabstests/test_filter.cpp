@@ -30,8 +30,8 @@ namespace krabstests
             auto was_called1 = false;
             auto was_called2 = false;
 
-            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) { was_called1 = true; });
-            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) { was_called2 = true; });
+            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called1 = true; });
+            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called2 = true; });
 
             krabs::testing::threadsafe_event_filter_proxy proxy(filter);
             proxy.push_event(record);
@@ -47,8 +47,8 @@ namespace krabstests
             auto was_called1 = false;
             auto was_called2 = false;
 
-            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) { was_called1 = true; });
-            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, krabs::schema_locator &) { was_called2 = true; });
+            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called1 = true; });
+            filter.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called2 = true; });
 
             krabs::testing::threadsafe_event_filter_proxy proxy(filter);
             proxy.push_event(record);

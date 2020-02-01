@@ -38,14 +38,14 @@ namespace krabs {
         uint8_t   version;
         uint8_t   level;
 
-        schema_key(const EVENT_RECORD& record)
+        schema_key(const EVENT_RECORD &record)
             : provider(record.EventHeader.ProviderId)
             , id(record.EventHeader.EventDescriptor.Id)
             , opcode(record.EventHeader.EventDescriptor.Opcode)
             , level(record.EventHeader.EventDescriptor.Level)
             , version(record.EventHeader.EventDescriptor.Version) { }
 
-        bool operator==(const schema_key& rhs) const
+        bool operator==(const schema_key &rhs) const
         {
             return provider == rhs.provider &&
                    id == rhs.id &&
@@ -54,7 +54,7 @@ namespace krabs {
                    version == rhs.version;
         }
 
-        bool operator!=(const schema_key& rhs) const { return !(*this == rhs); }
+        bool operator!=(const schema_key &rhs) const { return !(*this == rhs); }
     };
 }
 
@@ -68,7 +68,7 @@ namespace std {
     template<>
     struct std::hash<krabs::schema_key>
     {
-        size_t operator()(const krabs::schema_key& key) const
+        size_t operator()(const krabs::schema_key &key) const
         {
             // Shift-Add-XOR hash - good enough for the small sets we deal with
             const char* p = (const char*)&key;
@@ -91,11 +91,13 @@ namespace krabs {
      * Get event schema from TDH.
      * </summary>
      */
-    std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD&);
+    std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD &);
 
     /**
      * <summary>
      * Fetches and caches schemas from TDH.
+     * NOTE: this cache also reduces the number of managed to native transitions
+     * when krabs is compiled into a managed assembly.
      * </summary>
      */
     class schema_locator {
@@ -106,7 +108,7 @@ namespace krabs {
          * TDH to load the schema.
          * </summary>
          */
-        const PTRACE_EVENT_INFO get_event_schema(const EVENT_RECORD& record);
+        const PTRACE_EVENT_INFO get_event_schema(const EVENT_RECORD &record) const;
 
         /**
          * <summary>
@@ -131,13 +133,13 @@ namespace krabs {
 
     private:
         static schema_locator singleton_;
-        std::unordered_map<schema_key, std::unique_ptr<char[]>> cache_;
+        mutable std::unordered_map<schema_key, std::unique_ptr<char[]>> cache_;
     };
 
     // Implementation
     // ------------------------------------------------------------------------
 
-    inline const PTRACE_EVENT_INFO schema_locator::get_event_schema(const EVENT_RECORD& record)
+    inline const PTRACE_EVENT_INFO schema_locator::get_event_schema(const EVENT_RECORD &record) const
     {
         // check the cache
         auto key = schema_key(record);
@@ -156,7 +158,7 @@ namespace krabs {
         cache_.clear();
     }
 
-    inline std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD& record)
+    inline std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD &record)
     {
         // get required size
         ULONG bufferSize = 0;

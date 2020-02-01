@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "../compiler_check.hpp"
-#include "../schema_locator.hpp"
+#include "../trace_context.hpp"
 
 namespace krabs { namespace testing {
     class event_filter_proxy;
@@ -25,8 +25,8 @@ namespace krabs {
 
     typedef void(*c_provider_callback)(const EVENT_RECORD &);
     typedef std::function<void(const EVENT_RECORD &)> provider_callback;
-    typedef void(*threadsafe_c_provider_callback)(const EVENT_RECORD&, krabs::schema_locator&);
-    typedef std::function<void(const EVENT_RECORD&, krabs::schema_locator&)> threadsafe_provider_callback;
+    typedef void(*threadsafe_c_provider_callback)(const EVENT_RECORD&, const trace_context&);
+    typedef std::function<void(const EVENT_RECORD&, const trace_context&)> threadsafe_provider_callback;
     typedef std::function<bool(const EVENT_RECORD &)> filter_predicate;
 
     template <typename T> class provider;
@@ -195,7 +195,7 @@ namespace krabs {
         }
 
     private:
-        void on_event(const EVENT_RECORD& record, krabs::schema_locator& schema_locator) const;
+        void on_event(const EVENT_RECORD& record, const trace_context &context) const;
 
     private:
         std::deque<threadsafe_provider_callback> threadsafe_callbacks_;
@@ -245,7 +245,7 @@ namespace krabs {
     }
 
 
-    inline void threadsafe_event_filter::on_event(const EVENT_RECORD& record, krabs::schema_locator& schema_locator) const
+    inline void threadsafe_event_filter::on_event(const EVENT_RECORD& record, const trace_context &context) const
     {
         if (threadsafe_callbacks_.empty()) {
             return;
@@ -256,7 +256,7 @@ namespace krabs {
         }
 
         for (auto& callback : threadsafe_callbacks_) {
-            callback(record, schema_locator);
+            callback(record, context);
         }
     }
 } /* namespace krabs */
