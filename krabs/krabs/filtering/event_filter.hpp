@@ -24,7 +24,7 @@ namespace krabs {
 
     typedef void(*c_provider_callback)(const EVENT_RECORD &, const krabs::trace_context &);
     typedef std::function<void(const EVENT_RECORD &, const krabs::trace_context &)> provider_callback;
-    typedef std::function<bool(const EVENT_RECORD &)> filter_predicate;
+    typedef std::function<bool(const EVENT_RECORD &, const krabs::trace_context &)> filter_predicate;
 
     template <typename T> class provider;
 
@@ -161,7 +161,7 @@ namespace krabs {
             return;
         }
 
-        if (predicate_ != nullptr && !predicate_(record)) {
+        if (predicate_ != nullptr && !predicate_(record, trace_context)) {
             return;
         }
 
