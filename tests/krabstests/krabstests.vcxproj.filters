@@ -43,9 +43,6 @@
     <ClCompile Include="test_collection_view.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\krabs\krabs.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="test_trace_properties.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

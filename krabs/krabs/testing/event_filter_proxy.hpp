@@ -56,6 +56,7 @@ namespace krabs { namespace testing {
 
     private:
         krabs::event_filter &event_filter_;
+        krabs::trace_context trace_context_;
     };
 
     // Implementation
@@ -67,29 +68,6 @@ namespace krabs { namespace testing {
     }
 
     inline void event_filter_proxy::push_event(const synth_record &record)
-    {
-        event_filter_.on_event(record);
-    }
-
-    class threadsafe_event_filter_proxy {
-    public:
-        threadsafe_event_filter_proxy(krabs::threadsafe_event_filter& filter);
-        void push_event(const synth_record& record);
-
-    private:
-        krabs::threadsafe_event_filter& event_filter_;
-        krabs::trace_context trace_context_;
-    };
-
-    // Implementation
-    // ------------------------------------------------------------------------
-
-    inline threadsafe_event_filter_proxy::threadsafe_event_filter_proxy(krabs::threadsafe_event_filter& event_filter)
-        : event_filter_(event_filter)
-    {
-    }
-
-    inline void threadsafe_event_filter_proxy::push_event(const synth_record& record)
     {
         event_filter_.on_event(record, trace_context_);
     }

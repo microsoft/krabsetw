@@ -96,10 +96,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             return *filter_;
         }
 
-        void EventNotification(const EVENT_RECORD &);
+        void EventNotification(const EVENT_RECORD &, const krabs::trace_context &);
 
     internal:
-        delegate void NativeHookDelegate(const EVENT_RECORD &);
+        delegate void NativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
 
         NativeHookDelegate ^del_;
         NativePtr<krabs::event_filter> filter_;
@@ -178,11 +178,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
     }
 
-    inline void EventFilter::EventNotification(const EVENT_RECORD &record)
+    inline void EventFilter::EventNotification(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
     {
         try
         {
-            krabs::schema schema(record);
+            krabs::schema schema(record, trace_context.schema_locator);
             krabs::parser parser(schema);
 
             OnEvent(gcnew EventRecord(record, schema, parser));

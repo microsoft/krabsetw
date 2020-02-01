@@ -121,7 +121,8 @@ namespace krabs { namespace predicates {
 
             bool operator()(const EVENT_RECORD &record) const
             {
-                krabs::schema schema(record);
+                krabs::schema_locator schema_locator;
+                krabs::schema schema(record, schema_locator);
                 krabs::parser parser(schema);
 
                 try {
@@ -161,7 +162,8 @@ namespace krabs { namespace predicates {
 
             bool operator()(const EVENT_RECORD &record)
             {
-                krabs::schema schema(record);
+                krabs::schema_locator schema_locator;
+                krabs::schema schema(record, schema_locator);
                 krabs::parser parser(schema);
 
                 try {

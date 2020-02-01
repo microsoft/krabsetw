@@ -21,7 +21,7 @@ namespace krabstests
         TEST_METHOD(should_allow_event_registration)
         {
             krabs::kernel::thread_dispatch_provider cs;
-            cs.add_on_event_threadsafe_callback([](const EVENT_RECORD &, const krabs::trace_context &) {});
+            cs.add_on_event_callback([](const EVENT_RECORD &, const krabs::trace_context &) {});
         }
 
         TEST_METHOD(should_be_addable_to_a_kernel_trace)
@@ -38,13 +38,13 @@ namespace krabstests
 
             krabs::kernel_trace trace;
             krabs::kernel::image_load_provider cs;
-            cs.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {
+            cs.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {
                 calledImageLoad = true;
             });
             trace.enable(cs);
 
             krabs::kernel::alpc_provider ap;
-            ap.add_on_event_threadsafe_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {
+            ap.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {
                 calledAlpc = true;
             });
             trace.enable(ap);

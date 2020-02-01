@@ -93,7 +93,7 @@ namespace krabstests
                 (L"Message", L"Fake message");
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             Assert::AreEqual(parser.parse<std::wstring>(L"ClassName"), std::wstring(L"FClassName"));
@@ -110,7 +110,7 @@ namespace krabstests
                 (L"Status", (unsigned int)300);
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             Assert::AreEqual(parser.parse<unsigned int>(L"Status"), (unsigned int)300);
@@ -123,5 +123,8 @@ namespace krabstests
             krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
             auto record = builder.pack_incomplete();
         }
+
+        private:
+            krabs::schema_locator schema_locator_;
     };
 }

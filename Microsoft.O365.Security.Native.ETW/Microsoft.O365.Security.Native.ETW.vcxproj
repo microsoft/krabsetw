@@ -187,7 +187,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\krabs\krabs.cpp" />
     <ClCompile Include="AssemblyInfo.cpp" />
     <ClCompile Include="ETWLib.cpp" />
   </ItemGroup>

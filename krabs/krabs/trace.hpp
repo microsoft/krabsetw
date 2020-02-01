@@ -11,6 +11,7 @@
 #include "trace_context.hpp"
 #include "etw.hpp"
 
+
 namespace krabs { namespace details {
     template <typename T> class trace_manager;
 } /* namespace details */ } /* namespace krabs */

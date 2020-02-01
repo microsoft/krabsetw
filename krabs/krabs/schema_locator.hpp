@@ -19,7 +19,6 @@
 #include "compiler_check.hpp"
 #include "errors.hpp"
 #include "guid.hpp"
-#include "lock.hpp"
 
 #pragma comment(lib, "tdh.lib")
 
@@ -102,6 +101,7 @@ namespace krabs {
      */
     class schema_locator {
     public:
+
         /**
          * <summary>
          * Retrieves the event schema from the cache or falls back to
@@ -110,29 +110,7 @@ namespace krabs {
          */
         const PTRACE_EVENT_INFO get_event_schema(const EVENT_RECORD &record) const;
 
-        /**
-         * <summary>
-         * Reset the cache. IMPORTANT! This cannot be called while other
-         * objects have references to cache items. This basically means
-         * don't call this unless tracing is stopped or you'll probably
-         * cause an AV. TODO: could be addressed with shared_ptr but
-         * requires C++17 features or some rewrite of the buffer handling.
-         * </summary>
-         */
-        void reset();
-
-        /**
-         * Get the schema_locator singleton instance.
-         * WARNING: if compiled into managed code, do NOT get a reference
-         * to this in a static initializer or it will cause loader lock.
-         */
-        static schema_locator& get_instance()
-        {
-            return singleton_;
-        }
-
     private:
-        static schema_locator singleton_;
         mutable std::unordered_map<schema_key, std::unique_ptr<char[]>> cache_;
     };
 
@@ -150,12 +128,7 @@ namespace krabs {
             buffer.swap(temp);
         }
 
-        return (PTRACE_EVENT_INFO)(&buffer[0]);
-    }
-
-    inline void schema_locator::reset()
-    {
-        cache_.clear();
+        return (PTRACE_EVENT_INFO)(buffer.get());
     }
 
     inline std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD &record)
@@ -181,7 +154,7 @@ namespace krabs {
             (PEVENT_RECORD)&record,
             0,
             NULL,
-            (PTRACE_EVENT_INFO)&buffer[0],
+            (PTRACE_EVENT_INFO)buffer.get(),
             &bufferSize));
 
         return buffer;

@@ -62,7 +62,7 @@ namespace krabstests
         TEST_METHOD(should_allow_event_registration)
         {
             krabs::provider<> foo(krabs::guid::random_guid());
-            foo.add_on_event_threadsafe_callback([](const EVENT_RECORD &, const krabs::trace_context &) {});
+            foo.add_on_event_callback([](const EVENT_RECORD &, const krabs::trace_context &) {});
         }
 
         TEST_METHOD(should_allow_any_all_level_flag_settings)

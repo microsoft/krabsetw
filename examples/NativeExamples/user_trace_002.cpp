@@ -38,8 +38,8 @@ void user_trace_002::start()
     krabs::event_filter filter(krabs::predicates::id_is(7937));
 
     // event_filters can have attached callbacks, just like a regular provider.
-    filter.add_on_event_callback([](const EVENT_RECORD &record) {
-        krabs::schema schema(record);
+    filter.add_on_event_callback([](const EVENT_RECORD &record, const krabs::trace_context &trace_context) {
+        krabs::schema schema(record, trace_context.schema_locator);
         assert(schema.event_id() == 7937);
         std::wcout << L"Event 7937 received!" << std::endl;
     });

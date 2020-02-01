@@ -13,7 +13,6 @@
 
 namespace krabs { namespace testing {
     class event_filter_proxy;
-    class threadsafe_event_filter_proxy;
 } /* namespace testing */} /* namespace krabs */
 
 namespace krabs { namespace details {
@@ -23,10 +22,8 @@ namespace krabs { namespace details {
 
 namespace krabs {
 
-    typedef void(*c_provider_callback)(const EVENT_RECORD &);
-    typedef std::function<void(const EVENT_RECORD &)> provider_callback;
-    typedef void(*threadsafe_c_provider_callback)(const EVENT_RECORD&, const trace_context&);
-    typedef std::function<void(const EVENT_RECORD&, const trace_context&)> threadsafe_provider_callback;
+    typedef void(*c_provider_callback)(const EVENT_RECORD &, const krabs::trace_context &);
+    typedef std::function<void(const EVENT_RECORD &, const krabs::trace_context &)> provider_callback;
     typedef std::function<bool(const EVENT_RECORD &)> filter_predicate;
 
     template <typename T> class provider;
@@ -100,7 +97,7 @@ namespace krabs {
          *   satisfies the predicate.
          * </summary>
          */
-        void on_event(const EVENT_RECORD &record) const;
+        void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const;
 
     private:
         std::deque<provider_callback> callbacks_;
@@ -158,7 +155,7 @@ namespace krabs {
         callbacks_.push_back(callback);
     }
 
-    inline void event_filter::on_event(const EVENT_RECORD &record) const
+    inline void event_filter::on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const
     {
         if (callbacks_.empty()) {
             return;
@@ -169,94 +166,7 @@ namespace krabs {
         }
 
         for (auto &callback : callbacks_) {
-            callback(record);
-        }
-
-    }
-
-
-    class threadsafe_event_filter {
-    public:
-        threadsafe_event_filter(filter_predicate predicate);
-        threadsafe_event_filter(unsigned short event_id, filter_predicate predicate = nullptr);
-        threadsafe_event_filter(std::vector<unsigned short> event_ids, filter_predicate predicate = nullptr);
-
-        void add_on_event_threadsafe_callback(threadsafe_c_provider_callback callback);
-
-        template <typename U>
-        void add_on_event_threadsafe_callback(U& callback);
-
-        template <typename U>
-        void add_on_event_threadsafe_callback(const U& callback);
-
-        const std::vector<unsigned short>& provider_filter_event_ids() const
-        {
-            return provider_filter_event_ids_;
-        }
-
-    private:
-        void on_event(const EVENT_RECORD& record, const trace_context &context) const;
-
-    private:
-        std::deque<threadsafe_provider_callback> threadsafe_callbacks_;
-        filter_predicate predicate_{ nullptr };
-        std::vector<unsigned short> provider_filter_event_ids_;
-
-    private:
-        template <typename T>
-        friend class details::base_provider;
-
-        friend class krabs::testing::event_filter_proxy;
-        friend class krabs::testing::threadsafe_event_filter_proxy;
-    };
-
-    // Implementation
-    // ------------------------------------------------------------------------
-
-    inline threadsafe_event_filter::threadsafe_event_filter(filter_predicate predicate)
-        : predicate_(predicate)
-    {}
-
-    inline threadsafe_event_filter::threadsafe_event_filter(std::vector<unsigned short> event_ids, filter_predicate predicate/*=nullptr*/)
-        : provider_filter_event_ids_{ event_ids },
-        predicate_(predicate)
-    {}
-
-    inline threadsafe_event_filter::threadsafe_event_filter(unsigned short event_id, filter_predicate predicate/*=nullptr*/)
-        : provider_filter_event_ids_{ event_id },
-        predicate_(predicate)
-    {}
-
-    inline void threadsafe_event_filter::add_on_event_threadsafe_callback(threadsafe_c_provider_callback callback)
-    {
-        threadsafe_callbacks_.push_back(callback);
-    }
-
-    template <typename U>
-    void threadsafe_event_filter::add_on_event_threadsafe_callback(U& callback)
-    {
-        threadsafe_callbacks_.push_back(std::ref(callback));
-    }
-
-    template <typename U>
-    void threadsafe_event_filter::add_on_event_threadsafe_callback(const U& callback)
-    {
-        threadsafe_callbacks_.push_back(callback);
-    }
-
-
-    inline void threadsafe_event_filter::on_event(const EVENT_RECORD& record, const trace_context &context) const
-    {
-        if (threadsafe_callbacks_.empty()) {
-            return;
-        }
-
-        if (predicate_ != nullptr && !predicate_(record)) {
-            return;
-        }
-
-        for (auto& callback : threadsafe_callbacks_) {
-            callback(record, context);
+            callback(record, trace_context);
         }
     }
 } /* namespace krabs */
