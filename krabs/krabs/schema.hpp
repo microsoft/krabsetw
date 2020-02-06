@@ -47,7 +47,7 @@ namespace krabs {
          * </summary>
          *
          * <example>
-         *   void event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+         *   void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
          *   {
          *       krabs::schema schema(record, trace_context.schema_locator);
          *   }
