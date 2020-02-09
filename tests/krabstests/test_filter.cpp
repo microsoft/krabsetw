@@ -22,6 +22,8 @@ namespace krabstests
 
         krabs::testing::synth_record record = init();
 
+        krabs::trace_context trace_context;
+
     public:
         TEST_METHOD(should_forward_calls_to_all_its_callbacks_with_an_identity_filter)
         {
@@ -30,8 +32,8 @@ namespace krabstests
             auto was_called1 = false;
             auto was_called2 = false;
 
-            filter.add_on_event_callback([&](const EVENT_RECORD &) { was_called1 = true; });
-            filter.add_on_event_callback([&](const EVENT_RECORD &) { was_called2 = true; });
+            filter.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called1 = true; });
+            filter.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called2 = true; });
 
             krabs::testing::event_filter_proxy proxy(filter);
             proxy.push_event(record);
@@ -47,8 +49,8 @@ namespace krabstests
             auto was_called1 = false;
             auto was_called2 = false;
 
-            filter.add_on_event_callback([&](const EVENT_RECORD &) { was_called1 = true; });
-            filter.add_on_event_callback([&](const EVENT_RECORD &) { was_called2 = true; });
+            filter.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called1 = true; });
+            filter.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called2 = true; });
 
             krabs::testing::event_filter_proxy proxy(filter);
             proxy.push_event(record);
@@ -67,79 +69,79 @@ namespace krabstests
         TEST_METHOD(id_is_should_match_events_that_have_matching_ids)
         {
             krabs::predicates::id_is filter(7937);
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(id_is_should_match_events_that_dont_have_matching_ids)
         {
             krabs::predicates::id_is filter(8000);
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(version_is_should_match_events_that_have_matching_versions)
         {
             krabs::predicates::version_is filter(krabs::version(1));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(version_is_should_not_match_events_that_dont_have_matching_versions)
         {
             krabs::predicates::version_is filter(krabs::version(2));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(opcode_is_should_match_events_that_have_matching_opcodes)
         {
             krabs::predicates::opcode_is filter(krabs::opcode(0));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(opcode_is_should_not_match_events_that_dont_have_matching_opcodes)
         {
             krabs::predicates::opcode_is filter(krabs::opcode(77));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_is_should_match_events_with_matching_property_values)
         {
             auto filter = krabs::predicates::property_is(L"ContextInfo", std::wstring(L"Foo bar baz bingo"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_is_should_not_match_events_that_dont_have_matching_property_values)
         {
             auto filter = krabs::predicates::property_is(L"ContextInfo", std::wstring(L"Foo2"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_is_should_not_match_events_if_property_isnt_in_schema)
         {
             auto filter = krabs::predicates::property_is(L"SpecialSillyname", std::wstring(L"Foo2"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_equals_should_match_properties_that_exactly_match_expected)
         {
             auto filter = krabs::predicates::property_equals(L"ContextInfo", std::wstring(L"Foo bar baz bingo"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_equals_should_not_match_properties_that_dont_exactly_match_expected)
         {
             auto filter = krabs::predicates::property_equals(L"ContextInfo", std::wstring(L"I don't match"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_equals_should_match_counted_string_properties_that_exactly_match_expected)
         {
             auto filter = krabs::predicates::property_equals<adpt::counted_string>(L"UserData", std::wstring(L"this counted string is 31 chara"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_equals_should_not_match_counted_string_properties_that_do_not_exactly_match_expected)
         {
             auto filter = krabs::predicates::property_equals<adpt::counted_string>(L"UserData", std::wstring(L"I don't match"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         /* the ">" unicode character at the start corresponds to 0x003E, or 62. Therefore this function should only compare
@@ -148,31 +150,31 @@ namespace krabstests
         TEST_METHOD(property_equals_should_not_match_counted_string_props_that_include_past_endof_string)
         {
             auto filter = krabs::predicates::property_equals<adpt::counted_string>(L"UserData", std::wstring(L"this counted string is 31 charac"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_iequals_should_match_properties_that_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_iequals(L"ContextInfo", std::wstring(L"Foo BAR BAZ BINgo"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_iequals_should_not_match_properties_that_dont_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_iequals(L"ContextInfo", std::wstring(L"I don't match"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_iequals_should_match_counted_string_properties_that_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_iequals<adpt::counted_string>(L"UserData", std::wstring(L"this cOUNTED STRING IS 31 chara"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_iequals_should_not_match_counted_string_properties_that_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_iequals<adpt::counted_string>(L"UserData", std::wstring(L"I don't match"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         /* the ">" unicode character at the start corresponds to 0x003E, or 62. Therefore this function should only compare
@@ -181,31 +183,31 @@ namespace krabstests
         TEST_METHOD(property_iequals_should_not_match_counted_string_properties_that_include_past_string_end)
         {
             auto filter = krabs::predicates::property_iequals<adpt::counted_string>(L"UserData", std::wstring(L"this counTED STRING IS 31 charac"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_contains_should_match_properties_that_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_contains(L"ContextInfo", std::wstring(L"bar"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_contains_should_not_match_properties_that_dont_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_contains(L"ContextInfo", std::wstring(L"smile"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_contains_should_match_counted_string_properties_that_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_contains<adpt::counted_string>(L"UserData", std::wstring(L"counted string"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_contains_should_not_match_counted_string_properties_that_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_contains<adpt::counted_string>(L"UserData", std::wstring(L"unrelated string"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         /* the ">" unicode character at the start corresponds to 0x003E, or 62. Therefore this function should only compare
@@ -214,37 +216,37 @@ namespace krabstests
         TEST_METHOD(property_contains_should_not_match_counted_string_properties_that_include_past_string_end)
         {
             auto filter = krabs::predicates::property_contains<adpt::counted_string>(L"UserData", std::wstring(L"charac"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_contains_should_match_counted_string_properties_that_contain_string_values_at_end)
         {
             auto filter = krabs::predicates::property_contains<adpt::counted_string>(L"UserData", std::wstring(L"chara"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_icontains_should_match_properties_that_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_icontains(L"ContextInfo", std::wstring(L"BaR"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_icontains_should_not_match_properties_that_dont_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_icontains(L"ContextInfo", std::wstring(L"sMiLE"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_icontains_should_match_counted_string_properties_that_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_icontains<adpt::counted_string>(L"UserData", std::wstring(L"cOUnTeD stRIng"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_icontains_should_not_match_counted_string_properties_that_case_insensitive_match_expected)
         {
             auto filter = krabs::predicates::property_icontains<adpt::counted_string>(L"UserData", std::wstring(L"unRElATed sTRiNg"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         /* the ">" unicode character at the start corresponds to 0x003E, or 62. Therefore this function should only compare
@@ -253,67 +255,67 @@ namespace krabstests
         TEST_METHOD(property_icontains_should_not_match_counted_string_properties_that_include_past_string_end)
         {
             auto filter = krabs::predicates::property_icontains<adpt::counted_string>(L"UserData", std::wstring(L"chaRaC"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_icontains_should_match_counted_string_properties_that_contain_string_values_at_end_of_len)
         {
             auto filter = krabs::predicates::property_icontains<adpt::counted_string>(L"UserData", std::wstring(L"cHaRa"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_starts_with_should_match_properties_that_starts_with_expected)
         {
             auto filter = krabs::predicates::property_starts_with(L"ContextInfo", std::wstring(L"Foo bar"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_starts_with_should_not_match_properties_that_doesnt_starts_with_expected)
         {
             auto filter = krabs::predicates::property_starts_with(L"ContextInfo", std::wstring(L"baz bingo"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_starts_with_should_match_counted_string_properties_that_starts_with_expected)
         {
             auto filter = krabs::predicates::property_starts_with<adpt::counted_string>(L"UserData", std::wstring(L"this counted"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_starts_with_should_not_match_counted_string_properties_that_starts_with_expected)
         {
             auto filter = krabs::predicates::property_starts_with<adpt::counted_string>(L"UserData", std::wstring(L"string is"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_starts_with_should_not_match_with_unicode_length_character_at_start)
         {
             auto filter = krabs::predicates::property_starts_with<adpt::counted_string>(L"UserData", std::wstring(L">"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_starts_with_should_not_match_events_that_go_past_given_counted_string_len)
         {
             auto filter = krabs::predicates::property_starts_with<adpt::counted_string>(L"UserData", std::wstring(L"this counted string is 31 charac"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_istarts_with_should_match_events_that_start_with_expected)
         {
             auto filter = krabs::predicates::property_istarts_with(L"ContextInfo", std::wstring(L"fOo BAr"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_istarts_with_should_not_match_events_that_do_not_match_expected)
         {
             auto filter = krabs::predicates::property_istarts_with(L"ContextInfo", std::wstring(L"baZ bINgo"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_istarts_with_should_match_counted_string_with_events_that_start_with_expected)
         {
             auto filter = krabs::predicates::property_istarts_with<adpt::counted_string>(L"UserData", std::wstring(L"tHIs CouNTed"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         /* the ">" unicode character at the start corresponds to 0x003E, or 62. Therefore this function should only compare
@@ -322,130 +324,130 @@ namespace krabstests
         TEST_METHOD(property_istarts_with_should_not_match_counted_string_with_events_that_start_with_expected)
         {
             auto filter = krabs::predicates::property_istarts_with<adpt::counted_string>(L"UserData", std::wstring(L"stRING is"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_istarts_with_should_not_match_events_that_start_with_unicode_length_char)
         {
             auto filter = krabs::predicates::property_istarts_with<adpt::counted_string>(L"UserData", std::wstring(L">"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_istarts_with_should_not_match_events_that_go_past_given_counted_string_len)
         {
             auto filter = krabs::predicates::property_istarts_with<adpt::counted_string>(L"UserData", std::wstring(L"thIS coUNteD stRINg is 31 chArac"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_ends_with_should_match_properties_that_ends_with_expected)
         {
             auto filter = krabs::predicates::property_ends_with(L"ContextInfo", std::wstring(L"baz bingo"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_ends_with_should_not_match_properties_that_doesnt_ends_with_expected)
         {
             auto filter = krabs::predicates::property_ends_with(L"ContextInfo", std::wstring(L"Foo bar"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_ends_with_should_match_counted_string_properties_that_ends_with_expected)
         {
             auto filter = krabs::predicates::property_ends_with<adpt::counted_string>(L"UserData", std::wstring(L"is 31 chara"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_ends_with_should_not_match_counted_string_properties_that_ends_with_expected)
         {
             auto filter = krabs::predicates::property_ends_with<adpt::counted_string>(L"UserData", std::wstring(L"a lot after"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_ends_with_should_not_match_events_that_go_past_given_counted_string_len)
         {
             auto filter = krabs::predicates::property_ends_with<adpt::counted_string>(L"UserData", std::wstring(L"this counted string is 31 charac"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_iends_with_should_match_events_that_start_with_expected)
         {
             auto filter = krabs::predicates::property_iends_with(L"ContextInfo", std::wstring(L"baZ bINgo"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_iends_with_should_not_match_events_that_do_not_match_expected)
         {
             auto filter = krabs::predicates::property_iends_with(L"ContextInfo", std::wstring(L"fOo BAr"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_iends_with_should_match_counted_string_with_events_that_end_with_expected)
         {
             auto filter = krabs::predicates::property_iends_with<adpt::counted_string>(L"UserData", std::wstring(L"iS 31 chaRa"));
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(property_iends_with_should_not_match_counted_string_with_events_that_with_with_expected)
         {
             auto filter = krabs::predicates::property_iends_with<adpt::counted_string>(L"UserData", std::wstring(L"a LOT aFteR"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(property_iends_with_should_not_match_events_that_go_past_given_counted_string_len)
         {
             auto filter = krabs::predicates::property_iends_with<adpt::counted_string>(L"UserData", std::wstring(L"thIS coUNteD stRINg is 31 chArac"));
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(and_should_match_an_event_if_both_components_match)
         {
             auto filter = krabs::predicates::and_filter(krabs::predicates::any_event, krabs::predicates::any_event);
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(and_should_not_match_if_left_component_does_not_match)
         {
             auto filter = krabs::predicates::and_filter(krabs::predicates::no_event, krabs::predicates::any_event);
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(and_should_not_match_if_right_component_does_not_match)
         {
             auto filter = krabs::predicates::and_filter(krabs::predicates::any_event, krabs::predicates::no_event);
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(or_should_match_an_event_if_left_component_matches)
         {
             auto filter = krabs::predicates::or_filter(krabs::predicates::any_event, krabs::predicates::no_event);
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(or_should_match_an_event_if_right_component_matches)
         {
             auto filter = krabs::predicates::or_filter(krabs::predicates::no_event, krabs::predicates::any_event);
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(or_should_match_an_event_if_both_components_match)
         {
             auto filter = krabs::predicates::or_filter(krabs::predicates::any_event, krabs::predicates::any_event);
-            Assert::IsTrue(filter(record));
+            Assert::IsTrue(filter(record, trace_context));
         }
 
         TEST_METHOD(or_should_not_match_if_neither_component_matches)
         {
             auto filter = krabs::predicates::or_filter(krabs::predicates::no_event, krabs::predicates::no_event);
-            Assert::IsFalse(filter(record));
+            Assert::IsFalse(filter(record, trace_context));
         }
 
         TEST_METHOD(not_should_negate_value_of_component_filter)
         {
             auto filter1 = krabs::predicates::not_filter(krabs::predicates::any_event);
-            Assert::IsFalse(filter1(record));
+            Assert::IsFalse(filter1(record, trace_context));
 
             auto filter2 = krabs::predicates::not_filter(krabs::predicates::no_event);
-            Assert::IsTrue(filter2(record));
+            Assert::IsTrue(filter2(record, trace_context));
         }
     };
 }

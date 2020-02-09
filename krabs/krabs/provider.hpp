@@ -10,6 +10,7 @@
 
 #include "compiler_check.hpp"
 #include "filtering/event_filter.hpp"
+#include "trace_context.hpp"
 
 #include <evntcons.h>
 #include <guiddef.h>
@@ -35,8 +36,8 @@ namespace krabs {
     template <typename T>
     class trace;
 
-    typedef void(*c_provider_callback)(const EVENT_RECORD &);
-    typedef std::function<void(const EVENT_RECORD &)> provider_callback;
+    typedef void(*c_provider_callback)(const EVENT_RECORD &, const krabs::trace_context &);
+    typedef std::function<void(const EVENT_RECORD &, const krabs::trace_context &)> provider_callback;
 
     namespace details {
 
@@ -101,7 +102,7 @@ namespace krabs {
              *   Called when an event occurs, forwards to callbacks and filters.
              * </summary>
              */
-            void on_event(const EVENT_RECORD &record) const;
+            void on_event(const EVENT_RECORD &record, const krabs::trace_context &context) const;
 
         protected:
             std::deque<provider_callback> callbacks_;
@@ -344,17 +345,16 @@ namespace krabs {
         }
 
         template <typename T>
-        void base_provider<T>::on_event(const EVENT_RECORD &record) const
+        void base_provider<T>::on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const
         {
             for (auto &callback : callbacks_) {
-                callback(record);
+                callback(record, trace_context);
             }
 
             for (auto &filter : filters_) {
-                filter.on_event(record);
+                filter.on_event(record, trace_context);
             }
         }
-
     } // namespace details
 
     // ------------------------------------------------------------------------

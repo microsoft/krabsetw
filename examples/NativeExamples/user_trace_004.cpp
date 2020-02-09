@@ -37,8 +37,8 @@ void user_trace_004::start()
     // predicate filtering is taking in consideration only system process
     krabs::event_filter filter(11, krabs::predicates::process_id_is(4)); 
 
-    auto cb = [](const EVENT_RECORD &record) {
-        krabs::schema schema(record);
+    auto cb = [](const EVENT_RECORD &record, const krabs::trace_context &trace_context) {
+        krabs::schema schema(record, trace_context.schema_locator);
         assert(schema.event_id() == 11);
         assert(schema.process_id() == 4);
         std::wcout << L"Event " + 

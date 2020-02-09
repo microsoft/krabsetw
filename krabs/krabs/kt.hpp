@@ -123,7 +123,7 @@ namespace krabs { namespace details {
     {
         for (auto &provider : trace.providers_) {
             if (provider.get().id() == record.EventHeader.ProviderId) {
-                provider.get().on_event(record);
+                provider.get().on_event(record, trace.context_);
             }
         }
     }

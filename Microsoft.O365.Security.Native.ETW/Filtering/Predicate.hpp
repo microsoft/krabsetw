@@ -102,7 +102,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         bool Test(Testing::SynthRecord^ record)
         {
             auto& nativeRecord = *(record->record_);
-            return to_underlying()(nativeRecord);
+            krabs::trace_context trace_context;
+            return to_underlying()(nativeRecord, trace_context);
         }
 
     internal:

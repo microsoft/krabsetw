@@ -8,6 +8,7 @@
 #include "compiler_check.hpp"
 #include "guid.hpp"
 #include "provider.hpp"
+#include "trace_context.hpp"
 #include "etw.hpp"
 
 
@@ -233,6 +234,8 @@ namespace krabs {
 
         EVENT_TRACE_PROPERTIES properties_;
 
+        const trace_context context_;
+
     private:
         template <typename T>
         friend class details::trace_manager;
@@ -252,6 +255,7 @@ namespace krabs {
     , sessionHandle_(INVALID_PROCESSTRACE_HANDLE)
     , eventsHandled_(0)
     , buffersRead_(0)
+    , context_()
     {
         name_ = T::enforce_name_policy(name);
         ZeroMemory(&properties_, sizeof(EVENT_TRACE_PROPERTIES));
@@ -263,6 +267,7 @@ namespace krabs {
     , sessionHandle_(INVALID_PROCESSTRACE_HANDLE)
     , eventsHandled_(0)
     , buffersRead_(0)
+    , context_()
     {
         name_ = T::enforce_name_policy(name);
         ZeroMemory(&properties_, sizeof(EVENT_TRACE_PROPERTIES));

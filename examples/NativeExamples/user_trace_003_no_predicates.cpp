@@ -35,8 +35,8 @@ void user_trace_003_no_predicates::start()
     // event id which will be forwarded as filter to etw tracing api
     krabs::event_filter filter(11);
 
-    auto cb = [](const EVENT_RECORD &record) {
-        krabs::schema schema(record);
+    auto cb = [](const EVENT_RECORD &record, const krabs::trace_context &trace_context) {
+        krabs::schema schema(record, trace_context.schema_locator);
         assert(schema.event_id() == 11);
         std::wcout << L"Event " + std::to_wstring(schema.event_id()) +  L" received!" << std::endl;
     };

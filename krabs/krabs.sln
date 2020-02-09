@@ -36,7 +36,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs", "krabs", "{371361C8
 		krabs\kernel_guids.hpp = krabs\kernel_guids.hpp
 		krabs\kernel_providers.hpp = krabs\kernel_providers.hpp
 		krabs\kt.hpp = krabs\kt.hpp
-		krabs\lock.hpp = krabs\lock.hpp
 		krabs\parse_types.hpp = krabs\parse_types.hpp
 		krabs\parser.hpp = krabs\parser.hpp
 		krabs\property.hpp = krabs\property.hpp
@@ -46,6 +45,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs", "krabs", "{371361C8
 		krabs\size_provider.hpp = krabs\size_provider.hpp
 		krabs\tdh_helpers.hpp = krabs\tdh_helpers.hpp
 		krabs\trace.hpp = krabs\trace.hpp
+		krabs\trace_context.hpp = krabs\trace_context.hpp
 		krabs\ut.hpp = krabs\ut.hpp
 		krabs\version_helpers.hpp = krabs\version_helpers.hpp
 	EndProjectSection

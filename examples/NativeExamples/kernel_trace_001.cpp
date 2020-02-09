@@ -22,8 +22,8 @@ void kernel_trace_001::start()
     krabs::kernel::image_load_provider provider;
 
     // Kernel providers accept all the typical callback mechanisms.
-    provider.add_on_event_callback([](const EVENT_RECORD &record) {
-        krabs::schema schema(record);
+    provider.add_on_event_callback([](const EVENT_RECORD &record, const krabs::trace_context &trace_context) {
+        krabs::schema schema(record, trace_context.schema_locator);
 
         // To filter our events, we want to compare against the
         // event opcode. For kernel traces, you can consult this page

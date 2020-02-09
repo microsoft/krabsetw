@@ -18,7 +18,7 @@ namespace krabstests
             krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             // The number 8 here comes from the definition of the event in ETW -- we don't have control
@@ -34,7 +34,7 @@ namespace krabstests
             krabs::testing::record_builder builder(powershell, krabs::id(7937), krabs::version(1));
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             // note, this would be a corrupted result
@@ -47,7 +47,7 @@ namespace krabstests
             krabs::testing::record_builder builder(powershell, krabs::id(7937), krabs::version(1));
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             // note, this would be a corrupted result
@@ -61,7 +61,7 @@ namespace krabstests
             krabs::testing::record_builder builder(powershell, krabs::id(7937), krabs::version(1));
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             Assert::ExpectException<std::runtime_error>([&]() { parser.parse<int>(L"ContextInfo"); });
@@ -73,7 +73,7 @@ namespace krabstests
             krabs::testing::record_builder builder(powershell, krabs::id(7937), krabs::version(1));
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             int result = 0;
@@ -86,7 +86,7 @@ namespace krabstests
             krabs::testing::record_builder builder(powershell, krabs::id(7937), krabs::version(1));
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             Assert::ExpectException<krabs::type_mismatch_assert>([&]() { parser.parse<std::string>(L"ContextInfo"); });
@@ -98,7 +98,7 @@ namespace krabstests
             krabs::testing::record_builder builder(powershell, krabs::id(7937), krabs::version(1));
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             std::string result;
@@ -112,7 +112,8 @@ namespace krabstests
             builder.add_properties()(L"ContextInfo", L"Testing");
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema_locator schema_locator;
+            krabs::schema schema(record, schema_locator);
             krabs::parser parser(schema);
 
             // note: binary doesn't type check
@@ -133,12 +134,15 @@ namespace krabstests
                 (L"Url", expectedUrl);
 
             auto record = builder.pack_incomplete();
-            krabs::schema schema(record);
+            krabs::schema schema(record, schema_locator_);
             krabs::parser parser(schema);
 
             auto url = parser.parse<std::wstring>(L"Url");
 
             Assert::AreEqual(expectedUrl, url);
         }
+
+        private:
+            krabs::schema_locator schema_locator_;
     };
 }

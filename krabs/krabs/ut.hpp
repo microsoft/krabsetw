@@ -196,7 +196,7 @@ namespace krabs { namespace details {
     {
         for (auto &provider : trace.providers_) {
             if (record.EventHeader.ProviderId == provider.get().guid_) {
-                provider.get().on_event(record);
+                provider.get().on_event(record, trace.context_);
             }
         }
     }
