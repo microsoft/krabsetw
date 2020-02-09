@@ -14,7 +14,7 @@ Krabs represents different sources of ETW events with the concept of a `provider
 
 **NOTE:** The semantics of the `any` and `all` flag are left to the discretion of the ETW provider. Many providers ignore the `all` flag if the `any` flag is not set, for example.
 
-    void mycallbackFunction(const EVENT_RECORD &)
+    void mycallbackFunction(const EVENT_RECORD &, const trace_context &)
     {}
 
     provider<> powershellProvider(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
