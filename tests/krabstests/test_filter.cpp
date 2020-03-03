@@ -403,6 +403,9 @@ namespace krabstests
         {
             auto filter = krabs::predicates::and_filter(krabs::predicates::any_event, krabs::predicates::any_event);
             Assert::IsTrue(filter(record, trace_context));
+
+            auto filter2 = krabs::predicates::and_filter(krabs::predicates::id_is(7937), krabs::predicates::version_is(1));
+            Assert::IsTrue(filter2(record, trace_context));
         }
 
         TEST_METHOD(and_should_not_match_if_left_component_does_not_match)
@@ -433,6 +436,9 @@ namespace krabstests
         {
             auto filter = krabs::predicates::or_filter(krabs::predicates::any_event, krabs::predicates::any_event);
             Assert::IsTrue(filter(record, trace_context));
+
+            auto filter2 = krabs::predicates::or_filter(krabs::predicates::id_is(7397), krabs::predicates::version_is(1));
+            Assert::IsTrue(filter2(record, trace_context));
         }
 
         TEST_METHOD(or_should_not_match_if_neither_component_matches)
@@ -448,6 +454,12 @@ namespace krabstests
 
             auto filter2 = krabs::predicates::not_filter(krabs::predicates::no_event);
             Assert::IsTrue(filter2(record, trace_context));
+
+            auto filter3 = krabs::predicates::not_filter(krabs::predicates::id_is(7937));
+            Assert::IsFalse(filter3(record, trace_context));
+
+            auto filter4 = krabs::predicates::not_filter(krabs::predicates::version_is(2));
+            Assert::IsTrue(filter4(record, trace_context));
         }
     };
 }
