@@ -209,7 +209,7 @@ namespace krabs { namespace predicates {
         : expected_(USHORT(expected))
         {}
 
-        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &)
+        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &) const
         {
             return (record.EventHeader.EventDescriptor.Id == expected_);
         }
@@ -228,7 +228,7 @@ namespace krabs { namespace predicates {
         : expected_(USHORT(expected))
         {}
 
-        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &)
+        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &) const
         {
             return (record.EventHeader.EventDescriptor.Opcode == expected_);
         }
@@ -247,7 +247,7 @@ namespace krabs { namespace predicates {
         : expected_(USHORT(expected))
         {}
 
-        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &)
+        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &) const
         {
             return (record.EventHeader.EventDescriptor.Version == expected_);
         }
@@ -266,7 +266,7 @@ namespace krabs { namespace predicates {
         : expected_(ULONG(expected))
         {}
 
-        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &)
+        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &) const
         {
             return (record.EventHeader.ProcessId == expected_);
         }
