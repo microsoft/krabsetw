@@ -90,6 +90,58 @@ namespace krabs { namespace predicates {
 
         /**
          * <summary>
+         *   Performs a logical OR on multiple filters
+         * </summary>
+         */
+        template <typename T1>
+        struct or_filter_list {
+            or_filter_list(const std::initializer_list<T1> list)
+                : list_(list)
+            {}
+
+            bool operator()(const EVENT_RECORD& record, const krabs::trace_context& trace_context) const
+            {
+                for (T1 elem : list_)
+                {
+                    if (elem(record, trace_context)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+        private:
+            const std::initializer_list<T1> list_;
+        };
+
+        /**
+         * <summary>
+         *   Performs a logical AND on multiple filters
+         * </summary>
+         */
+        template <typename T1>
+        struct and_filter_list {
+            and_filter_list(const std::initializer_list<T1> list)
+                : list_(list)
+            {}
+
+            bool operator()(const EVENT_RECORD& record, const krabs::trace_context& trace_context) const
+            {
+                for (T1 elem : list_)
+                {
+                    if (!elem(record, trace_context)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+        private:
+            const std::initializer_list<T1> list_;
+        };
+
+        /**
+         * <summary>
          *   Performs a logical NOT on a filter.
          * </summary>
          */
@@ -452,6 +504,28 @@ namespace krabs { namespace predicates {
     details::or_filter<T1, T2> or_filter(const T1 &t1, const T2 &t2)
     {
         return details::or_filter<T1, T2>(t1, t2);
+    }
+
+    /**
+     * <summary>
+     *   Accepts an event if any of its multiple component filters accept the event.
+     * </summary>
+     */
+    template <typename T1>
+    details::or_filter_list<T1> or_filter_list(const std::initializer_list<T1> list)
+    {
+        return details::or_filter_list<T1>(list);
+    }
+
+    /**
+     * <summary>
+     *   Accepts an event if all of its multiple component filters accept the event.
+     * </summary>
+     */
+    template <typename T1>
+    details::and_filter_list<T1> and_filter_list(const std::initializer_list<T1> list)
+    {
+        return details::and_filter_list<T1>(list);
     }
 
     /**
