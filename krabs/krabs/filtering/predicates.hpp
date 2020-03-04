@@ -94,14 +94,14 @@ namespace krabs { namespace predicates {
          * </summary>
          */
         template <typename T1>
-        struct or_filter_list {
-            or_filter_list(const std::initializer_list<T1> list)
-                : list_(list)
+        struct or_filter_vector {
+            or_filter_vector(const std::vector<T1> vector)
+                : vector_(vector)
             {}
 
             bool operator()(const EVENT_RECORD& record, const krabs::trace_context& trace_context) const
             {
-                for (T1 elem : list_)
+                for (T1 elem : vector_)
                 {
                     if (elem(record, trace_context)) {
                         return true;
@@ -111,7 +111,7 @@ namespace krabs { namespace predicates {
             }
 
         private:
-            const std::initializer_list<T1> list_;
+            const std::vector<T1> vector_;
         };
 
         /**
@@ -120,14 +120,14 @@ namespace krabs { namespace predicates {
          * </summary>
          */
         template <typename T1>
-        struct and_filter_list {
-            and_filter_list(const std::initializer_list<T1> list)
-                : list_(list)
+        struct and_filter_vector {
+            and_filter_vector(const std::vector<T1> vector)
+                : vector_(vector)
             {}
 
             bool operator()(const EVENT_RECORD& record, const krabs::trace_context& trace_context) const
             {
-                for (T1 elem : list_)
+                for (T1 elem : vector_)
                 {
                     if (!elem(record, trace_context)) {
                         return false;
@@ -137,7 +137,7 @@ namespace krabs { namespace predicates {
             }
 
         private:
-            const std::initializer_list<T1> list_;
+            const std::vector<T1> vector_;
         };
 
         /**
@@ -512,9 +512,9 @@ namespace krabs { namespace predicates {
      * </summary>
      */
     template <typename T1>
-    details::or_filter_list<T1> or_filter_list(const std::initializer_list<T1> list)
+    details::or_filter_vector<T1> or_filter_vector(const std::vector<T1> vector)
     {
-        return details::or_filter_list<T1>(list);
+        return details::or_filter_vector<T1>(vector);
     }
 
     /**
@@ -523,9 +523,9 @@ namespace krabs { namespace predicates {
      * </summary>
      */
     template <typename T1>
-    details::and_filter_list<T1> and_filter_list(const std::initializer_list<T1> list)
+    details::and_filter_vector<T1> and_filter_vector(const std::vector<T1> vector)
     {
-        return details::and_filter_list<T1>(list);
+        return details::and_filter_vector<T1>(vector);
     }
 
     /**
