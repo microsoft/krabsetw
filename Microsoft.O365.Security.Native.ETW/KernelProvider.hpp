@@ -34,6 +34,17 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         KernelProvider(unsigned int flags, System::Guid id);
 
         /// <summary>
+        /// Constructs a KernelProvider that is identified by its GUID.
+        /// </summary>
+        /// <param name="id">the guid of the kernel trace</param>
+        /// <param name="mask">the group mask to set</param>
+        /// <remarks>
+        /// More information about group masks can be found here:
+        /// <see href="https://www.geoffchappell.com/studies/windows/km/ntoskrnl/api/etw/tracesup/perfinfo_groupmask.htm"/>
+        /// </remarks>
+        KernelProvider(System::Guid id, unsigned int mask);
+
+        /// <summary>
         /// Destructs a KernelProvider.
         /// </summary>
         ~KernelProvider();
@@ -94,6 +105,17 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline KernelProvider::KernelProvider(unsigned int flags, System::Guid id)
     : provider_(flags, ConvertGuid(id))
+    {
+        del_ = gcnew NativeHookDelegate(this, &KernelProvider::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        provider_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    inline KernelProvider::KernelProvider(System::Guid id, unsigned int mask)
+        : provider_(ConvertGuid(id), mask)
     {
         del_ = gcnew NativeHookDelegate(this, &KernelProvider::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);
