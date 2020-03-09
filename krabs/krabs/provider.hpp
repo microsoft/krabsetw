@@ -276,11 +276,24 @@ namespace krabs {
         kernel_provider(unsigned long flags, const GUID &id)
         : p_(flags)
         , id_(id)
+        , gm_(0)
         {}
 
         /**
          * <summary>
-         * Retrieves the GUID associated with this provider.
+         *   Constructs a kernel_provider that enables events of the given
+         *   group mask.
+         * </summary>
+         */
+        kernel_provider(const GUID& id, unsigned long group_mask)
+            : p_(0)
+            , id_(id)
+            , gm_(group_mask)
+        {}
+
+        /**
+         * <summary>
+         *   Retrieves the GUID associated with this provider.
          * </summary>
          */
          const krabs::guid &id() const;
@@ -294,9 +307,17 @@ namespace krabs {
          */
         unsigned long flags() const { return p_; }
 
+        /**
+         * <summary>
+         *   Retrieves the group mask value associated with this provider.
+         * </summary>
+         */
+        unsigned long group_mask() const { return gm_; }
+
     private:
         unsigned long p_;
         const krabs::guid id_;
+        unsigned long gm_;
 
     private:
         friend struct details::kt;
