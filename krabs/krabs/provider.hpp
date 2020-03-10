@@ -10,6 +10,7 @@
 
 #include "compiler_check.hpp"
 #include "filtering/event_filter.hpp"
+#include "perfinfo_groupmask.hpp"
 #include "trace_context.hpp"
 
 #include <evntcons.h>
@@ -285,7 +286,7 @@ namespace krabs {
          *   group mask.
          * </summary>
          */
-        kernel_provider(const GUID& id, unsigned long group_mask)
+        kernel_provider(const GUID& id, PERFINFO_MASK group_mask)
             : p_(0)
             , id_(id)
             , gm_(group_mask)
@@ -312,12 +313,12 @@ namespace krabs {
          *   Retrieves the group mask value associated with this provider.
          * </summary>
          */
-        unsigned long group_mask() const { return gm_; }
+        PERFINFO_MASK group_mask() const { return gm_; }
 
     private:
         unsigned long p_;
         const krabs::guid id_;
-        unsigned long gm_;
+        PERFINFO_MASK gm_;
 
     private:
         friend struct details::kt;

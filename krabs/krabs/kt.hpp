@@ -121,36 +121,8 @@ namespace krabs { namespace details {
         error_check_common_conditions(status);
 
         for (auto& provider : trace.providers_) {
-            auto mask = provider.get().group_mask();
-
-            // the top nibble indicates which Mask to set
-            auto index = 0;
-            switch (mask >> 28)
-            {
-            case 0:
-            case 1:
-                index = 0;
-                break;
-            case 2:
-                index = 1;
-                break;
-            case 4:
-                index = 2;
-                break;
-            case 8:
-                index = 4;
-                break;
-            case 0xa:
-                index = 5;
-                break;
-            case 0xc:
-            case 0xd:
-                index = 6;
-                break;
-            case 0xe:
-                index = 7;
-            }
-            group_mask.Masks[index] |= mask;
+            auto group = provider.get().group_mask();
+            PERFINFO_OR_GROUP_WITH_GROUPMASK(group, &group_mask);
         }
 
         status = TraceSetInformation(trace.registrationHandle_, TraceSystemTraceEnableFlagsInfo, &group_mask, sizeof(group_mask));

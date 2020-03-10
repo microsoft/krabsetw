@@ -5,53 +5,64 @@
 
 // https://geoffchappell.com/studies/windows/km/ntoskrnl/api/etw/tracesup/perfinfo_groupmask.htm
 
-struct PERFINFO_GROUPMASK
-{
-    ULONG Masks[8];
-};
+#define PERF_MASK_INDEX         (0xe0000000)
+#define PERF_MASK_GROUP         (~PERF_MASK_INDEX)
+#define PERF_NUM_MASKS          8
+
+typedef ULONG PERFINFO_MASK;
+
+typedef struct _PERFINFO_GROUPMASK {
+    ULONG Masks[PERF_NUM_MASKS];
+} PERFINFO_GROUPMASK, *PPERFINFO_GROUPMASK;
+
+#define PERF_GET_MASK_INDEX(GM) (((GM) & PERF_MASK_INDEX) >> 29)
+#define PERF_GET_MASK_GROUP(GM) ((GM) & PERF_MASK_GROUP)
+#define PERFINFO_OR_GROUP_WITH_GROUPMASK(Group, pGroupMask) \
+    (pGroupMask)->Masks[PERF_GET_MASK_INDEX(Group)] |= PERF_GET_MASK_GROUP(Group);
+
 
 // Masks[0]
-#define PERF_PROCESS            0x00000001
-#define PERF_THREAD             0x00000002
-#define PERF_PROC_THREAD        0x00000003
-#define PERF_LOADER             0x00000004
-#define PERF_PERF_COUNTER       0x00000008
-#define PERF_FILENAME           0x00000200
-#define PERF_DISK_IO            0x00000300
-#define PERF_DISK_IO_INIT       0x00000400
-#define PERF_ALL_FAULTS         0x00001000
-#define PERF_HARD_FAULTS        0x00002000
-#define PERF_VAMAP              0x00008000
-#define PERF_NETWORK            0x00010000
-#define PERF_REGISTRY           0x00020000
-#define PERF_DBGPRINT           0x00040000
-#define PERF_JOB                0x00080000
-#define PERF_ALPC               0x00100000
-#define PERF_SPLIT_IO           0x00200000
-#define PERF_DEBUG_EVENTS       0x00400000
-#define PERF_FILE_IO            0x02000000
-#define PERF_FILE_IO_INIT       0x04000000
-#define PERF_NO_SYSCONFIG       0x10000000
+#define PERF_PROCESS            EVENT_TRACE_FLAG_PROCESS
+#define PERF_THREAD             EVENT_TRACE_FLAG_THREAD
+#define PERF_PROC_THREAD        EVENT_TRACE_FLAG_PROCESS | EVENT_TRACE_FLAG_THREAD
+#define PERF_LOADER             EVENT_TRACE_FLAG_IMAGE_LOAD
+#define PERF_PERF_COUNTER       EVENT_TRACE_FLAG_PROCESS_COUNTERS
+#define PERF_FILENAME           EVENT_TRACE_FLAG_DISK_FILE_IO
+#define PERF_DISK_IO            EVENT_TRACE_FLAG_DISK_FILE_IO | EVENT_TRACE_FLAG_DISK_IO
+#define PERF_DISK_IO_INIT       EVENT_TRACE_FLAG_DISK_IO_INIT
+#define PERF_ALL_FAULTS         EVENT_TRACE_FLAG_MEMORY_PAGE_FAULTS
+#define PERF_HARD_FAULTS        EVENT_TRACE_FLAG_MEMORY_HARD_FAULTS
+#define PERF_VAMAP              EVENT_TRACE_FLAG_VAMAP
+#define PERF_NETWORK            EVENT_TRACE_FLAG_NETWORK_TCPIP
+#define PERF_REGISTRY           EVENT_TRACE_FLAG_REGISTRY
+#define PERF_DBGPRINT           EVENT_TRACE_FLAG_DBGPRINT
+#define PERF_JOB                EVENT_TRACE_FLAG_JOB
+#define PERF_ALPC               EVENT_TRACE_FLAG_ALPC
+#define PERF_SPLIT_IO           EVENT_TRACE_FLAG_SPLIT_IO
+#define PERF_DEBUG_EVENTS       EVENT_TRACE_FLAG_DEBUG_EVENTS
+#define PERF_FILE_IO            EVENT_TRACE_FLAG_FILE_IO
+#define PERF_FILE_IO_INIT       EVENT_TRACE_FLAG_FILE_IO_INIT
+#define PERF_NO_SYSCONFIG       EVENT_TRACE_FLAG_NO_SYSCONFIG
 
 // Masks[1]
 #define PERF_MEMORY             0x20000001
-#define PERF_PROFILE            0x20000002
-#define PERF_CONTEXT_SWITCH     0x20000004
+#define PERF_PROFILE            0x20000002  // equivalent to EVENT_TRACE_FLAG_PROFILE
+#define PERF_CONTEXT_SWITCH     0x20000004  // equivalent to EVENT_TRACE_FLAG_CSWITCH
 #define PERF_FOOTPRINT          0x20000008
-#define PERF_DRIVERS            0x20000010
+#define PERF_DRIVERS            0x20000010  // equivalent to EVENT_TRACE_FLAG_DRIVER
 #define PERF_REFSET             0x20000020
 #define PERF_POOL               0x20000040
 #define PERF_POOLTRACE          0x20000041
-#define PERF_DPC                0x20000080
+#define PERF_DPC                0x20000080  // equivalent to EVENT_TRACE_FLAG_DPC
 #define PERF_COMPACT_CSWITCH    0x20000100
-#define PERF_DISPATCHER         0x20000200
+#define PERF_DISPATCHER         0x20000200  // equivalent to EVENT_TRACE_FLAG_DISPATCHER
 #define PERF_PMC_PROFILE        0x20000400
 #define PERF_PROFILING          0x20000402
 #define PERF_PROCESS_INSWAP     0x20000800
 #define PERF_AFFINITY           0x20001000
 #define PERF_PRIORITY           0x20002000
-#define PERF_INTERRUPT          0x20004000
-#define PERF_VIRTUAL_ALLOC      0x20008000
+#define PERF_INTERRUPT          0x20004000  // equivalent to EVENT_TRACE_FLAG_INTERRUPT
+#define PERF_VIRTUAL_ALLOC      0x20008000  // equivalent to EVENT_TRACE_FLAG_VIRTUAL_ALLOC
 #define PERF_SPINLOCK           0x20010000
 #define PERF_SYNC_OBJECTS       0x20020000
 #define PERF_DPC_QUEUE          0x20040000
@@ -74,7 +85,7 @@ struct PERFINFO_GROUPMASK
 #define PERF_WS_DETAIL          0x40000008
 #define PERF_WS_ENTRY           0x40000010
 #define PERF_HEAP               0x40000020
-#define PERF_SYSCALL            0x40000040
+#define PERF_SYSCALL            0x40000040  // equivalent to EVENT_TRACE_FLAG_SYSTEMCALL
 #define PERF_UMS                0x40000080
 #define PERF_BACKTRACE          0x40000100
 #define PERF_VULCAN             0x40000200
@@ -134,6 +145,6 @@ struct PERFINFO_GROUPMASK
 #define PERF_SYSCFG_OPTICAL     0xC0000040
 #define PERF_SYSCFG_ALL         0xDFFFFFFF
 
-// Masks[7]
+// Masks[7] - Control Mask. All flags that change system behavior go here.
 #define PERF_CLUSTER_OFF        0xE0000001
 #define PERF_MEMORY_CONTROL     0xE0000002
