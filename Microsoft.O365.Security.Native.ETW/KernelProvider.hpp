@@ -4,6 +4,7 @@
 #pragma once
 
 #include <krabs.hpp>
+#include <krabs/perfinfo_groupmask.hpp>
 
 #include "EventRecord.hpp"
 #include "EventRecordMetadata.hpp"
@@ -42,7 +43,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// More information about group masks can be found here:
         /// <see href="https://www.geoffchappell.com/studies/windows/km/ntoskrnl/api/etw/tracesup/perfinfo_groupmask.htm"/>
         /// </remarks>
-        KernelProvider(System::Guid id, unsigned int mask);
+        KernelProvider(System::Guid id, PERFINFO_MASK mask);
 
         /// <summary>
         /// Destructs a KernelProvider.
@@ -114,7 +115,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         provider_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
     }
 
-    inline KernelProvider::KernelProvider(System::Guid id, unsigned int mask)
+    inline KernelProvider::KernelProvider(System::Guid id, PERFINFO_MASK mask)
         : provider_(ConvertGuid(id), mask)
     {
         del_ = gcnew NativeHookDelegate(this, &KernelProvider::EventNotification);
