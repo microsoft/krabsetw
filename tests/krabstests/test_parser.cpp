@@ -142,6 +142,27 @@ namespace krabstests
             Assert::AreEqual(expectedUrl, url);
         }
 
+        TEST_METHOD(parse_unicode_string_should_work_when_unicode_string_property_is_last_and_not_null_terminated_when_previous_properties_were_parsed)
+        {
+            std::wstring expectedUrl;
+
+            krabs::guid httpsys(L"{dd5ef90a-6398-47a4-ad34-4dcecdef795f}");
+            // httpsys: parse event
+            krabs::testing::record_builder builder(httpsys, krabs::id(2), 0U, 12, true);
+            builder.add_properties()
+                (L"Url", expectedUrl);
+
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+
+            auto requestobj = parser.parse<krabs::binary>(L"RequestObj");
+            auto httpverb = parser.parse<krabs::binary>(L"HttpVerb");
+            auto url = parser.parse<std::wstring>(L"Url");
+
+            Assert::AreEqual(expectedUrl, url);
+        }
+
         private:
             krabs::schema_locator schema_locator_;
     };

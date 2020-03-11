@@ -142,7 +142,9 @@ namespace krabs {
         assert((pBufferIndex_ <= pEndBuffer_ && pBufferIndex_ >= schema_.record_.UserData) &&
                "invariant: we should've already thrown for falling off the edge");
 
-        assert((pBufferIndex_ == pEndBuffer_ ? lastPropertyIndex_ == totalPropCount
+        // accept that last property can be omitted from buffer. this happens if last property
+        // is string but empty and the provider strips the null terminator
+        assert((pBufferIndex_ == pEndBuffer_ ? ((totalPropCount - lastPropertyIndex_) <= 1)
                                              : true)
                && "invariant: if we've exhausted our buffer, then we must've"
                   "exhausted the properties as well");
