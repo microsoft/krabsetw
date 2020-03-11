@@ -4,14 +4,13 @@
 #pragma once
 
 #include "compiler_check.hpp"
-#include "trace.hpp"
+#include "perfinfo_groupmask.hpp"
 #include "provider.hpp"
-
+#include "trace.hpp"
 #include "ut.hpp"
-
-#include <Evntrace.h>
 #include "version_helpers.hpp"
 
+#include <Evntrace.h>
 
 namespace krabs { namespace details {
 
@@ -112,8 +111,23 @@ namespace krabs { namespace details {
     }
 
     inline void kt::enable_providers(
-        const krabs::trace<krabs::details::kt> &)
+        const krabs::trace<krabs::details::kt> &trace)
     {
+        PERFINFO_GROUPMASK group_mask = { 0 };
+
+        // initialise Masks to the values that have been enabled via the trace flags
+        ULONG return_length;
+        ULONG status = TraceQueryInformation(trace.registrationHandle_, TraceSystemTraceEnableFlagsInfo, &group_mask, sizeof(group_mask), &return_length);
+        error_check_common_conditions(status);
+
+        for (auto& provider : trace.providers_) {
+            auto group = provider.get().group_mask();
+            PERFINFO_OR_GROUP_WITH_GROUPMASK(group, &group_mask);
+        }
+
+        status = TraceSetInformation(trace.registrationHandle_, TraceSystemTraceEnableFlagsInfo, &group_mask, sizeof(group_mask));
+        error_check_common_conditions(status);
+
         return;
     }
 

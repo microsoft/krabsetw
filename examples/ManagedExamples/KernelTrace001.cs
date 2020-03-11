@@ -26,7 +26,7 @@ namespace ManagedExamples
             // is hardcoded by Windows, and Lobster provides simple objects to
             // represent these. If other providers were enabled without an
             // update to Lobster, the same thing could be achieved with:
-            //    var provider = new KernelProvider(SOME_BITMASK_VALUE, SOME_GUID);
+            //    var provider = new KernelProvider(SOME_FLAGS_VALUE, SOME_GUID);
             var processProvider = new Kernel.ProcessProvider();
 
             // Kernel providers accept callbacks and event filters, as user
@@ -44,9 +44,27 @@ namespace ManagedExamples
                 }
             };
 
+            // Some kernel providers can't be enabled via EnableFlags and you need to call
+            // TraceSetInformation with an extended PERFINFO_GROUPMASK instead.
+            // e.g. https://docs.microsoft.com/en-us/windows/win32/etw/obtrace
+            // Lobster has convenience providers for some of these, but otherwise the same
+            // thing could be done with:
+            //    var provider = new KernelProvider(SOME_GUID, SOME_MASK_VALUE);
+            var objectManagerProvider = new Kernel.ObjectManagerProvider();
+            objectManagerProvider.OnEvent += (record) =>
+            {
+                if (record.Opcode == 33)
+                {
+                    var name = record.GetUnicodeString("ObjectName", string.Empty);
+                    if(!string.IsNullOrEmpty(name))
+                        Console.WriteLine($"Handle closed for object with name {name}");
+                }
+            };
+
             // From here, a KernelTrace is indistinguishable from a UserTrace
             // in how it's used.
             trace.Enable(processProvider);
+            trace.Enable(objectManagerProvider);
 
             // Another quirk here is that kernel traces can only be done by
             // administrators. :( :( :(

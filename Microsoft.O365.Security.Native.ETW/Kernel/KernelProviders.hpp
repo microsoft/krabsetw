@@ -7,12 +7,19 @@
 
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW { namespace Kernel {
 
-
 #define CREATE_CONVENIENCE_KERNEL_PROVIDER(__name__, __value__, __guid__)     \
     public ref class __name__ : public KernelProvider {                       \
     public:                                                                   \
         __name__()                                                            \
         : KernelProvider(__value__, __guid__)                                 \
+        {}                                                                    \
+    };
+
+#define CREATE_CONVENIENCE_KERNEL_PROVIDER_MASK(__name__, __guid__, __mask__) \
+    public ref class __name__ : public KernelProvider {                       \
+    public:                                                                   \
+        __name__()                                                            \
+        : KernelProvider(__guid__, __mask__)                                  \
         {}                                                                    \
     };
 
@@ -176,6 +183,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
         EVENT_TRACE_FLAG_VIRTUAL_ALLOC,
         FromGuid(krabs::guids::page_fault));
 
+    /// <summary>A provider that enables Object Manager events.</summary>
+    CREATE_CONVENIENCE_KERNEL_PROVIDER_MASK(
+        ObjectManagerProvider,
+        FromGuid(krabs::guids::ob_trace),
+        PERF_OB_HANDLE);
+
 #undef CREATE_CONVENIENCE_KERNEL_PROVIDER
+#undef CREATE_CONVENIENCE_KERNEL_PROVIDER_MASK
 
 } } } } }

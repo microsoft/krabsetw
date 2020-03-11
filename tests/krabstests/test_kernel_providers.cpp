@@ -16,6 +16,8 @@ namespace krabstests
         {
             krabs::kernel_provider provider(EVENT_TRACE_FLAG_ALPC, krabs::guids::alpc);
             krabs::kernel::thread_dispatch_provider cs;
+            krabs::kernel_provider ob_trace(krabs::guids::ob_trace, PERF_OB_HANDLE | PERF_OB_OBJECT);
+            krabs::kernel_provider alpc_provider(krabs::guids::alpc, PERF_ALPC);
         }
 
         TEST_METHOD(should_allow_event_registration)
