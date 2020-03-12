@@ -30,6 +30,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs", "krabs", "{371361C8
 		krabs\client.hpp = krabs\client.hpp
 		krabs\collection_view.hpp = krabs\collection_view.hpp
 		krabs\compiler_check.hpp = krabs\compiler_check.hpp
+		krabs\dll_helpers.hpp = krabs\dll_helpers.hpp
 		krabs\errors.hpp = krabs\errors.hpp
 		krabs\etw.hpp = krabs\etw.hpp
 		krabs\guid.hpp = krabs\guid.hpp

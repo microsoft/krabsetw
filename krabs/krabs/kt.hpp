@@ -9,6 +9,7 @@
 #include "trace.hpp"
 #include "ut.hpp"
 #include "version_helpers.hpp"
+#include "dll_helpers.hpp"
 
 #include <Evntrace.h>
 
@@ -55,7 +56,7 @@ namespace krabs { namespace details {
          *   Enables the providers that are attached to the given trace.
          * </summary>
          * <remarks>
-         *   This does a whole lot of nothing for kernel traces.
+         *   PERFINFO_MASK is only applied on Windows 8 and newer
          * </remarks>
          */
         static void enable_providers(
@@ -113,20 +114,43 @@ namespace krabs { namespace details {
     inline void kt::enable_providers(
         const krabs::trace<krabs::details::kt> &trace)
     {
-        PERFINFO_GROUPMASK group_mask = { 0 };
+        if (IsWindows8OrGreater())
+        {
+            std::wstring dll_name = L"advapi32.dll";
+            if (IsWindows8Point1OrGreater())
+            {
+                dll_name = L"sechost.dll";
+            }
 
-        // initialise Masks to the values that have been enabled via the trace flags
-        ULONG return_length;
-        ULONG status = TraceQueryInformation(trace.registrationHandle_, TraceSystemTraceEnableFlagsInfo, &group_mask, sizeof(group_mask), &return_length);
-        error_check_common_conditions(status);
+            dll_helper lib_handle(dll_name);
 
-        for (auto& provider : trace.providers_) {
-            auto group = provider.get().group_mask();
-            PERFINFO_OR_GROUP_WITH_GROUPMASK(group, &group_mask);
+            if (lib_handle.get() == nullptr)
+            {
+                throw std::runtime_error("Could not load library for TraceQueryInformation");
+            }
+
+            typedef ULONG(WINAPI *PTraceQueryInformation)(TRACEHANDLE, TRACE_INFO_CLASS, PVOID, ULONG, PULONG);
+            PTraceQueryInformation traceQI = reinterpret_cast<PTraceQueryInformation>(::GetProcAddress(lib_handle.get(), "TraceQueryInformation"));
+            if (traceQI == nullptr)
+            {
+                throw std::runtime_error("Could not find TraceQueryInformation");
+            }
+
+            PERFINFO_GROUPMASK group_mask = { 0 };
+
+            // initialise Masks to the values that have been enabled via the trace flags
+            ULONG return_length;
+            ULONG status = traceQI(trace.registrationHandle_, TraceSystemTraceEnableFlagsInfo, &group_mask, sizeof(group_mask), &return_length);
+            error_check_common_conditions(status);
+
+            for (auto& provider : trace.providers_) {
+                auto group = provider.get().group_mask();
+                PERFINFO_OR_GROUP_WITH_GROUPMASK(group, &group_mask);
+            }
+
+            status = TraceSetInformation(trace.registrationHandle_, TraceSystemTraceEnableFlagsInfo, &group_mask, sizeof(group_mask));
+            error_check_common_conditions(status);
         }
-
-        status = TraceSetInformation(trace.registrationHandle_, TraceSystemTraceEnableFlagsInfo, &group_mask, sizeof(group_mask));
-        error_check_common_conditions(status);
 
         return;
     }
