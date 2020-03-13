@@ -124,6 +124,21 @@ namespace krabstests
             auto record = builder.pack_incomplete();
         }
 
+        TEST_METHOD(pack_incomplete_should_correctly_handle_sid_in_event)
+        {
+            krabs::guid logon(L"{199FE037-2B82-40A9-82AC-E1D46C792B99}");
+            krabs::testing::record_builder builder(logon, krabs::id(301), krabs::version(0));
+            builder.add_properties()
+                (L"TargetUserName", L"")
+                (L"LogonType", (uint32_t)5);
+
+            auto record = builder.pack_incomplete();
+
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+            Assert::AreEqual(parser.parse<uint32_t>(L"LogonType"), (uint32_t)5);
+        }
+
         private:
             krabs::schema_locator schema_locator_;
     };
