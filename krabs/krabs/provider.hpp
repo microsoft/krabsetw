@@ -12,6 +12,7 @@
 #include "filtering/event_filter.hpp"
 #include "perfinfo_groupmask.hpp"
 #include "trace_context.hpp"
+#include "version_helpers.hpp"
 
 #include <evntcons.h>
 #include <guiddef.h>
@@ -290,7 +291,12 @@ namespace krabs {
             : p_(0)
             , id_(id)
             , gm_(group_mask)
-        {}
+        {
+            if (!IsWindows8OrGreater())
+            {
+                throw std::runtime_error("Setting PERFINFO_MASK only supported on Windows 8 and newer");
+            }
+        }
 
         /**
          * <summary>
