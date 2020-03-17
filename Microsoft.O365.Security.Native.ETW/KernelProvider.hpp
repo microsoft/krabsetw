@@ -40,6 +40,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <param name="id">the guid of the kernel trace</param>
         /// <param name="mask">the group mask to set</param>
         /// <remarks>
+        /// Only supported on Windows 8 and newer.
         /// More information about group masks can be found here:
         /// <see href="https://www.geoffchappell.com/studies/windows/km/ntoskrnl/api/etw/tracesup/perfinfo_groupmask.htm"/>
         /// </remarks>

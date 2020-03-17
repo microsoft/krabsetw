@@ -3,6 +3,9 @@
 
 #pragma once
 
+#include <Windows.h>
+#pragma comment(lib, "ntdll")
+
 // https://geoffchappell.com/studies/windows/km/ntoskrnl/api/etw/tracesup/perfinfo_groupmask.htm
 
 #define PERF_MASK_INDEX         (0xe0000000)
@@ -19,7 +22,6 @@ typedef struct _PERFINFO_GROUPMASK {
 #define PERF_GET_MASK_GROUP(GM) ((GM) & PERF_MASK_GROUP)
 #define PERFINFO_OR_GROUP_WITH_GROUPMASK(Group, pGroupMask) \
     (pGroupMask)->Masks[PERF_GET_MASK_INDEX(Group)] |= PERF_GET_MASK_GROUP(Group);
-
 
 // Masks[0]
 #define PERF_PROCESS            EVENT_TRACE_FLAG_PROCESS
@@ -148,3 +150,55 @@ typedef struct _PERFINFO_GROUPMASK {
 // Masks[7] - Control Mask. All flags that change system behavior go here.
 #define PERF_CLUSTER_OFF        0xE0000001
 #define PERF_MEMORY_CONTROL     0xE0000002
+
+
+// TraceQueryInformation wasn't introduced until Windows 8, so we need to use
+// NtQuerySystemInformation instead in order to maintain support for Windows 7.
+// This requires the below additional definitions.
+
+typedef enum _EVENT_TRACE_INFORMATION_CLASS {
+    EventTraceKernelVersionInformation,
+    EventTraceGroupMaskInformation,
+    EventTracePerformanceInformation,
+    EventTraceTimeProfileInformation,
+    EventTraceSessionSecurityInformation,
+    EventTraceSpinlockInformation,
+    EventTraceStackTracingInformation,
+    EventTraceExecutiveResourceInformation,
+    EventTraceHeapTracingInformation,
+    EventTraceHeapSummaryTracingInformation,
+    EventTracePoolTagFilterInformation,
+    EventTracePebsTracingInformation,
+    EventTraceProfileConfigInformation,
+    EventTraceProfileSourceListInformation,
+    EventTraceProfileEventListInformation,
+    EventTraceProfileCounterListInformation,
+    EventTraceStackCachingInformation,
+    EventTraceObjectTypeFilterInformation,
+    MaxEventTraceInfoClass
+} EVENT_TRACE_INFORMATION_CLASS;
+
+typedef struct _EVENT_TRACE_GROUPMASK_INFORMATION {
+    EVENT_TRACE_INFORMATION_CLASS EventTraceInformationClass;
+    TRACEHANDLE TraceHandle;
+    PERFINFO_GROUPMASK EventTraceGroupMasks;
+} EVENT_TRACE_GROUPMASK_INFORMATION, * PEVENT_TRACE_GROUPMASK_INFORMATION;
+
+typedef enum _SYSTEM_INFORMATION_CLASS {
+    SystemPerformanceTraceInformation = 0x1f
+} SYSTEM_INFORMATION_CLASS;
+
+typedef LONG NTSTATUS;
+
+extern "C" NTSTATUS NTAPI NtQuerySystemInformation(
+    _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    _Out_writes_bytes_to_opt_(SystemInformationLength, *ReturnLength) PVOID SystemInformation,
+    _In_ ULONG SystemInformationLength,
+    _Out_opt_ PULONG ReturnLength
+);
+
+extern "C" NTSTATUS NTAPI NtSetSystemInformation(
+    _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    _In_reads_bytes_opt_(SystemInformationLength) PVOID SystemInformation,
+    _In_ ULONG SystemInformationLength
+);

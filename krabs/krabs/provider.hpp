@@ -285,6 +285,9 @@ namespace krabs {
          *   Constructs a kernel_provider that enables events of the given
          *   group mask.
          * </summary>
+         * <remarks>
+         *   Only supported on Windows 8 and newer.
+         * </remarks>
          */
         kernel_provider(const GUID& id, PERFINFO_MASK group_mask)
             : p_(0)
