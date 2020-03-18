@@ -82,6 +82,8 @@ namespace krabs {
                 throw krabs::could_not_find_schema();
             case ERROR_NO_SYSTEM_RESOURCES:
                 throw krabs::no_trace_sessions_remaining();
+            case ERROR_NOT_SUPPORTED:
+                throw std::runtime_error("This function is not supported on this system");
             default:
                 throw std::runtime_error("Unexpected error");
         }

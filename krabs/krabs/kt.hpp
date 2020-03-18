@@ -54,9 +54,6 @@ namespace krabs { namespace details {
          * <summary>
          *   Enables the providers that are attached to the given trace.
          * </summary>
-         * <remarks>
-         *   This does a whole lot of nothing for kernel traces.
-         * </remarks>
          */
         static void enable_providers(
             const krabs::trace<krabs::details::kt> &trace);
@@ -113,20 +110,26 @@ namespace krabs { namespace details {
     inline void kt::enable_providers(
         const krabs::trace<krabs::details::kt> &trace)
     {
-        PERFINFO_GROUPMASK group_mask = { 0 };
+        EVENT_TRACE_GROUPMASK_INFORMATION gmi = { 0 };
+        gmi.EventTraceInformationClass = EventTraceGroupMaskInformation;
+        gmi.TraceHandle = trace.registrationHandle_;
 
-        // initialise Masks to the values that have been enabled via the trace flags
-        ULONG return_length;
-        ULONG status = TraceQueryInformation(trace.registrationHandle_, TraceSystemTraceEnableFlagsInfo, &group_mask, sizeof(group_mask), &return_length);
+        // initialise EventTraceGroupMasks to the values that have been enabled via the trace flags
+        ULONG status = NtQuerySystemInformation(SystemPerformanceTraceInformation, &gmi, sizeof(gmi), nullptr);
         error_check_common_conditions(status);
 
+        auto group_mask_set = false;
         for (auto& provider : trace.providers_) {
             auto group = provider.get().group_mask();
-            PERFINFO_OR_GROUP_WITH_GROUPMASK(group, &group_mask);
+            PERFINFO_OR_GROUP_WITH_GROUPMASK(group, &(gmi.EventTraceGroupMasks));
+            group_mask_set |= (group != 0);
         }
 
-        status = TraceSetInformation(trace.registrationHandle_, TraceSystemTraceEnableFlagsInfo, &group_mask, sizeof(group_mask));
-        error_check_common_conditions(status);
+        if (group_mask_set) {
+            // This will fail on Windows 7, so only call it if truly neccessary
+            status = NtSetSystemInformation(SystemPerformanceTraceInformation, &gmi, sizeof(gmi));
+            error_check_common_conditions(status);
+        }
 
         return;
     }
