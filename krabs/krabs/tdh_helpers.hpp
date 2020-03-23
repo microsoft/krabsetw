@@ -101,7 +101,10 @@ namespace krabs {
 
             if (requested == actual) return;
 
+#pragma warning(push)
+#pragma warning(disable: 4244) // narrowing property name wchar_t to char for this error message
             std::string ansiName(name.begin(), name.end());
+#pragma warning(pop)
 
             throw type_mismatch_assert(
                 ansiName.c_str(),
