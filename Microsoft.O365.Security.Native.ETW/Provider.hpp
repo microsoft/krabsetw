@@ -123,7 +123,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         property TraceFlags TraceFlags {
             void set(O365::Security::ETW::TraceFlags value) {
-                provider_->trace_flags((UCHAR)value);
+                provider_->trace_flags((ULONG)value);
             }
         }
 
