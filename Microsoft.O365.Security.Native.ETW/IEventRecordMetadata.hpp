@@ -107,6 +107,20 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         array<uint8_t>^ CopyUserData();
 
 #pragma endregion
+
+#pragma region ExtendedData
+
+        /// <summary>
+        /// If the event's extended data contains an Argon container ID, retrieve it.
+        /// Can be expensive, avoid calling more than once per event.
+        /// </summary>
+        /// <returns>
+        /// A Guid representing the Argon container ID if the data is present. Null it's not present. 
+        /// Throws a DataFormatException if the container ID is present but parsing fails.
+        /// </returns>
+        virtual System::Nullable<System::Guid> GetContainerId();
+
+#pragma endregion
     };
 
 } } } }

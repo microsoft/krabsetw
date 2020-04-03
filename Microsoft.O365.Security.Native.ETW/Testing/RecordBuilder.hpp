@@ -62,6 +62,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
         generic <typename T>
         void AddValue(System::String^ name, T value);
 
+        /// <summary>
+        /// Adds a container ID extended data item
+        /// </summary>
+        void AddContainerId(System::Guid container_id);
+
     internal:
         NativePtr<krabs::testing::record_builder> builder_;
 
@@ -171,6 +176,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
     {
         auto propName = msclr::interop::marshal_as<std::wstring>(name);
         builder_->add_properties()(propName, value);
+    }
+
+    inline void RecordBuilder::AddContainerId(System::Guid container_id)
+    {
+        builder_->add_container_id_extended_data(ConvertGuid(container_id));
     }
 
 } /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */ } /* namespace Microsoft */

@@ -30,5 +30,23 @@ namespace EtwTestsCS.Events
                 return rb.Pack();
             }
         }
+
+        public static SynthRecord CreateRecordWithContainerId(
+            string userData,
+            string contextInfo,
+            string payload,
+            Guid containerId)
+        {
+            using (var rb = new RecordBuilder(ProviderId, EventId, Version))
+            {
+                rb.AddUnicodeString(UserData, userData);
+                rb.AddUnicodeString(ContextInfo, contextInfo);
+                rb.AddUnicodeString(Payload, payload);
+
+                rb.AddContainerId(containerId);
+
+                return rb.Pack();
+            }
+        }
     }
 }
