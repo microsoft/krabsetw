@@ -225,6 +225,23 @@ namespace krabs {
         void trace_flags(T trace_flags);
 
         /**
+        * <summary>
+        * Gets the configured value for the "EnableProperty" flag on the 
+        * ENABLE_TRACE_PARAMETER struct. See void trace_flags(T trace_flags)
+        * for details on what the values mean.
+        * </summary>
+        * <returns>The value to set when the provider is enabled.</returns>
+        * <example>
+        *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+        *    provider<> powershell(id);
+        *    powershell.trace_flags(EVENT_ENABLE_PROPERTY_STACK_TRACE);
+        *    auto flags = powershell.get_trace_flags(); 
+        *    assert(flags == EVENT_ENABLE_PROPERTY_STACK_TRACE);
+        * </example>
+        */
+        T trace_flags() const;
+
+        /**
          * <summary>
          * Turns a strongly typed provider<T> to provider<> (useful for
          * creating collections of providers).
@@ -508,6 +525,12 @@ namespace krabs {
     void provider<T>::trace_flags(T trace_flags)
     {
         trace_flags_ = trace_flags;
+    }
+
+    template <typename T>
+    T provider<T>::trace_flags() const
+    {
+        return static_cast<T>(trace_flags_);
     }
 
     template <typename T>

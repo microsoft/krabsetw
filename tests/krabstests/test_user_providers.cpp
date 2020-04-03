@@ -112,5 +112,15 @@ namespace krabstests
             // no buffers --> trace has stopped
             Assert::IsTrue(0 == trace.query_stats().buffersCount);
         }
+
+        TEST_METHOD(should_get_same_trace_flags_as_set)
+        {
+            // Take up the full width of the datatype.
+            const ULONG FLAGS = 0xFFFFFFFF;
+
+            krabs::provider<> foo(krabs::guid::random_guid());
+            foo.trace_flags(FLAGS);
+            Assert::IsTrue(foo.trace_flags() == FLAGS);
+        }
     };
 }
