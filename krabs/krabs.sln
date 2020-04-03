@@ -38,6 +38,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs", "krabs", "{371361C8
 		krabs\kt.hpp = krabs\kt.hpp
 		krabs\parse_types.hpp = krabs\parse_types.hpp
 		krabs\parser.hpp = krabs\parser.hpp
+		krabs\perfinfo_groupmask.hpp = krabs\perfinfo_groupmask.hpp
 		krabs\property.hpp = krabs\property.hpp
 		krabs\provider.hpp = krabs\provider.hpp
 		krabs\schema.hpp = krabs\schema.hpp

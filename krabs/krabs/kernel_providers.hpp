@@ -4,20 +4,28 @@
 #pragma once
 
 #include "compiler_check.hpp"
-#include "provider.hpp"
 #include "kernel_guids.hpp"
+#include "perfinfo_groupmask.hpp"
+#include "provider.hpp"
 
 #define INITGUID
 #include <Evntrace.h>
 
 namespace krabs { namespace kernel {
 
-
 #define CREATE_CONVENIENCE_KERNEL_PROVIDER(__name__, __value__, __guid__)     \
     struct __name__ : public krabs::kernel_provider                           \
     {                                                                         \
         __name__()                                                            \
         : krabs::kernel_provider(__value__, __guid__)                         \
+        {}                                                                    \
+    };
+
+#define CREATE_CONVENIENCE_KERNEL_PROVIDER_MASK(__name__, __guid__, __mask__) \
+    struct __name__ : public krabs::kernel_provider                           \
+    {                                                                         \
+        __name__()                                                            \
+        : krabs::kernel_provider(__guid__, __mask__)                          \
         {}                                                                    \
     };
 
@@ -221,6 +229,15 @@ namespace krabs { namespace kernel {
          EVENT_TRACE_FLAG_VIRTUAL_ALLOC,
          krabs::guids::page_fault);
 
+     /**
+      * <summary>A provider that enables Object Manager events.</summary>
+      */
+     CREATE_CONVENIENCE_KERNEL_PROVIDER_MASK(
+         object_manager_provider,
+         krabs::guids::ob_trace,
+         PERF_OB_HANDLE);
+
 #undef CREATE_CONVENIENCE_KERNEL_PROVIDER
+#undef CREATE_CONVENIENCE_KERNEL_PROVIDER_MASK
 
 } /* namespace kernel */ } /* namespace krabs */

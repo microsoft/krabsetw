@@ -4,6 +4,7 @@
 #pragma once
 
 #include <krabs.hpp>
+#include <krabs/perfinfo_groupmask.hpp>
 
 #include "EventRecord.hpp"
 #include "EventRecordMetadata.hpp"
@@ -32,6 +33,18 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <see href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa363784(v=vs.85).aspx"/>
         /// </remarks>
         KernelProvider(unsigned int flags, System::Guid id);
+
+        /// <summary>
+        /// Constructs a KernelProvider that is identified by its GUID.
+        /// </summary>
+        /// <param name="id">the guid of the kernel trace</param>
+        /// <param name="mask">the group mask to set</param>
+        /// <remarks>
+        /// Only supported on Windows 8 and newer.
+        /// More information about group masks can be found here:
+        /// <see href="https://www.geoffchappell.com/studies/windows/km/ntoskrnl/api/etw/tracesup/perfinfo_groupmask.htm"/>
+        /// </remarks>
+        KernelProvider(System::Guid id, PERFINFO_MASK mask);
 
         /// <summary>
         /// Destructs a KernelProvider.
@@ -94,6 +107,17 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline KernelProvider::KernelProvider(unsigned int flags, System::Guid id)
     : provider_(flags, ConvertGuid(id))
+    {
+        del_ = gcnew NativeHookDelegate(this, &KernelProvider::EventNotification);
+        delegateHandle_ = GCHandle::Alloc(del_);
+        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+        delegateHookHandle_ = GCHandle::Alloc(bridged);
+
+        provider_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+    }
+
+    inline KernelProvider::KernelProvider(System::Guid id, PERFINFO_MASK mask)
+        : provider_(ConvertGuid(id), mask)
     {
         del_ = gcnew NativeHookDelegate(this, &KernelProvider::EventNotification);
         delegateHandle_ = GCHandle::Alloc(del_);

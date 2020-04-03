@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Krabsetw</id>
-        <version>4.0.0</version>
+        <version>4.1.2</version>
         <title>Krabs ETW Wrappers</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -11,7 +11,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</description>
         <summary>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</summary>
-        <releaseNotes>Fixed an issue where two concurrent traces could result in an access violation. This required a new callback prototype.</releaseNotes>
+        <releaseNotes>Widen trace_flags_ to support additional flags.</releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs krabsetw native headers cpp</tags>
@@ -42,6 +42,7 @@
         <file src="krabs\krabs\kt.hpp" target="lib\native\include\krabs\kt.hpp" />
         <file src="krabs\krabs\parser.hpp" target="lib\native\include\krabs\parser.hpp" />
         <file src="krabs\krabs\parse_types.hpp" target="lib\native\include\krabs\parse_types.hpp" />
+        <file src="krabs\krabs\perfinfo_groupmask.hpp" target="lib\native\include\krabs\perfinfo_groupmask.hpp" />
         <file src="krabs\krabs\property.hpp" target="lib\native\include\krabs\property.hpp" />
         <file src="krabs\krabs\provider.hpp" target="lib\native\include\krabs\provider.hpp" />
         <file src="krabs\krabs\schema.hpp" target="lib\native\include\krabs\schema.hpp" />

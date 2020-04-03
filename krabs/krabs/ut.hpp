@@ -26,7 +26,7 @@ namespace krabs { namespace details {
             UCHAR level_;
             ULONGLONG any_;
             ULONGLONG all_;
-            UCHAR trace_flags_;
+            ULONG trace_flags_;
         };
 
         struct filter_settings{

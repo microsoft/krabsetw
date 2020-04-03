@@ -233,8 +233,12 @@ namespace krabs { namespace testing {
         if (!results.second.empty()) {
             std::string msg = "Not all the properties of the event were filled:";
 
-            for (auto& s : results.second)
+            for (auto& s : results.second) {
+#pragma warning(push)
+#pragma warning(disable: 4244) // narrowing property name wchar_t to char for this error message
                 msg += " " + std::string(s.begin(), s.end());
+#pragma warning(pop)
+            }
 
             throw std::invalid_argument(msg);
         }

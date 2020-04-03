@@ -10,6 +10,7 @@
 
 #include "compiler_check.hpp"
 #include "filtering/event_filter.hpp"
+#include "perfinfo_groupmask.hpp"
 #include "trace_context.hpp"
 
 #include <evntcons.h>
@@ -276,11 +277,27 @@ namespace krabs {
         kernel_provider(unsigned long flags, const GUID &id)
         : p_(flags)
         , id_(id)
+        , gm_(0)
         {}
 
         /**
          * <summary>
-         * Retrieves the GUID associated with this provider.
+         *   Constructs a kernel_provider that enables events of the given
+         *   group mask.
+         * </summary>
+         * <remarks>
+         *   Only supported on Windows 8 and newer.
+         * </remarks>
+         */
+        kernel_provider(const GUID& id, PERFINFO_MASK group_mask)
+            : p_(0)
+            , id_(id)
+            , gm_(group_mask)
+        {}
+
+        /**
+         * <summary>
+         *   Retrieves the GUID associated with this provider.
          * </summary>
          */
          const krabs::guid &id() const;
@@ -294,9 +311,17 @@ namespace krabs {
          */
         unsigned long flags() const { return p_; }
 
+        /**
+         * <summary>
+         *   Retrieves the group mask value associated with this provider.
+         * </summary>
+         */
+        PERFINFO_MASK group_mask() const { return gm_; }
+
     private:
         unsigned long p_;
         const krabs::guid id_;
+        PERFINFO_MASK gm_;
 
     private:
         friend struct details::kt;
@@ -492,7 +517,7 @@ namespace krabs {
         tmp.any_            = static_cast<ULONGLONG>(any_);
         tmp.all_            = static_cast<ULONGLONG>(all_);
         tmp.level_          = static_cast<UCHAR>(level_);
-        tmp.trace_flags_    = static_cast<UCHAR>(trace_flags_);
+        tmp.trace_flags_    = static_cast<ULONG>(trace_flags_);
         tmp.callbacks_      = this.callbacks_;
 
         return tmp;
