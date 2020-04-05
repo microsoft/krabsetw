@@ -4,14 +4,13 @@
 #pragma once
 
 #include "compiler_check.hpp"
-#include "trace.hpp"
+#include "perfinfo_groupmask.hpp"
 #include "provider.hpp"
-
+#include "trace.hpp"
 #include "ut.hpp"
-
-#include <Evntrace.h>
 #include "version_helpers.hpp"
 
+#include <Evntrace.h>
 
 namespace krabs { namespace details {
 
@@ -55,9 +54,6 @@ namespace krabs { namespace details {
          * <summary>
          *   Enables the providers that are attached to the given trace.
          * </summary>
-         * <remarks>
-         *   This does a whole lot of nothing for kernel traces.
-         * </remarks>
          */
         static void enable_providers(
             const krabs::trace<krabs::details::kt> &trace);
@@ -112,8 +108,29 @@ namespace krabs { namespace details {
     }
 
     inline void kt::enable_providers(
-        const krabs::trace<krabs::details::kt> &)
+        const krabs::trace<krabs::details::kt> &trace)
     {
+        EVENT_TRACE_GROUPMASK_INFORMATION gmi = { 0 };
+        gmi.EventTraceInformationClass = EventTraceGroupMaskInformation;
+        gmi.TraceHandle = trace.registrationHandle_;
+
+        // initialise EventTraceGroupMasks to the values that have been enabled via the trace flags
+        ULONG status = NtQuerySystemInformation(SystemPerformanceTraceInformation, &gmi, sizeof(gmi), nullptr);
+        error_check_common_conditions(status);
+
+        auto group_mask_set = false;
+        for (auto& provider : trace.providers_) {
+            auto group = provider.get().group_mask();
+            PERFINFO_OR_GROUP_WITH_GROUPMASK(group, &(gmi.EventTraceGroupMasks));
+            group_mask_set |= (group != 0);
+        }
+
+        if (group_mask_set) {
+            // This will fail on Windows 7, so only call it if truly neccessary
+            status = NtSetSystemInformation(SystemPerformanceTraceInformation, &gmi, sizeof(gmi));
+            error_check_common_conditions(status);
+        }
+
         return;
     }
 
@@ -123,7 +140,7 @@ namespace krabs { namespace details {
     {
         for (auto &provider : trace.providers_) {
             if (provider.get().id() == record.EventHeader.ProviderId) {
-                provider.get().on_event(record);
+                provider.get().on_event(record, trace.context_);
             }
         }
     }
@@ -133,7 +150,7 @@ namespace krabs { namespace details {
         if (IsWindows8OrGreater()) {
             return EVENT_TRACE_SYSTEM_LOGGER_MODE;
         }
-        
+
         return 0;
     }
 

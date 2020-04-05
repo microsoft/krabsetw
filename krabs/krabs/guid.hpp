@@ -3,6 +3,10 @@
 
 #pragma once
 
+#ifndef  WIN32_LEAN_AND_MEAN
+#define  WIN32_LEAN_AND_MEAN
+#endif
+
 #include <windows.h>
 #include <objbase.h>
 
@@ -55,7 +59,10 @@ namespace krabs {
     {
         HRESULT hr = CLSIDFromString(guid.c_str(), &guid_);
         if (FAILED(hr)) {
+#pragma warning(push)
+#pragma warning(disable: 4244) // narrowing guid wchar_t to char for this error message
             std::string guidStr(guid.begin(), guid.end());
+#pragma warning(pop)
             std::stringstream stream;
             stream << "Error in constructing guid from string (";
             stream << guidStr;

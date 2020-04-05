@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    - uses: microsoft/setup-msbuild@v1
+    - uses: NuGet/setup-nuget@v1.0.2
+    - uses: darenm/Setup-VSTest@v1
+    - name: nuget restore
+      run: nuget.exe restore krabs\krabs.sln
+    - name: build release
+      run: msbuild.exe /nologo /m /t:Rebuild /p:Configuration=Release krabs\krabs.sln
+    - name: build debug
+      run: msbuild.exe /nologo /m /t:Rebuild /p:Configuration=Debug krabs\krabs.sln
+    - name: test native debug
+      run: vstest.console.exe krabs\x64\Debug\krabstests.dll
+    - name: test debug
+      run: vstest.console.exe tests\ManagedETWTests\bin\x64\Debug\EtwTestsCS.dll

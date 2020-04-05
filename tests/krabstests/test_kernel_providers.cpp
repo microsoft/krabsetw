@@ -16,12 +16,14 @@ namespace krabstests
         {
             krabs::kernel_provider provider(EVENT_TRACE_FLAG_ALPC, krabs::guids::alpc);
             krabs::kernel::thread_dispatch_provider cs;
+            krabs::kernel_provider ob_trace(krabs::guids::ob_trace, PERF_OB_HANDLE | PERF_OB_OBJECT);
+            krabs::kernel_provider alpc_provider(krabs::guids::alpc, PERF_ALPC);
         }
 
         TEST_METHOD(should_allow_event_registration)
         {
             krabs::kernel::thread_dispatch_provider cs;
-            cs.add_on_event_callback([](const EVENT_RECORD &) {});
+            cs.add_on_event_callback([](const EVENT_RECORD &, const krabs::trace_context &) {});
         }
 
         TEST_METHOD(should_be_addable_to_a_kernel_trace)
@@ -38,13 +40,13 @@ namespace krabstests
 
             krabs::kernel_trace trace;
             krabs::kernel::image_load_provider cs;
-            cs.add_on_event_callback([&](const EVENT_RECORD &) {
+            cs.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {
                 calledImageLoad = true;
             });
             trace.enable(cs);
 
             krabs::kernel::alpc_provider ap;
-            ap.add_on_event_callback([&](const EVENT_RECORD &) {
+            ap.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {
                 calledAlpc = true;
             });
             trace.enable(ap);

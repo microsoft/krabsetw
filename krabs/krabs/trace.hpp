@@ -8,7 +8,8 @@
 #include "compiler_check.hpp"
 #include "guid.hpp"
 #include "provider.hpp"
-#include "nightmare.hpp"
+#include "trace_context.hpp"
+#include "etw.hpp"
 
 
 namespace krabs { namespace details {
@@ -94,6 +95,36 @@ namespace krabs {
 
         /**
          * <summary>
+         * Sets the trace properties for a session.
+         * Must be called before open()/start().
+         * See https://docs.microsoft.com/en-us/windows/win32/etw/event-trace-properties
+         * for important details and restrictions.
+         * Configurable properties are ->
+         *  - BufferSize.  In KB. The maximum buffer size is 1024 KB.
+         *  - MinimumBuffers. Minimum number of buffers is two per processor*.
+         *  - MaximumBuffers.
+         *  - FlushTimer. How often, in seconds, the trace buffers are forcibly flushed.
+         *  - LogFileMode. EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING simulates a *single* sequential processor.
+         * </summary>
+         * <example>
+         *    krabs::trace trace;
+         *    EVENT_TRACE_PROPERTIES properties = { 0 };
+         *    properties.BufferSize = 256;
+         *    properties.MinimumBuffers = 12;
+         *    properties.MaximumBuffers = 48;
+         *    properties.FlushTimer = 1;
+         *    properties.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
+         *    trace.set_trace_properties(&properties);
+         *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+         *    provider<> powershell(id);
+         *    trace.enable(powershell);
+         *    trace.start();
+         * </example>
+         */
+        void set_trace_properties(const PEVENT_TRACE_PROPERTIES properties);
+
+        /**
+         * <summary>
          * Enables the provider on the given user trace.
          * </summary>
          * <example>
@@ -133,6 +164,30 @@ namespace krabs {
          * </example>
          */
         void stop();
+
+        /**
+        * <summary>
+        * Opens a trace session.
+        * This is an optional call before start() if you need the trace
+        * registered with the ETW subsystem before you start processing events.
+        * </summary>
+        * <example>
+        *    krabs::trace trace;
+        *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+        *    provider<> powershell(id);
+        *    trace.enable(powershell);
+        *    auto logfile = trace.open();
+        * </example>
+        */
+        EVENT_TRACE_LOGFILE open();
+
+        /**
+        * <summary>
+        * This is an alias for start().
+        * </summary>
+        */
+        [[deprecated("use start() instead")]]
+        void process();
 
         /**
          * <summary>
@@ -177,6 +232,10 @@ namespace krabs {
         size_t buffersRead_;
         uint64_t eventsHandled_;
 
+        EVENT_TRACE_PROPERTIES properties_;
+
+        const trace_context context_;
+
     private:
         template <typename T>
         friend class details::trace_manager;
@@ -196,8 +255,10 @@ namespace krabs {
     , sessionHandle_(INVALID_PROCESSTRACE_HANDLE)
     , eventsHandled_(0)
     , buffersRead_(0)
+    , context_()
     {
         name_ = T::enforce_name_policy(name);
+        ZeroMemory(&properties_, sizeof(EVENT_TRACE_PROPERTIES));
     }
 
     template <typename T>
@@ -206,14 +267,26 @@ namespace krabs {
     , sessionHandle_(INVALID_PROCESSTRACE_HANDLE)
     , eventsHandled_(0)
     , buffersRead_(0)
+    , context_()
     {
         name_ = T::enforce_name_policy(name);
+        ZeroMemory(&properties_, sizeof(EVENT_TRACE_PROPERTIES));
     }
 
     template <typename T>
     trace<T>::~trace()
     {
         stop();
+    }
+
+    template <typename T>
+    void trace<T>::set_trace_properties(const PEVENT_TRACE_PROPERTIES properties)
+    {
+        properties_.BufferSize = properties->BufferSize;
+        properties_.MinimumBuffers = properties->MinimumBuffers;
+        properties_.MaximumBuffers = properties->MaximumBuffers;
+        properties_.FlushTimer = properties->FlushTimer;
+        properties_.LogFileMode = properties->LogFileMode;
     }
 
     template <typename T>
@@ -243,6 +316,21 @@ namespace krabs {
     {
         details::trace_manager<trace> manager(*this);
         manager.stop();
+    }
+
+    template <typename T>
+    EVENT_TRACE_LOGFILE trace<T>::open()
+    {
+        eventsHandled_ = 0;
+
+        details::trace_manager<trace> manager(*this);
+        return manager.open();
+    }
+
+    template <typename T>
+    void trace<T>::process()
+    {
+        trace<T>::start();
     }
 
     template <typename T>

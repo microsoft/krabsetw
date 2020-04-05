@@ -30,8 +30,8 @@
 #include "krabs/ut.hpp"
 #include "krabs/kt.hpp"
 #include "krabs/guid.hpp"
-#include "krabs/lock.hpp"
 #include "krabs/trace.hpp"
+#include "krabs/trace_context.hpp"
 #include "krabs/client.hpp"
 #include "krabs/errors.hpp"
 #include "krabs/schema.hpp"
@@ -42,7 +42,7 @@
 #include "krabs/parser.hpp"
 #include "krabs/property.hpp"
 #include "krabs/provider.hpp"
-#include "krabs/nightmare.hpp"
+#include "krabs/etw.hpp"
 #include "krabs/tdh_helpers.hpp"
 #include "krabs/kernel_providers.hpp"
 

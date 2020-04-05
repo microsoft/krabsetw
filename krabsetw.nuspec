@@ -1,22 +1,22 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
-        <id>krabsetw</id>
-        <version>1.0.8</version>
+        <id>Microsoft.O365.Security.Krabsetw</id>
+        <version>4.1.3</version>
         <title>Krabs ETW Wrappers</title>
-        <authors>Microsoft Corporation,OneDrive/SharePoint Security</authors>
-        <owners>Microsoft Corporation,OneDrive/SharePoint Security</owners>
+        <authors>Microsoft</authors>
+        <owners>Microsoft</owners>
         <licenseUrl>https://opensource.org/licenses/MIT</licenseUrl>
         <projectUrl>https://github.com/Microsoft/krabsetw</projectUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</description>
         <summary>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</summary>
-        <releaseNotes>Remove forced unmanaged code compilation for comparers.hpp.</releaseNotes>
-        <copyright>Copyright 2016 Microsoft Corporation</copyright>
+        <releaseNotes>Add getter for property Provider.TraceFlags.</releaseNotes>
+        <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs krabsetw native headers cpp</tags>
         <dependencies>
-            <dependency id="boost" version="1.61.0" />
+            <dependency id="boost" version="1.68.0" />
         </dependencies>
     </metadata>
     <files>
@@ -35,14 +35,14 @@
         <file src="krabs\krabs\collection_view.hpp" target="lib\native\include\krabs\collection_view.hpp" />
         <file src="krabs\krabs\compiler_check.hpp" target="lib\native\include\krabs\compiler_check.hpp" />
         <file src="krabs\krabs\errors.hpp" target="lib\native\include\krabs\errors.hpp" />
+        <file src="krabs\krabs\etw.hpp" target="lib\native\include\krabs\etw.hpp" />
         <file src="krabs\krabs\guid.hpp" target="lib\native\include\krabs\guid.hpp" />
         <file src="krabs\krabs\kernel_guids.hpp" target="lib\native\include\krabs\kernel_guids.hpp" />
         <file src="krabs\krabs\kernel_providers.hpp" target="lib\native\include\krabs\kernel_providers.hpp" />
         <file src="krabs\krabs\kt.hpp" target="lib\native\include\krabs\kt.hpp" />
-        <file src="krabs\krabs\lock.hpp" target="lib\native\include\krabs\lock.hpp" />
-        <file src="krabs\krabs\nightmare.hpp" target="lib\native\include\krabs\nightmare.hpp" />
         <file src="krabs\krabs\parser.hpp" target="lib\native\include\krabs\parser.hpp" />
         <file src="krabs\krabs\parse_types.hpp" target="lib\native\include\krabs\parse_types.hpp" />
+        <file src="krabs\krabs\perfinfo_groupmask.hpp" target="lib\native\include\krabs\perfinfo_groupmask.hpp" />
         <file src="krabs\krabs\property.hpp" target="lib\native\include\krabs\property.hpp" />
         <file src="krabs\krabs\provider.hpp" target="lib\native\include\krabs\provider.hpp" />
         <file src="krabs\krabs\schema.hpp" target="lib\native\include\krabs\schema.hpp" />
@@ -50,10 +50,10 @@
         <file src="krabs\krabs\size_provider.hpp" target="lib\native\include\krabs\size_provider.hpp" />
         <file src="krabs\krabs\tdh_helpers.hpp" target="lib\native\include\krabs\tdh_helpers.hpp" />
         <file src="krabs\krabs\trace.hpp" target="lib\native\include\krabs\trace.hpp" />
+        <file src="krabs\krabs\trace_context.hpp" target="lib\native\include\krabs\trace_context.hpp" />
         <file src="krabs\krabs\ut.hpp" target="lib\native\include\krabs\ut.hpp" />
         <file src="krabs\krabs\version_helpers.hpp" target="lib\native\include\krabs\version_helpers.hpp" />
         <file src="krabs\krabs.hpp" target="lib\native\include\krabs.hpp" />
-        <file src="krabs\krabs.cpp" target="lib\native\src\krabs.cpp" />
-        <file src="krabs\Readme.txt" target="Readme.txt" />
+        <file src="krabs\Readme.md" target="Readme.md" />
     </files>
 </package>

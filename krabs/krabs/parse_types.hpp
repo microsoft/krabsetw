@@ -3,6 +3,14 @@
 
 #pragma once
 
+#ifndef  WIN32_LEAN_AND_MEAN
+#define  WIN32_LEAN_AND_MEAN
+#endif
+
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
 #include <vector>
 #include <type_traits>
 
@@ -157,6 +165,30 @@ namespace krabs {
 
         ip_address() {}
      };
+
+    /**
+    * <summary>
+    * Used to handle parsing of socket addresses in
+    * network order. This union is a convenient wrapper
+    * around the type IPv4 and IPv6 types provided by
+    * the Winsock (v2) APIs.
+    * </summary>
+    */
+    struct socket_address {
+        union {
+            struct sockaddr sa;
+            struct sockaddr_in sa_in;
+            struct sockaddr_in6 sa_in6;
+            struct sockaddr_storage sa_stor;
+        };
+
+        static socket_address from_bytes(const BYTE* bytes, size_t size_in_bytes)
+        {
+            socket_address sa;
+            memcpy_s(&(sa.sa_stor), sizeof sa.sa_stor, bytes, size_in_bytes);
+            return sa;
+        }
+    };
 
     /**
      * <summary>

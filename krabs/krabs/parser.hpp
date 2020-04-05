@@ -142,7 +142,9 @@ namespace krabs {
         assert((pBufferIndex_ <= pEndBuffer_ && pBufferIndex_ >= schema_.record_.UserData) &&
                "invariant: we should've already thrown for falling off the edge");
 
-        assert((pBufferIndex_ == pEndBuffer_ ? lastPropertyIndex_ == totalPropCount
+        // accept that last property can be omitted from buffer. this happens if last property
+        // is string but empty and the provider strips the null terminator
+        assert((pBufferIndex_ == pEndBuffer_ ? ((totalPropCount - lastPropertyIndex_) <= 1)
                                              : true)
                && "invariant: if we've exhausted our buffer, then we must've"
                   "exhausted the properties as well");
@@ -179,13 +181,15 @@ namespace krabs {
             property_info propInfo(pBufferIndex_, currentPropInfo, propertyLength);
             cache_property(pName, propInfo);
 
+            // advance the buffer index since we've already processed this property
+            pBufferIndex_ += propertyLength;
+
             // The property was found, return it
             if (name == pName) {
+                // advance the index since we've already processed this property
+                ++i;
                 return propInfo;
             }
-
-            // Not found yet, advance the buffer index and try again
-            pBufferIndex_ += propertyLength;
         }
 
         // property wasn't found, return an empty propInfo
@@ -313,7 +317,7 @@ namespace krabs {
         return binary(propInfo.pPropertyIndex_, propInfo.length_);
     }
 
-    template <>
+    template<>
     inline ip_address parser::parse<ip_address>(
         const std::wstring &name)
     {
@@ -334,6 +338,18 @@ namespace krabs {
         default:
             throw std::runtime_error("IP Address was not IPV4 or IPV6");
         }
+    }
+
+    template<>
+    inline socket_address parser::parse<socket_address>(
+        const std::wstring &name)
+    {
+        auto propInfo = find_property(name);
+        throw_if_property_not_found(propInfo);
+
+        krabs::debug::assert_valid_assignment<socket_address>(name, propInfo);
+
+        return socket_address::from_bytes(propInfo.pPropertyIndex_, propInfo.length_);
     }
 
     // view_of

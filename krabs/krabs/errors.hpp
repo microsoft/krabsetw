@@ -23,10 +23,10 @@ namespace krabs {
         {}
     };
 
-    class start_trace_failure : public std::runtime_error {
+    class open_trace_failure : public std::runtime_error {
     public:
-        start_trace_failure()
-            : std::runtime_error("Failure to start trace")
+        open_trace_failure()
+            : std::runtime_error("Failure to open trace")
         {}
     };
 
@@ -82,6 +82,8 @@ namespace krabs {
                 throw krabs::could_not_find_schema();
             case ERROR_NO_SYSTEM_RESOURCES:
                 throw krabs::no_trace_sessions_remaining();
+            case ERROR_NOT_SUPPORTED:
+                throw std::runtime_error("This function is not supported on this system");
             default:
                 throw std::runtime_error("Unexpected error");
         }

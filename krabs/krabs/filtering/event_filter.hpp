@@ -6,8 +6,10 @@
 #include <evntcons.h>
 #include <functional>
 #include <deque>
+#include <vector>
 
 #include "../compiler_check.hpp"
+#include "../trace_context.hpp"
 
 namespace krabs { namespace testing {
     class event_filter_proxy;
@@ -20,9 +22,9 @@ namespace krabs { namespace details {
 
 namespace krabs {
 
-    typedef void(*c_provider_callback)(const EVENT_RECORD &);
-    typedef std::function<void(const EVENT_RECORD &)> provider_callback;
-    typedef std::function<bool(const EVENT_RECORD &)> filter_predicate;
+    typedef void(*c_provider_callback)(const EVENT_RECORD &, const krabs::trace_context &);
+    typedef std::function<void(const EVENT_RECORD &, const krabs::trace_context &)> provider_callback;
+    typedef std::function<bool(const EVENT_RECORD &, const krabs::trace_context &)> filter_predicate;
 
     template <typename T> class provider;
 
@@ -51,6 +53,26 @@ namespace krabs {
 
         /**
          * <summary>
+         *   Constructs an event_filter that applies event id filtering by event_id
+         *   which will be added to list of filtered event ids in ETW API.
+         *   This way is more effective from performance point of view.
+         *   Given optional predicate will be applied to ETW API filtered results
+         * </summary>
+         */
+        event_filter(unsigned short event_id, filter_predicate predicate=nullptr);
+
+        /**
+         * <summary>
+         *   Constructs an event_filter that applies event id filtering by event_id
+         *   which will be added to list of filtered event ids in ETW API.
+         *   This way is more effective from performance point of view.
+         *   Given optional predicate will be applied to ETW API filtered results
+         * </summary>
+         */
+        event_filter(std::vector<unsigned short> event_ids, filter_predicate predicate = nullptr);
+
+        /**
+         * <summary>
          * Adds a function to call when an event for this filter is fired.
          * </summary>
          */
@@ -62,6 +84,11 @@ namespace krabs {
         template <typename U>
         void add_on_event_callback(const U &callback);
 
+        const std::vector<unsigned short>& provider_filter_event_ids() const
+        {
+            return provider_filter_event_ids_;
+        }
+
     private:
 
         /**
@@ -70,11 +97,12 @@ namespace krabs {
          *   satisfies the predicate.
          * </summary>
          */
-        void on_event(const EVENT_RECORD &record) const;
+        void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const;
 
     private:
         std::deque<provider_callback> callbacks_;
-        filter_predicate predicate_;
+        filter_predicate predicate_{ nullptr };
+        std::vector<unsigned short> provider_filter_event_ids_;
 
     private:
         template <typename T>
@@ -88,6 +116,16 @@ namespace krabs {
 
     inline event_filter::event_filter(filter_predicate predicate)
     : predicate_(predicate)
+    {}
+
+    inline event_filter::event_filter(std::vector<unsigned short> event_ids, filter_predicate predicate/*=nullptr*/)
+    : provider_filter_event_ids_{ event_ids },
+      predicate_(predicate)
+    {}
+
+    inline event_filter::event_filter(unsigned short event_id, filter_predicate predicate/*=nullptr*/)
+    : provider_filter_event_ids_{ event_id },
+      predicate_(predicate)
     {}
 
     inline void event_filter::add_on_event_callback(c_provider_callback callback)
@@ -117,18 +155,18 @@ namespace krabs {
         callbacks_.push_back(callback);
     }
 
-    inline void event_filter::on_event(const EVENT_RECORD &record) const
+    inline void event_filter::on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const
     {
         if (callbacks_.empty()) {
             return;
         }
 
-        if (!predicate_(record)) {
+        if (predicate_ != nullptr && !predicate_(record, trace_context)) {
             return;
         }
 
         for (auto &callback : callbacks_) {
-            callback(record);
+            callback(record, trace_context);
         }
     }
 } /* namespace krabs */

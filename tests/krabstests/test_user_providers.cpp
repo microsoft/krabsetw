@@ -8,9 +8,20 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace krabstests
 {
+    constexpr auto TEST_TRACE_NAME = L"krabs test named trace";
+
     static DWORD WINAPI threadproc(void*)
     {
         krabs::provider<> foo(L"Microsoft-Windows-WinINet");
+        return 0;
+    }
+
+    static DWORD WINAPI starttrace_threadproc(void*)
+    {
+        krabs::user_trace trace(TEST_TRACE_NAME);
+        krabs::provider<> foo(L"Microsoft-Windows-WinINet");
+        trace.enable(foo);
+        trace.start();
         return 0;
     }
 
@@ -51,7 +62,7 @@ namespace krabstests
         TEST_METHOD(should_allow_event_registration)
         {
             krabs::provider<> foo(krabs::guid::random_guid());
-            foo.add_on_event_callback([](const EVENT_RECORD &) {});
+            foo.add_on_event_callback([](const EVENT_RECORD &, const krabs::trace_context &) {});
         }
 
         TEST_METHOD(should_allow_any_all_level_flag_settings)
@@ -67,6 +78,49 @@ namespace krabstests
             krabs::user_trace trace;
             krabs::provider<> foo(krabs::guid::random_guid());
             trace.enable(foo);
+        }
+
+        TEST_METHOD(should_allow_user_trace_stop_by_name_without_start)
+        {
+            // start a trace in another thread and orphan it
+            DWORD thread_id = 0;
+            HANDLE my_thread = CreateThread(
+                nullptr,
+                0,
+                reinterpret_cast<LPTHREAD_START_ROUTINE>(starttrace_threadproc),
+                nullptr,
+                0,
+                &thread_id);
+            Assert::IsFalse(my_thread == nullptr);
+
+            // create a new user_trace with the same name
+            // we never call open/start for this user_trace ourselves, but
+            // we can still query it to determine if a trace with a
+            // matching name is running
+            krabs::user_trace trace(TEST_TRACE_NAME);
+            while (0 == trace.query_stats().buffersCount) {
+                Sleep(500);
+            }
+
+            // and we can stop traces by name
+            trace.stop();
+
+            // wait for the orphaned trace to stop, and its thread to return
+            WaitForSingleObject(my_thread, INFINITE);
+            CloseHandle(my_thread);
+
+            // no buffers --> trace has stopped
+            Assert::IsTrue(0 == trace.query_stats().buffersCount);
+        }
+
+        TEST_METHOD(should_get_same_trace_flags_as_set)
+        {
+            // Take up the full width of the datatype.
+            const ULONG FLAGS = 0xFFFFFFFF;
+
+            krabs::provider<> foo(krabs::guid::random_guid());
+            foo.trace_flags(FLAGS);
+            Assert::IsTrue(foo.trace_flags() == FLAGS);
         }
     };
 }

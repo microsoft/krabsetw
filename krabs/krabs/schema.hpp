@@ -3,6 +3,10 @@
 
 #pragma once
 
+#ifndef  WIN32_LEAN_AND_MEAN
+#define  WIN32_LEAN_AND_MEAN
+#endif
+
 #define INITGUID
 
 #include <memory>
@@ -38,17 +42,18 @@ namespace krabs {
 
         /**
          * <summary>
-         * Constructs a schema from an event record instance.
+         * Constructs a schema from an event record instance
+         * using the provided schema_locator.
          * </summary>
          *
          * <example>
-         *   void event(const EVENT_RECORD &record)
+         *   void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
          *   {
-         *       krabs::schema schema(record);
+         *       krabs::schema schema(record, trace_context.schema_locator);
          *   }
          * </example>
          */
-        schema(const EVENT_RECORD &);
+        schema(const EVENT_RECORD &, const krabs::schema_locator &);
 
         /**
          * <summary>Compares two schemas for equality.<summary>
@@ -66,9 +71,9 @@ namespace krabs {
          * Returns the name of an event via its schema.
          * </summary>
          * <example>
-         *    void on_event(const EVENT_RECORD &record)
+         *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
          *    {
-         *        krabs::schema schema(record);
+         *        krabs::schema schema(record, trace_context.schema_locator);
          *        std::wstring name = krabs::event_name(schema);
          *    }
          * </example>
@@ -80,9 +85,9 @@ namespace krabs {
          * Returns the event ID via its schema.
          * </summary>
          * <example>
-         *    void on_event(const EVENT_RECORD &record)
+         *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
          *    {
-         *        krabs::schema schema(record);
+         *        krabs::schema schema(record, trace_context.schema_locator);
          *        int id = schema.event_id();
          *    }
          * </example>
@@ -94,9 +99,9 @@ namespace krabs {
          * Returns the event opcode.
          * </summary>
          * <example>
-         *    void on_event(const EVENT_RECORD &record)
+         *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
          *    {
-         *        krabs::schema schema(record);
+         *        krabs::schema schema(record, trace_context.schema_locator);
          *        int opcode = schema.event_opcode();
          *    }
          * </example>
@@ -122,9 +127,9 @@ namespace krabs {
          * Returns the provider name of an event via its schema.
          * </summary>
          * <example>
-         *    void on_event(const EVENT_RECORD &record)
+         *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
          *    {
-         *        krabs::schema schema(record);
+         *        krabs::schema schema(record, trace_context.schema_locator);
          *        std::wstring name = krabs::provider_name(schema);
          *    }
          * </example>
@@ -136,9 +141,9 @@ namespace krabs {
         * Returns the PID associated with the event via its schema.
         * </summary>
         * <example>
-        *    void on_event(const EVENT_RECORD &record)
+        *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
         *    {
-        *        krabs::schema schema(record);
+        *        krabs::schema schema(record, trace_context.schema_locator);
         *        unsigned int name = krabs::process_id(schema);
         *    }
         * </example>
@@ -150,9 +155,9 @@ namespace krabs {
         * Returns the Thread ID associated with the event via its schema.
         * </summary>
         * <example>
-        *    void on_event(const EVENT_RECORD &record)
+        *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
         *    {
-        *        krabs::schema schema(record);
+        *        krabs::schema schema(record, trace_context.schema_locator);
         *        unsigned int name = krabs::thread_id(schema);
         *    }
         * </example>
@@ -164,9 +169,9 @@ namespace krabs {
         * Returns the timestamp associated with the event via its schema.
         * </summary>
         * <example>
-        *    void on_event(const EVENT_RECORD &record)
+        *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
         *    {
-        *        krabs::schema schema(record);
+        *        krabs::schema schema(record, trace_context.schema_locator);
         *        LARGE_INTEGER time = krabs::timestamp(schema);
         *    }
         * </example>
@@ -194,9 +199,9 @@ namespace krabs {
     // Implementation
     // ------------------------------------------------------------------------
 
-    inline schema::schema(const EVENT_RECORD &record)
+    inline schema::schema(const EVENT_RECORD &record, const krabs::schema_locator &schema_locator)
         : record_(record)
-        , pSchema_(schema_locator::get_instance().get_event_schema(record))
+        , pSchema_(schema_locator.get_event_schema(record))
     { }
 
     inline bool schema::operator==(const schema &other) const

@@ -10,6 +10,7 @@
 
 #include "../compiler_check.hpp"
 #include "comparers.hpp"
+#include "../trace_context.hpp"
 #include "view_adapters.hpp"
 
 using namespace krabs::predicates::adapters;
@@ -25,7 +26,7 @@ namespace krabs { namespace predicates {
          * </summary>
          */
         struct any_event {
-            bool operator()(const EVENT_RECORD &) const
+            bool operator()(const EVENT_RECORD &, const krabs::trace_context &) const
             {
                 return true;
             }
@@ -37,7 +38,7 @@ namespace krabs { namespace predicates {
          * </summary>
          */
         struct no_event {
-            bool operator()(const EVENT_RECORD &) const
+            bool operator()(const EVENT_RECORD &, const krabs::trace_context &) const
             {
                 return false;
             }
@@ -55,9 +56,9 @@ namespace krabs { namespace predicates {
                 , t2_(t2)
             {}
 
-            bool operator()(const EVENT_RECORD &record) const
+            bool operator()(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const
             {
-                return (t1_(record) && t2_(record));
+                return (t1_(record, trace_context) && t2_(record, trace_context));
             }
 
         private:
@@ -77,9 +78,9 @@ namespace krabs { namespace predicates {
                 , t2_(t2)
             {}
 
-            bool operator()(const EVENT_RECORD &record) const
+            bool operator()(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const
             {
-                return (t1_(record) || t2_(record));
+                return (t1_(record, trace_context) || t2_(record, trace_context));
             }
 
         private:
@@ -98,9 +99,9 @@ namespace krabs { namespace predicates {
                 : t1_(t1)
             {}
 
-            bool operator()(const EVENT_RECORD &record) const
+            bool operator()(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const
             {
-                return !t1_(record);
+                return !t1_(record, trace_context);
             }
 
         private:
@@ -119,9 +120,9 @@ namespace krabs { namespace predicates {
                 , expected_(expected)
             {}
 
-            bool operator()(const EVENT_RECORD &record) const
+            bool operator()(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const
             {
-                krabs::schema schema(record);
+                krabs::schema schema(record, trace_context.schema_locator);
                 krabs::parser parser(schema);
 
                 try {
@@ -159,9 +160,9 @@ namespace krabs { namespace predicates {
                 , predicate_(predicate)
             { }
 
-            bool operator()(const EVENT_RECORD &record)
+            bool operator()(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
             {
-                krabs::schema schema(record);
+                krabs::schema schema(record, trace_context.schema_locator);
                 krabs::parser parser(schema);
 
                 try {
@@ -208,7 +209,7 @@ namespace krabs { namespace predicates {
         : expected_(USHORT(expected))
         {}
 
-        bool operator()(const EVENT_RECORD &record)
+        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &) const
         {
             return (record.EventHeader.EventDescriptor.Id == expected_);
         }
@@ -227,7 +228,7 @@ namespace krabs { namespace predicates {
         : expected_(USHORT(expected))
         {}
 
-        bool operator()(const EVENT_RECORD &record)
+        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &) const
         {
             return (record.EventHeader.EventDescriptor.Opcode == expected_);
         }
@@ -246,13 +247,32 @@ namespace krabs { namespace predicates {
         : expected_(USHORT(expected))
         {}
 
-        bool operator()(const EVENT_RECORD &record)
+        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &) const
         {
             return (record.EventHeader.EventDescriptor.Version == expected_);
         }
 
     private:
         USHORT expected_;
+    };
+
+    /**
+    * <summary>
+    *   Accepts an event if its PID matches the expected value.
+    * </summary>
+    */
+    struct process_id_is {
+        process_id_is(size_t expected)
+        : expected_(ULONG(expected))
+        {}
+
+        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &) const
+        {
+            return (record.EventHeader.ProcessId == expected_);
+        }
+
+    private:
+        ULONG expected_;
     };
 
     /**

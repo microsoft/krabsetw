@@ -65,11 +65,11 @@ void setup_ps_provider(krabs::provider<>& provider)
 
     // providers should be wired up with functions (or functors) that are called when
     // events from that provider are fired.
-    provider.add_on_event_callback([](const EVENT_RECORD &record) {
+    provider.add_on_event_callback([](const EVENT_RECORD &record, const krabs::trace_context &trace_context) {
 
         // Once an event is received, if we want krabs to help us analyze it, we need
         // to snap in a schema to ask it for information.
-        krabs::schema schema(record);
+        krabs::schema schema(record, trace_context.schema_locator);
 
         // We then have the ability to ask a few questions of the event.
         std::wcout << L"Event " << schema.event_id();
@@ -94,8 +94,8 @@ void setup_ps_provider(krabs::provider<>& provider)
 void setup_image_load_provider(krabs::kernel::image_load_provider& provider)
 {
     // Kernel providers accept all the typical callback mechanisms.
-    provider.add_on_event_callback([](const EVENT_RECORD &record) {
-        krabs::schema schema(record);
+    provider.add_on_event_callback([](const EVENT_RECORD &record, const krabs::trace_context &trace_context) {
+        krabs::schema schema(record, trace_context.schema_locator);
 
         // Opcodes can be found on the kernel provider's documentation:
         // https://msdn.microsoft.com/en-us/library/windows/desktop/aa364068(v=vs.85).aspx

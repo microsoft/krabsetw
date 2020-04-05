@@ -101,7 +101,10 @@ namespace krabs {
 
             if (requested == actual) return;
 
+#pragma warning(push)
+#pragma warning(disable: 4244) // narrowing property name wchar_t to char for this error message
             std::string ansiName(name.begin(), name.end());
+#pragma warning(pop)
 
             throw type_mismatch_assert(
                 ansiName.c_str(),
@@ -148,6 +151,10 @@ namespace krabs {
         BUILD_ASSERT(float, TDH_INTYPE_FLOAT);
         BUILD_ASSERT(double, TDH_INTYPE_DOUBLE);
 
+        // FILETIME
+        BUILD_ASSERT(::FILETIME, TDH_INTYPE_FILETIME);
+        BUILD_ASSERT(::SYSTEMTIME, TDH_INTYPE_SYSTEMTIME);
+
 #undef BUILD_ASSERT
 
         template <>
@@ -160,6 +167,18 @@ namespace krabs {
                 outType != TDH_OUTTYPE_IPV4) {
                 throw std::runtime_error(
                     "Requested an IP address from non-IP address property");
+            }
+        }
+
+        template <>
+        inline void assert_valid_assignment<socket_address>(
+            const std::wstring&, const property_info& info)
+        {
+            auto outType = info.pEventPropertyInfo_->nonStructType.OutType;
+
+            if (outType != TDH_OUTTYPE_SOCKETADDRESS) {
+                throw std::runtime_error(
+                    "Requested a socket address from property that does not contain a socket address");
             }
         }
 

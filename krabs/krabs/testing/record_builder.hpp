@@ -80,7 +80,8 @@ namespace krabs { namespace testing {
             const krabs::guid &providerId,
             size_t id,
             size_t version,
-            size_t opcode = 0);
+            size_t opcode = 0,
+            bool trim_string_null_terminator = false);
 
         /**
          * <summary>Enables adding new properties to the builder.</summary>
@@ -171,6 +172,7 @@ namespace krabs { namespace testing {
         const size_t opcode_;
         EVENT_HEADER header_;
         std::vector<record_property_thunk> properties_;
+        bool trim_string_null_terminator_;
         friend struct details::property_adder;
     };
 
@@ -198,11 +200,13 @@ namespace krabs { namespace testing {
         const krabs::guid &providerId,
         size_t id,
         size_t version,
-        size_t opcode)
+        size_t opcode,
+        bool trim_string_null_terminator)
     : providerId_(providerId)
     , id_(id)
     , version_(version)
     , opcode_(opcode)
+    , trim_string_null_terminator_(trim_string_null_terminator)
     {
         ZeroMemory(&header_, sizeof(EVENT_HEADER));
         header_.EventDescriptor.Id      = static_cast<USHORT>(id_);
@@ -229,8 +233,12 @@ namespace krabs { namespace testing {
         if (!results.second.empty()) {
             std::string msg = "Not all the properties of the event were filled:";
 
-            for (auto& s : results.second)
+            for (auto& s : results.second) {
+#pragma warning(push)
+#pragma warning(disable: 4244) // narrowing property name wchar_t to char for this error message
                 msg += " " + std::string(s.begin(), s.end());
+#pragma warning(pop)
+            }
 
             throw std::invalid_argument(msg);
         }
@@ -266,10 +274,17 @@ namespace krabs { namespace testing {
     record_builder::pack_impl(const EVENT_RECORD &record) const
     {
         std::pair<std::vector<BYTE>, std::vector<std::wstring>> results;
-        krabs::schema event_schema(record);
+        krabs::schema_locator schema_locator;
+        krabs::schema event_schema(record, schema_locator);
         krabs::parser event_parser(event_schema);
 
+        // When the last property in a record is of string type (ansi or unicode), 
+        // ETW may omit the string NULL terminator. bytes_to_trim below will eventually be
+        // set to the number of bytes that can be trimmed from the generated buffer.
+
+        auto bytes_to_trim = 0;
         for (auto prop : event_parser.properties()) {
+            bytes_to_trim = 0;
 
             auto found_prop = std::find_if(properties_.begin(),
                                            properties_.end(),
@@ -291,6 +306,15 @@ namespace krabs { namespace testing {
                     throw std::invalid_argument(msg.c_str());
                 }
 
+                // if this is a string type, we could trim the null terminator
+                // (assuming that there are no other properties after this one)
+                if (prop.type() == TDH_INTYPE_UNICODESTRING) {
+                    bytes_to_trim = sizeof(L'\0');
+                }
+                else if (prop.type() == TDH_INTYPE_ANSISTRING) {
+                    bytes_to_trim = sizeof('\0');
+                }
+
                 std::copy(found_prop->bytes().begin(),
                           found_prop->bytes().end(),
                           std::back_inserter(results.first));
@@ -303,8 +327,12 @@ namespace krabs { namespace testing {
                 // properties manually.
                 results.second.emplace_back(prop.name());
                 std::fill_n(std::back_inserter(results.first),
-                            details::how_many_bytes_to_fill(prop.type()), 0);
+                            details::how_many_bytes_to_fill(prop.type()), static_cast<UCHAR>(0));
             }
+        }
+
+        if (trim_string_null_terminator_) {
+            results.first.resize(results.first.size() - bytes_to_trim);
         }
 
         return results;

@@ -26,11 +26,20 @@ x64/
 # githooks specific
 githooks/*.dll
 
-# VS2015 db poops
+# VS2015 db
 *.VC.db
 
-# ignore SNK files
+# ignore cert files
 *.snk
+*.pfx
 
 # ignore Mac stuff
 .DS_Store
+
+# Visual Studio files. 
+.vs/
+
+# Vim files
+*~
+*.swp
+*.swo

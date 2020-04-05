@@ -15,7 +15,7 @@ using namespace std::placeholders;
 
 bool was_c_style_callback_invoked = false;
 
-void c_style_callback(const EVENT_RECORD &)
+void c_style_callback(const EVENT_RECORD &, const krabs::trace_context &)
 {
     was_c_style_callback_invoked = true;
 }
@@ -23,12 +23,12 @@ void c_style_callback(const EVENT_RECORD &)
 
 struct functor {
 public:
-    void operator()(const EVENT_RECORD &)
+    void operator()(const EVENT_RECORD &, const krabs::trace_context &)
     {
         called_ = true;
     }
 
-    void my_member_func(const EVENT_RECORD &)
+    void my_member_func(const EVENT_RECORD &, const krabs::trace_context &)
     {
         called_ = true;
     }
@@ -53,7 +53,7 @@ public:
         : called_(b)
     {}
 
-    void operator()(const EVENT_RECORD &)
+    void operator()(const EVENT_RECORD &, const krabs::trace_context &)
     {
         called_ = true;
     }
@@ -92,7 +92,7 @@ namespace krabstests
 
         TEST_METHOD(add_callback_should_allow_lambdas_as_callbacks)
         {
-            provider.add_on_event_callback([&](const EVENT_RECORD &) {});
+            provider.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {});
         }
 
         TEST_METHOD(add_callback_should_allow_temporary_objects_as_callbacks)
@@ -103,7 +103,7 @@ namespace krabstests
         TEST_METHOD(add_callback_should_allow_pointer_to_member_functions_as_callbacks)
         {
             functor func;
-            provider.add_on_event_callback(std::bind(&functor::my_member_func, &func, _1));
+            provider.add_on_event_callback(std::bind(&functor::my_member_func, &func, _1, _2));
         }
 
         TEST_METHOD(trace_add_callback)
@@ -120,12 +120,12 @@ namespace krabstests
 
             provider.add_on_event_callback(c_style_callback);
             provider.add_on_event_callback(func1);
-            provider.add_on_event_callback([&](const EVENT_RECORD &) {
+            provider.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) {
                 was_lambda_invoked = true;
             });
 
             provider.add_on_event_callback(tmp_functor(was_tmp_invoked));
-            provider.add_on_event_callback(std::bind(&functor::my_member_func, &func2, _1));
+            provider.add_on_event_callback(std::bind(&functor::my_member_func, &func2, _1, _2));
             trace.enable(provider);
 
             // Kick off a fake event.
