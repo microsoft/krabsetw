@@ -20,12 +20,17 @@ namespace krabs { namespace predicates {
 
     namespace details {
 
+        struct predicate_base
+        {
+            virtual bool operator()(const EVENT_RECORD&, const krabs::trace_context&) const = 0;
+        };
+
         /**
          * <summary>
          *   Returns true for any event.
          * </summary>
          */
-        struct any_event {
+        struct any_event : predicate_base {
             bool operator()(const EVENT_RECORD &, const krabs::trace_context &) const
             {
                 return true;
@@ -37,7 +42,7 @@ namespace krabs { namespace predicates {
          *   Returns false for any event.
          * </summary>
          */
-        struct no_event {
+        struct no_event : predicate_base {
             bool operator()(const EVENT_RECORD &, const krabs::trace_context &) const
             {
                 return false;
@@ -50,7 +55,7 @@ namespace krabs { namespace predicates {
          * </summary>
          */
         template <typename T1, typename T2>
-        struct and_filter {
+        struct and_filter : predicate_base {
             and_filter(const T1 &t1, const T2 &t2)
                 : t1_(t1)
                 , t2_(t2)
@@ -72,7 +77,7 @@ namespace krabs { namespace predicates {
          * </summary>
          */
         template <typename T1, typename T2>
-        struct or_filter {
+        struct or_filter : predicate_base {
             or_filter(const T1 &t1, const T2 &t2)
                 : t1_(t1)
                 , t2_(t2)
@@ -94,7 +99,7 @@ namespace krabs { namespace predicates {
          * </summary>
          */
         template <typename T1>
-        struct not_filter {
+        struct not_filter : predicate_base {
             not_filter(const T1 &t1)
                 : t1_(t1)
             {}
@@ -114,7 +119,7 @@ namespace krabs { namespace predicates {
         * </summary>
         */
         template <typename T>
-        struct property_is {
+        struct property_is : predicate_base {
             property_is(const std::wstring &property, const T &expected)
                 : property_(property)
                 , expected_(expected)
@@ -147,7 +152,7 @@ namespace krabs { namespace predicates {
          * </summary>
          */
         template <typename T, typename Adapter, typename Predicate>
-        struct property_view_predicate
+        struct property_view_predicate : details::predicate_base
         {
             property_view_predicate(
                 const std::wstring &property,
@@ -160,7 +165,8 @@ namespace krabs { namespace predicates {
                 , predicate_(predicate)
             { }
 
-            bool operator()(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+            //bool operator()(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+            bool operator()(const EVENT_RECORD& record, const krabs::trace_context& trace_context) const
             {
                 krabs::schema schema(record, trace_context.schema_locator);
                 krabs::parser parser(schema);
@@ -204,7 +210,7 @@ namespace krabs { namespace predicates {
      *   Accepts an event if its ID matches the expected value.
      * </summary>
      */
-    struct id_is {
+    struct id_is : details::predicate_base {
         id_is(size_t expected)
         : expected_(USHORT(expected))
         {}
@@ -223,7 +229,7 @@ namespace krabs { namespace predicates {
      *   Accepts an event if its opcode matches the expected value.
      * </summary>
      */
-    struct opcode_is {
+    struct opcode_is : details::predicate_base {
         opcode_is(size_t expected)
         : expected_(USHORT(expected))
         {}
@@ -239,10 +245,82 @@ namespace krabs { namespace predicates {
 
     /**
      * <summary>
+     *   Accepts an event if one of the predicates in the vector matches
+     * </summary>
+     */
+    struct or_filter_vector : details::predicate_base {
+        or_filter_vector(std::vector<details::predicate_base*> list)
+        : list_(list)
+        {}
+
+        bool operator()(const EVENT_RECORD &record, const krabs::trace_context &trace_context) const
+        {
+            for (auto &item : list_) {
+                if (item->operator()(record, trace_context)) {
+                    return true;
+                };
+            }
+            return false;
+        }
+    private:
+        std::vector<details::predicate_base*> list_;
+    };
+
+    /**
+     * <summary>
+     *   Accepts an event if all of the predicates in the vector matches
+     * </summary>
+     */
+    struct and_filter_vector : details::predicate_base {
+        and_filter_vector(std::vector<details::predicate_base*> list)
+            : list_(list)
+        {}
+
+        bool operator()(const EVENT_RECORD& record, const krabs::trace_context& trace_context) const
+        {
+            if (list_.empty()) {
+                return false;
+            }
+            for (auto& item : list_) {
+                if (!item->operator()(record, trace_context)) {
+                    return false;
+                };
+            }
+            return true;
+        }
+    private:
+        std::vector<details::predicate_base*> list_;
+    };
+
+    /**
+     * <summary>
+     *   Accepts an event only if none of the predicates in the vector match
+     * </summary>
+     */
+    struct none_filter_vector : details::predicate_base {
+        none_filter_vector(std::vector<details::predicate_base*> list)
+            : list_(list)
+        {}
+
+        bool operator()(const EVENT_RECORD& record, const krabs::trace_context& trace_context) const
+        {
+            for (auto& item : list_) {
+                if (item->operator()(record, trace_context)) {
+                    return false;
+                };
+            }
+            return true;
+        }
+    private:
+        std::vector<details::predicate_base*> list_;
+    };
+
+    /**
+     * <summary>
      *   Accepts an event if its version matches the expected value.
      * </summary>
      */
-    struct version_is {
+    struct version_is : details::predicate_base {
         version_is(size_t expected)
         : expected_(USHORT(expected))
         {}
@@ -261,7 +339,7 @@ namespace krabs { namespace predicates {
     *   Accepts an event if its PID matches the expected value.
     * </summary>
     */
-    struct process_id_is {
+    struct process_id_is : details::predicate_base {
         process_id_is(size_t expected)
         : expected_(ULONG(expected))
         {}
@@ -331,7 +409,7 @@ namespace krabs { namespace predicates {
         const std::wstring &prop,
         const T& expected)
     {
-        return{ prop, expected, Adapter(), Comparer() };
+        return { prop, expected, Adapter(), Comparer() };
     }
 
     /**

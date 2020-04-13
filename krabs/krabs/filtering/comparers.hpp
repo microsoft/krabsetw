@@ -30,7 +30,7 @@ namespace krabs { namespace predicates {
         struct equals
         {
             template <typename Iter1, typename Iter2>
-            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2)
+            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
                 auto r1 = boost::make_iterator_range(begin1, end1);
                 auto r2 = boost::make_iterator_range(begin2, end2);
@@ -46,7 +46,7 @@ namespace krabs { namespace predicates {
         struct contains
         {
             template <typename Iter1, typename Iter2>
-            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2)
+            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
                 auto r1 = boost::make_iterator_range(begin1, end1);
                 auto r2 = boost::make_iterator_range(begin2, end2);
@@ -62,7 +62,7 @@ namespace krabs { namespace predicates {
         struct starts_with
         {
             template <typename Iter1, typename Iter2>
-            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2)
+            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
                 auto r1 = boost::make_iterator_range(begin1, end1);
                 auto r2 = boost::make_iterator_range(begin2, end2);
@@ -78,7 +78,7 @@ namespace krabs { namespace predicates {
         struct ends_with
         {
             template <typename Iter1, typename Iter2>
-            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2)
+            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
                 auto r1 = boost::make_iterator_range(begin1, end1);
                 auto r2 = boost::make_iterator_range(begin2, end2);
@@ -93,7 +93,7 @@ namespace krabs { namespace predicates {
         template <typename T>
         struct iequal_to
         {
-            bool operator()(const T& a, const T& b)
+            bool operator()(const T& a, const T& b) const
             {
                 static_assert(sizeof(T) == 0,
                     "iequal_to needs a specialized overload for type");
