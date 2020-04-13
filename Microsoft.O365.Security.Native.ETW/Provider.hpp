@@ -117,11 +117,15 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 
         /// <summary>
-        /// Represents the "level" value on the provider's options, where
-        /// "level" determines events in what categories are 
-        /// enabled for notification.
+        /// Represents the "EnabledProperty" value on the provider's options.
+        /// Values are documented here:
+        /// https://docs.microsoft.com/en-us/windows/win32/api/evntrace/ns-evntrace-enable_trace_parameters
         /// </summary>
         property TraceFlags TraceFlags {
+            ETW::TraceFlags get() {
+                return static_cast<ETW::TraceFlags>(provider_->trace_flags());
+            }
+
             void set(O365::Security::ETW::TraceFlags value) {
                 provider_->trace_flags((ULONG)value);
             }
