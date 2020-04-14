@@ -19,37 +19,28 @@ void user_trace_006_predicate_vectors::start()
     krabs::provider<> provider(L"Microsoft-Windows-Kernel-Process");
     provider.any(0x10);
 
+    // We'll log events where ome of the following is true
+    //  - The Opcode is 1,
+    //  - The Event ID is 2, or
+    //  - The Version is 3
+    krabs::predicates::opcode_is opcode_is_1 = krabs::predicates::opcode_is(1);
+    krabs::predicates::id_is eventid_is_2 = krabs::predicates::id_is(2);
+    krabs::predicates::version_is version_is_3 = krabs::predicates::version_is(3);
 
-    krabs::predicates::id_is id_is_1 = krabs::predicates::id_is(1);
-    krabs::predicates::id_is id_is_2 = krabs::predicates::id_is(2);
-    krabs::predicates::id_is opcode_is_1 = krabs::predicates::id_is(2);
-    krabs::predicates::id_is opcode_is_2 = krabs::predicates::id_is(2);
-    std::vector<krabs::predicates::details::predicate_base*> vector_ids = {
-        &id_is_1,
-        &id_is_2,
-        &opcode_is_1,
-        &opcode_is_2,
-    };
-
-    // We'll make one filter of if the ID is 1 OR 2, or OPCODE is 1
-    krabs::predicates::or_filter_vector or_pred_ids = krabs::predicates::or_filter_vector(vector_ids);
-    krabs::event_filter or_filter(or_pred_ids);
-    or_filter.add_on_event_callback([](const EVENT_RECORD& record, const krabs::trace_context& trace_context) {
-        krabs::schema schema(record, trace_context.schema_locator);
-        assert(schema.event_id() == 1 || schema.event_id() == 2);
-        printf("Event ID: %d || Opcode: %d\n", schema.event_id(), schema.event_opcode());
+    krabs::event_filter filter(
+        krabs::predicates::or_filter_vector({
+            &opcode_is_1,
+            &eventid_is_2,
+            &version_is_3,
+        })
+    );
+    filter.add_on_event_callback([](const EVENT_RECORD & record, const krabs::trace_context &trace_context) {
+            krabs::schema schema(record, trace_context.schema_locator);
+            assert(schema.event_id() == 1 || schema.event_id() == 2);
+            printf("Event ID: %d || Opcode: %d || Version %d\n", schema.event_id(), schema.event_opcode(), schema.event_version());
         });
-    provider.add_filter(or_filter);
 
-    // We'll make an AND filter, that should never work (as an ID can't be two numbers ar once
-    krabs::predicates::and_filter_vector and_pred_ids = krabs::predicates::and_filter_vector(vector_ids);
-    krabs::event_filter and_filter(and_pred_ids);
-    and_filter.add_on_event_callback([](const EVENT_RECORD&, const krabs::trace_context&) {
-        // This should never be called
-        assert(false);
-        });
-    provider.add_filter(and_filter);
-
+    provider.add_filter(filter);
     trace.enable(provider);
     trace.start();
 }
