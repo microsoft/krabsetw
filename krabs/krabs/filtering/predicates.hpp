@@ -95,6 +95,58 @@ namespace krabs { namespace predicates {
 
         /**
          * <summary>
+         *   Performs a logical OR on multiple filters
+         * </summary>
+         */
+        template <typename T1>
+        struct or_filter_vector {
+            or_filter_vector(const std::vector<T1> vector)
+                : vector_(vector)
+            {}
+
+            bool operator()(const EVENT_RECORD& record, const krabs::trace_context& trace_context) const
+            {
+                for (T1 elem : vector_)
+                {
+                    if (elem(record, trace_context)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+        private:
+            const std::vector<T1> vector_;
+        };
+
+        /**
+         * <summary>
+         *   Performs a logical AND on multiple filters
+         * </summary>
+         */
+        template <typename T1>
+        struct and_filter_vector {
+            and_filter_vector(const std::vector<T1> vector)
+                : vector_(vector)
+            {}
+
+            bool operator()(const EVENT_RECORD& record, const krabs::trace_context& trace_context) const
+            {
+                for (T1 elem : vector_)
+                {
+                    if (!elem(record, trace_context)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+        private:
+            const std::vector<T1> vector_;
+        };
+
+        /**
+         * <summary>
          *   Performs a logical NOT on a filter.
          * </summary>
          */
@@ -530,6 +582,28 @@ namespace krabs { namespace predicates {
     details::or_filter<T1, T2> or_filter(const T1 &t1, const T2 &t2)
     {
         return details::or_filter<T1, T2>(t1, t2);
+    }
+
+    /**
+     * <summary>
+     *   Accepts an event if any of its multiple component filters accept the event.
+     * </summary>
+     */
+    template <typename T1>
+    details::or_filter_vector<T1> or_filter_vector(const std::vector<T1> vector)
+    {
+        return details::or_filter_vector<T1>(vector);
+    }
+
+    /**
+     * <summary>
+     *   Accepts an event if all of its multiple component filters accept the event.
+     * </summary>
+     */
+    template <typename T1>
+    details::and_filter_vector<T1> and_filter_vector(const std::vector<T1> vector)
+    {
+        return details::and_filter_vector<T1>(vector);
     }
 
     /**
