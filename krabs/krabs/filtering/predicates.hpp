@@ -20,6 +20,12 @@ namespace krabs { namespace predicates {
 
     namespace details {
 
+        /**
+         * <summary>
+         *   The base predicate struct, use to create a vector or list of
+         *   Arbitrary predicate types
+         * </summary>
+         */
         struct predicate_base
         {
             virtual bool operator()(const EVENT_RECORD&, const krabs::trace_context&) const = 0;
