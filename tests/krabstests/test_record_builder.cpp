@@ -216,19 +216,16 @@ namespace krabstests
             Assert::AreEqual((size_t)extended_data.DataSize, krabs::testing::extended_data_builder::GUID_STRING_LENGTH_NO_BRACES);
             
             // Extract the GUID back out of the extended data, adding wrapping braces and null terminator.
-            char guid_buffer[krabs::testing::extended_data_builder::GUID_STRING_LENGTH_WITH_BRACES + 1] = "{00000000-0000-0000-0000-000000000000}";
-            errno_t copy_error = memcpy_s(
-                (BYTE*)guid_buffer + 1,
-                krabs::testing::extended_data_builder::GUID_STRING_LENGTH_NO_BRACES,
-                reinterpret_cast<void*>(extended_data.DataPtr),
-                extended_data.DataSize);
-
-            // memcpy_s error would indicate the generated data is incorrectly packed/formatted.
-            Assert::AreEqual((int)copy_error, 0, L"memcpy_s error, most likely means extended data payload was incorrectly packed.");
+            std::wstring guid_buffer(L"{########-####-####-####-############}");
+            Assert::AreEqual(guid_buffer.length(), krabs::testing::extended_data_builder::GUID_STRING_LENGTH_WITH_BRACES);
+            for (int i = 0; i < krabs::testing::extended_data_builder::GUID_STRING_LENGTH_NO_BRACES; i++)
+            {
+                // brace offset
+                guid_buffer[i + 1] = static_cast<wchar_t>(reinterpret_cast<char*>(extended_data.DataPtr)[i]);
+            }
 
             // Check that the right GUID came out.
-            std::string container_guid(guid_buffer);
-            Assert::IsTrue(CONTAINER_GUID == krabs::guid(std::wstring(container_guid.begin(), container_guid.end())));
+            Assert::IsTrue(CONTAINER_GUID == krabs::guid(guid_buffer));
         }
 
         private:

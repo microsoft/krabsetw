@@ -53,8 +53,9 @@ namespace krabs { namespace testing {
     class extended_data_builder
     {
     public:
-        static const size_t GUID_STRING_LENGTH_WITH_BRACES = 38;
-        static const size_t GUID_STRING_LENGTH_NO_BRACES = 36;
+        static constexpr size_t GUID_STRING_LENGTH_NO_BRACES = 36;
+        static constexpr size_t GUID_STRING_LENGTH_WITH_BRACES = GUID_STRING_LENGTH_NO_BRACES + 2;
+
 
         extended_data_builder()
         : items_()

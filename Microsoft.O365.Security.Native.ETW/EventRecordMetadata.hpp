@@ -168,7 +168,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         virtual System::Nullable<System::Guid> GetContainerId()
         {
             // We are expecting format "00000000-0000-0000-0000-0000000000000", 32 hex digits with 4 hyphens
-            const size_t CONTAINER_ID_DATA_LENGTH_IN_BYTES = 36;
+            constexpr size_t CONTAINER_ID_DATA_LENGTH_IN_BYTES = 36;
 
             size_t extended_data_count = record_->ExtendedDataCount;
             for (size_t i = 0; i < extended_data_count; i++)
@@ -179,22 +179,25 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
                 {
                     // Convert the non-null terminated, no-braces ASCII GUID into a null terminated, curly braces, wide string 
                     // for parsing.
+                    std::wstring guid_string_buffer (L"{########-####-####-####-############}");
                     assert(extended_data.DataSize == CONTAINER_ID_DATA_LENGTH_IN_BYTES);
-                    wchar_t guid_string_buffer[1 + CONTAINER_ID_DATA_LENGTH_IN_BYTES + 2] = L"{00000000-0000-0000-0000-000000000000}";
+                    assert(guid_string_buffer.length() == 1 + CONTAINER_ID_DATA_LENGTH_IN_BYTES + 1);
+
                     for (size_t c = 0; c < CONTAINER_ID_DATA_LENGTH_IN_BYTES; c++)
                     {
-                        guid_string_buffer[c + 1] = (wchar_t)((reinterpret_cast<char*>(extended_data.DataPtr))[c]);
+                        // Offset by 1 to account for curly brace
+                        guid_string_buffer[c + 1] = static_cast<wchar_t>(reinterpret_cast<char*>(extended_data.DataPtr)[c]);
                     }
 
                     // Parse GUID in native code to avoid marshalling any strings.
                     GUID container_guid;
-                    HRESULT guid_conversion_error = CLSIDFromString(guid_string_buffer, &container_guid);
+                    HRESULT guid_conversion_error = CLSIDFromString(guid_string_buffer.c_str(), &container_guid);
                     if (guid_conversion_error != S_OK)
                     {
                         // As long as we're getting GUIDs in the expected format from the extended data, this shouldn't be 
                         // happening, but if it does it should be explicit instead of making the event look like it's not coming
                         // from inside an Argon container.
-                        System::String^ guidData = gcnew System::String(guid_string_buffer);
+                        System::String^ guidData = gcnew System::String(guid_string_buffer.c_str());
                         System::Int32 errorCode = System::Int32(guid_conversion_error);
                         throw gcnew ContainerIdFormatException(
                             System::String::Format(
