@@ -461,109 +461,109 @@ namespace krabstests
             auto filter4 = krabs::predicates::not_filter(krabs::predicates::version_is(2));
             Assert::IsTrue(filter4(record, trace_context));
         }
-        TEST_METHOD(or_vector_should_match_first)
+        TEST_METHOD(any_of_should_match_first)
         {
             auto item1 = krabs::predicates::any_event;
             auto item2 = krabs::predicates::no_event;
-            auto filter = krabs::predicates::or_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::any_of({ &item1, &item2 });
             Assert::IsTrue(filter(record, trace_context));
         }
 
-        TEST_METHOD(or_vector_should_match_last)
+        TEST_METHOD(any_of_should_match_last)
         {
             auto item1 = krabs::predicates::no_event;
             auto item2 = krabs::predicates::any_event;
-            auto filter = krabs::predicates::or_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::any_of({ &item1, &item2 });
             Assert::IsTrue(filter(record, trace_context));
         }
 
-        TEST_METHOD(or_vector_should_match_all)
+        TEST_METHOD(any_of_should_match_all)
         {
             auto item1 = krabs::predicates::any_event;
             auto item2 = krabs::predicates::any_event;
-            auto filter = krabs::predicates::or_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::any_of({ &item1, &item2 });
             Assert::IsTrue(filter(record, trace_context));
         }
 
-        TEST_METHOD(or_vector_should_not_match_any)
+        TEST_METHOD(any_of_should_not_match_any)
         {
             auto item1 = krabs::predicates::no_event;
             auto item2 = krabs::predicates::no_event;
-            auto filter = krabs::predicates::or_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::any_of({ &item1, &item2 });
             Assert::IsFalse(filter(record, trace_context));
         }
 
-        TEST_METHOD(or_vector_should_not_match_empty)
+        TEST_METHOD(any_of_should_not_match_empty)
         {
-            auto filter = krabs::predicates::or_filter_vector({});
+            auto filter = krabs::predicates::any_of({});
             Assert::IsFalse(filter(record, trace_context));
         }
 
-        TEST_METHOD(and_vector_should_match_all)
+        TEST_METHOD(all_of_should_match_all)
         {
             auto item1 = krabs::predicates::any_event;
             auto item2 = krabs::predicates::any_event;
-            auto filter = krabs::predicates::and_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::all_of({ &item1, &item2 });
             Assert::IsTrue(filter(record, trace_context));
         }
 
-        TEST_METHOD(and_vector_should_not_match_first)
+        TEST_METHOD(all_of_should_not_match_first)
         {
             auto item1 = krabs::predicates::any_event;
             auto item2 = krabs::predicates::no_event;
-            auto filter = krabs::predicates::and_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::all_of({ &item1, &item2 });
             Assert::IsFalse(filter(record, trace_context));
         }
 
-        TEST_METHOD(and_vector_should_not_match_last)
+        TEST_METHOD(all_of_should_not_match_last)
         {
             auto item1 = krabs::predicates::no_event;
             auto item2 = krabs::predicates::any_event;
-            auto filter = krabs::predicates::and_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::all_of({ &item1, &item2 });
             Assert::IsFalse(filter(record, trace_context));
         }
 
-        TEST_METHOD(and_vector_should_not_match_any)
+        TEST_METHOD(all_of_should_not_match_any)
         {
             auto item1 = krabs::predicates::no_event;
             auto item2 = krabs::predicates::no_event;
-            auto filter = krabs::predicates::and_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::all_of({ &item1, &item2 });
             Assert::IsFalse(filter(record, trace_context));
         }
 
-        TEST_METHOD(and_vector_should_not_match_empty)
+        TEST_METHOD(all_of_should_not_match_empty)
         {
-            auto filter = krabs::predicates::and_filter_vector({});
+            auto filter = krabs::predicates::all_of({});
             Assert::IsFalse(filter(record, trace_context));
         }
 
-        TEST_METHOD(none_vector_should_match_all)
+        TEST_METHOD(none_of_should_match_all)
         {
             auto item1 = krabs::predicates::no_event;
             auto item2 = krabs::predicates::no_event;
-            auto filter = krabs::predicates::none_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::none_of({ &item1, &item2 });
             Assert::IsTrue(filter(record, trace_context));
         }
 
-        TEST_METHOD(none_vector_should_match_empty)
+        TEST_METHOD(none_of_should_match_empty)
         {
-            auto filter = krabs::predicates::none_filter_vector({});
+            auto filter = krabs::predicates::none_of({});
             Assert::IsTrue(filter(record, trace_context));
         }
 
-        TEST_METHOD(none_vector_should_not_match_first)
+        TEST_METHOD(none_of_should_not_match_first)
         {
             auto item1 = krabs::predicates::any_event;
             auto item2 = krabs::predicates::no_event;
-            auto filter = krabs::predicates::none_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::none_of({ &item1, &item2 });
             Assert::IsFalse(filter(record, trace_context));
         }
 
-        TEST_METHOD(none_vector_should_not_match_last)
+        TEST_METHOD(none_of_should_not_match_last)
         {
             auto item1 = krabs::predicates::any_event;
             auto item2 = krabs::predicates::no_event;
-            auto filter = krabs::predicates::none_filter_vector({ &item1, &item2 });
+            auto filter = krabs::predicates::none_of({ &item1, &item2 });
             Assert::IsFalse(filter(record, trace_context));
         }
     };

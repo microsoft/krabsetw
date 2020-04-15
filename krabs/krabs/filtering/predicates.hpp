@@ -251,11 +251,11 @@ namespace krabs { namespace predicates {
 
     /**
      * <summary>
-     *   Accepts an event if one of the predicates in the vector matches
+     *   Accepts an event if any of the predicates in the vector matches
      * </summary>
      */
-    struct or_filter_vector : details::predicate_base {
-        or_filter_vector(std::vector<details::predicate_base*> list)
+    struct any_of : details::predicate_base {
+        any_of(std::vector<details::predicate_base*> list)
         : list_(list)
         {}
 
@@ -277,8 +277,8 @@ namespace krabs { namespace predicates {
      *   Accepts an event if all of the predicates in the vector matches
      * </summary>
      */
-    struct and_filter_vector : details::predicate_base {
-        and_filter_vector(std::vector<details::predicate_base*> list)
+    struct all_of : details::predicate_base {
+        all_of(std::vector<details::predicate_base*> list)
             : list_(list)
         {}
 
@@ -303,8 +303,8 @@ namespace krabs { namespace predicates {
      *   Accepts an event only if none of the predicates in the vector match
      * </summary>
      */
-    struct none_filter_vector : details::predicate_base {
-        none_filter_vector(std::vector<details::predicate_base*> list)
+    struct none_of : details::predicate_base {
+        none_of(std::vector<details::predicate_base*> list)
             : list_(list)
         {}
 

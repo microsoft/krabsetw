@@ -28,7 +28,7 @@ void user_trace_006_predicate_vectors::start()
     krabs::predicates::version_is version_is_3 = krabs::predicates::version_is(3);
 
     krabs::event_filter filter(
-        krabs::predicates::or_filter_vector({
+        krabs::predicates::any_of({
             &opcode_is_1,
             &eventid_is_2,
             &version_is_3,
