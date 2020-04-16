@@ -137,7 +137,7 @@ namespace krabs { namespace testing {
 
          /**
          * <summary>
-         * Adds extended data representing a GUID for an Argon container ID
+         * Adds extended data representing a GUID for an Windows container ID
          * </summary>
          */
          void add_container_id_extended_data(const GUID& container_id);

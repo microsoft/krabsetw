@@ -217,8 +217,8 @@ namespace EtwTestsCS
                 var provider = new Provider(PowerShellEvent.ProviderId);
                 provider.OnEvent += e =>
                 {
-                    Guid? containerId = e.GetContainerId();
-                    Assert.IsNotNull(containerId);
+                    Guid containerId;
+                    Assert.IsTrue(e.TryGetContainerId(out containerId));
                     Assert.AreEqual(containerId, guid);
                 };
 

@@ -27,6 +27,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             , header_(&record.EventHeader) { }
 
     public:
+        // For container ID's, we are expecting format "00000000-0000-0000-0000-0000000000000", 
+        // 32 hex digits with 4 hyphens, no braces.
+        static const size_t CONTAINER_ID_DATA_LENGTH_IN_BYTES = 36;
+
 #pragma region EventDescriptor
 
         /// <summary>
@@ -158,19 +162,17 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 #pragma region ExtendedData
 
         /// <summary>
-        /// If the event's extended data contains an Argon container ID, retrieve it.
+        /// If the event's extended data contains a Windows container ID (i.e. event came from inside
+        /// a container using process isolation), retrieve it.
         /// Can be expensive, avoid calling more than once per event.
         /// </summary>
         /// <returns>
-        /// A Guid representing the Argon container ID if the data is present. Null it's not present. 
-        /// Throws a ContainerIdFormatException if the container ID is present but parsing fails.
+        /// True if a Guid was present. False if not. If a Guid was present, it will be written into the result 
+        /// parameter. Throws a ContainerIdFormatException if the container ID is present but parsing fails.
         /// </returns>
-        virtual System::Nullable<System::Guid> GetContainerId()
+        virtual bool TryGetContainerId([Out] System::Guid% result)
         {
-            // We are expecting format "00000000-0000-0000-0000-0000000000000", 32 hex digits with 4 hyphens
-            constexpr size_t CONTAINER_ID_DATA_LENGTH_IN_BYTES = 36;
-
-            size_t extended_data_count = record_->ExtendedDataCount;
+            auto extended_data_count = static_cast<size_t>(record_->ExtendedDataCount);
             for (size_t i = 0; i < extended_data_count; i++)
             {
                 EVENT_HEADER_EXTENDED_DATA_ITEM& extended_data = record_->ExtendedData[i];
@@ -196,7 +198,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
                     {
                         // As long as we're getting GUIDs in the expected format from the extended data, this shouldn't be 
                         // happening, but if it does it should be explicit instead of making the event look like it's not coming
-                        // from inside an Argon container.
+                        // from inside a process isolation container.
                         System::String^ guidData = gcnew System::String(guid_string_buffer.c_str());
                         System::Int32 errorCode = System::Int32(guid_conversion_error);
                         throw gcnew ContainerIdFormatException(
@@ -207,12 +209,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
                     }
 
                     // Convert to managed System::Guid for returning to managed code.
-                    return System::Nullable<System::Guid>(ConvertGuid(container_guid));
+                    result = ConvertGuid(container_guid);
+                    return true;
                 }
             }
 
-            // Not found, return null.
-            return System::Nullable<System::Guid>();
+            // Not found.
+            result = System::Guid::Empty;
+            return false;
         }
 
 #pragma endregion
