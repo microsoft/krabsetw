@@ -78,6 +78,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ManagedExamples", "..\examples\ManagedExamples\ManagedExamples.csproj", "{32E71DD0-D11A-44DE-8CA8-572995AF2373}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NativeExamples", "..\examples\NativeExamples\NativeExamples.vcxproj", "{D31B1A4B-8282-4AED-99FC-9AA5974B9134}"
+	ProjectSection(ProjectDependencies) = postProject
+		{ED4E6027-541F-440A-A5EE-15DBB7B89423} = {ED4E6027-541F-440A-A5EE-15DBB7B89423}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

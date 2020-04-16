@@ -40,6 +40,9 @@
     <ClCompile Include="user_trace_005.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="user_trace_006_predicate_vectors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="examples.h">

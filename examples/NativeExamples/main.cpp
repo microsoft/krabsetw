@@ -15,4 +15,5 @@ int main(void)
     //user_trace_003_no_predicates::start();
     //user_trace_004::start();
     //user_trace_005::start();
+    //user_trace_006_predicate_vectors::start();
 }
