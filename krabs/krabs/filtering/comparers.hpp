@@ -8,9 +8,9 @@
 #pragma warning(disable: 4800) // bool warning in boost when _MANAGED flag is set
 #endif
 
+#include <algorithm>
+
 #include "../compiler_check.hpp"
-#include <boost/algorithm/string.hpp>
-#include <boost/range/iterator_range_core.hpp>
 
 #if(_MANAGED)
 #pragma warning(pop)
@@ -32,10 +32,7 @@ namespace krabs { namespace predicates {
             template <typename Iter1, typename Iter2>
             bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
-                auto r1 = boost::make_iterator_range(begin1, end1);
-                auto r2 = boost::make_iterator_range(begin2, end2);
-
-                return boost::equals(r1, r2, Comparer());
+                return std::equal(begin1, end1, begin2, end2, Comparer());
             }
         };
 
@@ -48,10 +45,7 @@ namespace krabs { namespace predicates {
             template <typename Iter1, typename Iter2>
             bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
-                auto r1 = boost::make_iterator_range(begin1, end1);
-                auto r2 = boost::make_iterator_range(begin2, end2);
-
-                return boost::contains(r1, r2, Comparer());
+                return std::search(begin1, end1, begin2, end2, Comparer()) != end1;
             }
         };
 
@@ -64,10 +58,20 @@ namespace krabs { namespace predicates {
             template <typename Iter1, typename Iter2>
             bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
-                auto r1 = boost::make_iterator_range(begin1, end1);
-                auto r2 = boost::make_iterator_range(begin2, end2);
+                const auto dist1 = std::distance(begin1, end1);
+                const auto dist2 = std::distance(begin2, end2);
 
-                return boost::starts_with(r1, r2, Comparer());
+                // always starts with empty range
+                if (dist2 == 0)
+                    return true;
+
+                if (dist2 > dist1)
+                    return false;
+
+                auto prefix_end = begin1;
+                std::advance(prefix_end, dist2);
+
+                return std::equal(begin1, prefix_end, begin2, end2, Comparer());
             }
         };
 
@@ -80,10 +84,20 @@ namespace krabs { namespace predicates {
             template <typename Iter1, typename Iter2>
             bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
-                auto r1 = boost::make_iterator_range(begin1, end1);
-                auto r2 = boost::make_iterator_range(begin2, end2);
+                const auto dist1 = std::distance(begin1, end1);
+                const auto dist2 = std::distance(begin2, end2);
 
-                return boost::ends_with(r1, r2, Comparer());
+                // always ends with empty range
+                if (dist2 == 0)
+                    return true;
+
+                if (dist2 > dist1)
+                    return false;
+
+                auto suffix_begin = begin1;
+                std::advance(suffix_begin, dist1 - dist2);
+
+                return std::equal(suffix_begin, end1, begin2, end2, Comparer());
             }
         };
 
