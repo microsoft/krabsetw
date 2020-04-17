@@ -179,37 +179,20 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
                 if (extended_data.ExtType == EVENT_HEADER_EXT_TYPE_CONTAINER_ID)
                 {
-                    // Convert the non-null terminated, no-braces ASCII GUID into a null terminated, curly braces, wide string 
-                    // for parsing.
-                    std::wstring guid_string_buffer (L"{########-####-####-####-############}");
-                    assert(extended_data.DataSize == CONTAINER_ID_DATA_LENGTH_IN_BYTES);
-                    assert(guid_string_buffer.length() == 1 + CONTAINER_ID_DATA_LENGTH_IN_BYTES + 1);
-
-                    for (size_t c = 0; c < CONTAINER_ID_DATA_LENGTH_IN_BYTES; c++)
+                    try
                     {
-                        // Offset by 1 to account for curly brace
-                        guid_string_buffer[c + 1] = static_cast<wchar_t>(reinterpret_cast<char*>(extended_data.DataPtr)[c]);
+                        // Convert to managed System::Guid for returning to managed code.
+                        result = ConvertGuid(
+                            krabs::guid_parser::parse_guid(
+                                reinterpret_cast<char*>(extended_data.DataPtr),
+                                extended_data.DataSize));
                     }
-
-                    // Parse GUID in native code to avoid marshalling any strings.
-                    GUID container_guid;
-                    HRESULT guid_conversion_error = CLSIDFromString(guid_string_buffer.c_str(), &container_guid);
-                    if (guid_conversion_error != S_OK)
+                    catch (const std::runtime_error& err)
                     {
-                        // As long as we're getting GUIDs in the expected format from the extended data, this shouldn't be 
-                        // happening, but if it does it should be explicit instead of making the event look like it's not coming
-                        // from inside a process isolation container.
-                        System::String^ guidData = gcnew System::String(guid_string_buffer.c_str());
-                        System::Int32 errorCode = System::Int32(guid_conversion_error);
-                        throw gcnew ContainerIdFormatException(
-                            System::String::Format(
-                                "Failed to convert event's container ID data to GUID. Error code: {0}, Data: {1}",
-                                errorCode,
-                                guidData));
+                        // Convert to managed exception coming from managed function.
+                        throw gcnew ContainerIdFormatException(gcnew System::String(err.what()));
                     }
-
-                    // Convert to managed System::Guid for returning to managed code.
-                    result = ConvertGuid(container_guid);
+                    
                     return true;
                 }
             }
