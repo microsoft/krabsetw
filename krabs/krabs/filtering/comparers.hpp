@@ -3,18 +3,9 @@
 
 #pragma once
 
-#if(_MANAGED)
-#pragma warning(push)
-#pragma warning(disable: 4800) // bool warning in boost when _MANAGED flag is set
-#endif
-
 #include <algorithm>
 
 #include "../compiler_check.hpp"
-
-#if(_MANAGED)
-#pragma warning(pop)
-#endif
 
 namespace krabs { namespace predicates {
 
@@ -45,9 +36,9 @@ namespace krabs { namespace predicates {
             template <typename Iter1, typename Iter2>
             bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
-                // semantics of boost::contains() require that empty range is always contained
-                return std::distance(begin2, end2) == 0 ||
-                    std::search(begin1, end1, begin2, end2, Comparer()) != end1;
+                // empty test range always contained, even when input range empty
+                return std::distance(begin2, end2) == 0 
+                    || std::search(begin1, end1, begin2, end2, Comparer()) != end1;
             }
         };
 
@@ -60,20 +51,8 @@ namespace krabs { namespace predicates {
             template <typename Iter1, typename Iter2>
             bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
-                const auto dist1 = std::distance(begin1, end1);
-                const auto dist2 = std::distance(begin2, end2);
-
-                // always starts with empty range
-                if (dist2 == 0)
-                    return true;
-
-                if (dist2 > dist1)
-                    return false;
-
-                auto prefix_end = begin1;
-                std::advance(prefix_end, dist2);
-
-                return std::equal(begin1, prefix_end, begin2, end2, Comparer());
+                const auto first_nonequal = std::mismatch(begin1, end1, begin2, end2, Comparer());
+                return first_nonequal.second == end2;
             }
         };
 
@@ -89,16 +68,10 @@ namespace krabs { namespace predicates {
                 const auto dist1 = std::distance(begin1, end1);
                 const auto dist2 = std::distance(begin2, end2);
 
-                // always ends with empty range
-                if (dist2 == 0)
-                    return true;
-
                 if (dist2 > dist1)
                     return false;
 
-                auto suffix_begin = begin1;
-                std::advance(suffix_begin, dist1 - dist2);
-
+                const auto suffix_begin = std::next(begin1, dist1 - dist2);
                 return std::equal(suffix_begin, end1, begin2, end2, Comparer());
             }
         };
