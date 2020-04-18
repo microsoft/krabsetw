@@ -45,7 +45,9 @@ namespace krabs { namespace predicates {
             template <typename Iter1, typename Iter2>
             bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
             {
-                return std::search(begin1, end1, begin2, end2, Comparer()) != end1;
+                // semantics of boost::contains() require that empty range is always contained
+                return std::distance(begin2, end2) == 0 ||
+                    std::search(begin1, end1, begin2, end2, Comparer()) != end1;
             }
         };
 
