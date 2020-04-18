@@ -21,9 +21,9 @@ namespace krabs { namespace predicates {
         struct equals
         {
             template <typename Iter1, typename Iter2>
-            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
+            bool operator()(Iter1 first1, Iter1 last1, Iter2 first2, Iter2 last2) const
             {
-                return std::equal(begin1, end1, begin2, end2, Comparer());
+                return std::equal(first1, last1, first2, last2, Comparer());
             }
         };
 
@@ -34,11 +34,11 @@ namespace krabs { namespace predicates {
         struct contains
         {
             template <typename Iter1, typename Iter2>
-            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
+            bool operator()(Iter1 first1, Iter1 last1, Iter2 first2, Iter2 last2) const
             {
                 // empty test range always contained, even when input range empty
-                return std::distance(begin2, end2) == 0 
-                    || std::search(begin1, end1, begin2, end2, Comparer()) != end1;
+                return first2 == last2
+                    || std::search(first1, last1, first2, last2, Comparer()) != last1;
             }
         };
 
@@ -49,10 +49,10 @@ namespace krabs { namespace predicates {
         struct starts_with
         {
             template <typename Iter1, typename Iter2>
-            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
+            bool operator()(Iter1 first1, Iter1 last1, Iter2 first2, Iter2 last2) const
             {
-                const auto first_nonequal = std::mismatch(begin1, end1, begin2, end2, Comparer());
-                return first_nonequal.second == end2;
+                const auto first_nonequal = std::mismatch(first1, last1, first2, last2, Comparer());
+                return first_nonequal.second == last2;
             }
         };
 
@@ -63,16 +63,16 @@ namespace krabs { namespace predicates {
         struct ends_with
         {
             template <typename Iter1, typename Iter2>
-            bool operator()(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) const
+            bool operator()(Iter1 first1, Iter1 last1, Iter2 first2, Iter2 last2) const
             {
-                const auto dist1 = std::distance(begin1, end1);
-                const auto dist2 = std::distance(begin2, end2);
+                const auto dist1 = std::distance(first1, last1);
+                const auto dist2 = std::distance(first2, last2);
 
                 if (dist2 > dist1)
                     return false;
 
-                const auto suffix_begin = std::next(begin1, dist1 - dist2);
-                return std::equal(suffix_begin, end1, begin2, end2, Comparer());
+                const auto suffix_begin = std::next(first1, dist1 - dist2);
+                return std::equal(suffix_begin, last1, first2, last2, Comparer());
             }
         };
 
