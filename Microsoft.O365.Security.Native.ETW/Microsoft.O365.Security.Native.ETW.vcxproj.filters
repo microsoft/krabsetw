@@ -130,6 +130,5 @@
     <None Include=".nuget\NuGet.targets">
       <Filter>.nuget</Filter>
     </None>
-    <None Include="packages.config" />
   </ItemGroup>
 </Project>
