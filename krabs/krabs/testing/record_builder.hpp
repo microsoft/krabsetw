@@ -253,7 +253,7 @@ namespace krabs { namespace testing {
             throw std::invalid_argument(msg);
         }
 
-        // Don't allocate an extended data buffer if it's a size 0 list.
+        // If it's a size 0 list, pack() will return (nullptr, 0) and no buffer is allocated.
         auto extended_data_buffer = extended_data_.pack();
         record.ExtendedData = reinterpret_cast<EVENT_HEADER_EXTENDED_DATA_ITEM*>(extended_data_buffer.first.get());
         record.ExtendedDataCount = static_cast<USHORT>(extended_data_.count());
@@ -267,7 +267,7 @@ namespace krabs { namespace testing {
         EVENT_RECORD record = create_stub_record();
         auto results = pack_impl(record);
 
-        // Don't include allocate and include an extended data PTR if it's a size 0 list.
+        // If it's a size 0 list, pack() will return (nullptr, 0) and no buffer is allocated.
         auto extended_data_buffer = extended_data_.pack();
         record.ExtendedData = reinterpret_cast<EVENT_HEADER_EXTENDED_DATA_ITEM*>(extended_data_buffer.first.get());
         record.ExtendedDataCount = static_cast<USHORT>(extended_data_.count());

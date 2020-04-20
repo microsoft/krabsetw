@@ -132,14 +132,14 @@ namespace krabs { namespace testing {
         ZeroMemory(data_buffer, data_buffer_size);
 
         // Step 2: Fill the buffer. For each extended data item, write the object into the buffer at the back.
-        EVENT_HEADER_EXTENDED_DATA_ITEM* array_ptr = reinterpret_cast<EVENT_HEADER_EXTENDED_DATA_ITEM*>(data_buffer);
-        BYTE* data_ptr = data_buffer + array_part_size;
+        auto array_ptr = reinterpret_cast<EVENT_HEADER_EXTENDED_DATA_ITEM*>(data_buffer);
+        auto data_ptr = data_buffer + array_part_size;
 
         for (int i = 0; i < items_.size(); i++)
         {
             // 2a: write the struct
-            EVENT_HEADER_EXTENDED_DATA_ITEM& destination = array_ptr[i];
-            const extended_data_thunk& thunk = items_[i];
+            auto& destination = array_ptr[i];
+            const auto& thunk = items_[i];
             
             destination.ExtType = thunk.ext_type_;
             destination.DataSize = static_cast<USHORT>(thunk.bytes_.size());

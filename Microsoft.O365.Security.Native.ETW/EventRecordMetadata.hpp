@@ -172,10 +172,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </returns>
         virtual bool TryGetContainerId([Out] System::Guid% result)
         {
-            auto extended_data_count = static_cast<size_t>(record_->ExtendedDataCount);
-            for (size_t i = 0; i < extended_data_count; i++)
+            auto extended_data_count = record_->ExtendedDataCount;
+            for (USHORT i = 0; i < extended_data_count; i++)
             {
-                EVENT_HEADER_EXTENDED_DATA_ITEM& extended_data = record_->ExtendedData[i];
+                auto& extended_data = record_->ExtendedData[i];
 
                 if (extended_data.ExtType == EVENT_HEADER_EXT_TYPE_CONTAINER_ID)
                 {

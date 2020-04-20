@@ -211,21 +211,16 @@ namespace krabstests
             Assert::AreEqual((unsigned int)record.ExtendedDataCount, 1u);
             Assert::IsNotNull(record.ExtendedData);
             
-            EVENT_HEADER_EXTENDED_DATA_ITEM& extended_data = record.ExtendedData[0];
+            auto& extended_data = record.ExtendedData[0];
             Assert::AreEqual((unsigned int)extended_data.ExtType, (unsigned int)EVENT_HEADER_EXT_TYPE_CONTAINER_ID);
             Assert::AreEqual((size_t)extended_data.DataSize, krabs::testing::extended_data_builder::GUID_STRING_LENGTH_NO_BRACES);
             
-            // Extract the GUID back out of the extended data, adding wrapping braces and null terminator.
-            std::wstring guid_buffer(L"{########-####-####-####-############}");
-            Assert::AreEqual(guid_buffer.length(), krabs::testing::extended_data_builder::GUID_STRING_LENGTH_WITH_BRACES);
-            for (int i = 0; i < krabs::testing::extended_data_builder::GUID_STRING_LENGTH_NO_BRACES; i++)
-            {
-                // brace offset
-                guid_buffer[i + 1] = static_cast<wchar_t>(reinterpret_cast<char*>(extended_data.DataPtr)[i]);
-            }
+            auto parsed_guid = krabs::guid_parser::parse_guid(
+                reinterpret_cast<const char*>(extended_data.DataPtr), 
+                extended_data.DataSize);
 
             // Check that the right GUID came out.
-            Assert::IsTrue(CONTAINER_GUID == krabs::guid(guid_buffer));
+            Assert::IsTrue(CONTAINER_GUID == krabs::guid(parsed_guid));
         }
 
         private:

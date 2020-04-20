@@ -81,17 +81,17 @@ namespace krabs {
         static bool hex_string_to_bytes(const char* str_input, unsigned char* byte_output, size_t byte_count);
         
         /** <summary>
-          * Parses GUID of format 8-4-4-4-12, such as 00000000-0000-0000-0000-000000000000.
-          * 
-          * This function is for performance reasons to help deal with container ID extended data, which has 
-          * no null terminator, which would force us to clone the data to append a null terminator in order to
-          * use existing GUID parsing functions. 
-          * 
-          * This does not assume a null-terminated string, and will not respect null terminators. This assumes 
-          * that str has at least (length) valid characters. Since the format is fixed, that means the only 
-          * valid value for length is 36.
+          * Parses GUID of "D" format. For example, the nil GUID would be "00000000-0000-0000-0000-000000000000".
+          * See: https://docs.microsoft.com/en-us/dotnet/api/system.guid.tostring?view=netframework-4.8
           *
-          * Returns the parsed GUID. Throws a std::runtime_error if it fails.
+          * (str) must have at least (length) valid characters for memory safety. A null terminator is not
+          * required. Instead, (length) is used for the bounds check.
+          *
+          * Returns the parsed GUID. Throws a std::runtime_error if there is a bounds error or format error.
+          *
+          * This function is for performance, to help deal with container ID extended data, which has no null
+          * terminator, which would force us to clone the data to append a null terminator in order to use
+          * existing GUID parsing functions.
           * </summary>
           */
         static GUID parse_guid(const char* str, unsigned int length);
@@ -171,11 +171,11 @@ namespace krabs {
         // 'a' through 'f' (0x61 to 0x66)
 
         // Narrow the value later, for safety checking.
-        int value = 0;
+        auto value = 0;
         // most significant digit in the octet
-        char msd = str_input[0];
+        auto msd = str_input[0];
         // least significant digit in the octet
-        char lsd = str_input[1];
+        auto lsd = str_input[1];
 
         if (msd >= '0' && msd <= '9')
         {
@@ -211,11 +211,11 @@ namespace krabs {
     template<typename T>
     bool guid_parser::hex_string_to_number(const char* str_input, T& int_output)
     {
-        size_t byte_count = sizeof(T);
+        auto byte_count = sizeof(T);
         T value = 0;
         unsigned char byte = 0;
 
-        for (int i = 0; i < byte_count; i++)
+        for (size_t i = 0; i < byte_count; i++)
         {
             if (!guid_parser::hex_octet_to_byte(str_input + i * 2, byte))
             {
@@ -242,6 +242,20 @@ namespace krabs {
         return true;
     }
 
+    /** <summary>
+      * Parses GUID of "D" format. For example, the nil GUID would be "00000000-0000-0000-0000-000000000000".
+      * See: https://docs.microsoft.com/en-us/dotnet/api/system.guid.tostring?view=netframework-4.8
+      *
+      * (str) must have at least (length) valid characters for memory safety. A null terminator is not
+      * required. Instead, (length) is used for the bounds check.
+      *
+      * Returns the parsed GUID. Throws a std::runtime_error if there is a bounds error or format error.
+      * 
+      * This function is for performance, to help deal with container ID extended data, which has no null 
+      * terminator, which would force us to clone the data to append a null terminator in order to use 
+      * existing GUID parsing functions.
+      * </summary>
+      */
     inline GUID guid_parser::parse_guid(const char* str, unsigned int length)
     {
         if (length != UUID_STRING_LENGTH)
@@ -267,7 +281,7 @@ namespace krabs {
 
         // Use from_hex_string for Data1, Data2, and Data3 because of endianness of the data
         // Use hex_string_to_bytes for Data4's array elements because it's byte by byte instead
-        bool success = guid_parser::hex_string_to_number(str + STR_POSITION_DATA1, guid.Data1)
+        auto success = guid_parser::hex_string_to_number(str + STR_POSITION_DATA1, guid.Data1)
             && guid_parser::hex_string_to_number(str + STR_POSITION_DATA2, guid.Data2)
             && guid_parser::hex_string_to_number(str + STR_POSITION_DATA3, guid.Data3)
             && guid_parser::hex_string_to_bytes(str + STR_POSITION_DATA4_PART1, reinterpret_cast<unsigned char*>(&guid.Data4[0]), 2)
