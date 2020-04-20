@@ -139,6 +139,90 @@ namespace krabstests
             Assert::AreEqual(parser.parse<uint32_t>(L"LogonType"), (uint32_t)5);
         }
 
+        TEST_METHOD(pack_should_include_extended_data)
+        {
+            krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+            krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
+            // Random GUID
+            builder.add_container_id_extended_data(krabs::guid(L"{86E2A814-8893-431D-A1DC-F44931D6B99A}"));
+            
+            // Have to hold onto the record instance so that the data buffers don't get deleted.
+            auto synth_record = builder.pack_incomplete();
+            const EVENT_RECORD& record = synth_record;
+
+            // USHORT has template specialization issues, so use uint.
+            Assert::AreEqual((unsigned int)record.ExtendedDataCount, 1u);
+            Assert::IsNotNull(record.ExtendedData);
+        }
+
+        TEST_METHOD(pack_should_correctly_handle_no_extended_data)
+        {
+            krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+            krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
+            
+            // Have to hold onto the record instance so that the data buffers don't get deleted.
+            auto synth_record = builder.pack_incomplete();
+            const EVENT_RECORD& record = synth_record;
+            
+            // USHORT has template specialization issues, so use uint.
+            Assert::AreEqual((unsigned int)record.ExtendedDataCount, 0u);
+            Assert::IsNull(record.ExtendedData);
+        }
+
+        TEST_METHOD(pack_should_correctly_handle_multiple_extended_data)
+        {
+            // This assumes that the builder isn't enforcing semantic constraints like "you can't 
+            // have more than one container ID extended data item in the same event". Which is
+            // probably true for events you'd get from the real API, but we're going to exploit the
+            // loophole to test the "multiple extended data" case.
+            krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+            krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
+            // Random GUID
+            builder.add_container_id_extended_data(krabs::guid(L"{86E2A814-8893-431D-A1DC-F44931D6B99A}"));
+            builder.add_container_id_extended_data(krabs::guid(L"{86E2A814-8893-431D-A1DC-F44931D6B99A}"));
+
+            // Have to hold onto the record instance so that the data buffers don't get deleted.
+            auto synth_record = builder.pack_incomplete();
+            const EVENT_RECORD& record = synth_record;
+
+            // USHORT has template specialization issues, so use uint.
+            Assert::AreEqual((unsigned int)record.ExtendedDataCount, 2u);
+            Assert::IsNotNull(record.ExtendedData);
+
+            // Sanity check
+            Assert::AreEqual((unsigned int)record.ExtendedData[0].ExtType, (unsigned int)EVENT_HEADER_EXT_TYPE_CONTAINER_ID);
+            Assert::AreEqual((unsigned int)record.ExtendedData[1].ExtType, (unsigned int)EVENT_HEADER_EXT_TYPE_CONTAINER_ID);
+        }
+
+        TEST_METHOD(container_id_should_be_read_correctly_after_packing)
+        {
+            // Randomly generated GUID
+            const krabs::guid CONTAINER_GUID(L"{86E2A814-8893-431D-A1DC-F44931D6B99A}");
+
+            krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+            krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
+            builder.add_container_id_extended_data(CONTAINER_GUID);
+            
+            // Have to hold onto the record instance so that the data buffers don't get deleted.
+            auto synth_record = builder.pack_incomplete();
+            const EVENT_RECORD& record = synth_record;
+
+            // USHORT has template specialization issues, so use uint.
+            Assert::AreEqual((unsigned int)record.ExtendedDataCount, 1u);
+            Assert::IsNotNull(record.ExtendedData);
+            
+            auto& extended_data = record.ExtendedData[0];
+            Assert::AreEqual((unsigned int)extended_data.ExtType, (unsigned int)EVENT_HEADER_EXT_TYPE_CONTAINER_ID);
+            Assert::AreEqual((size_t)extended_data.DataSize, krabs::testing::extended_data_builder::GUID_STRING_LENGTH_NO_BRACES);
+            
+            auto parsed_guid = krabs::guid_parser::parse_guid(
+                reinterpret_cast<const char*>(extended_data.DataPtr), 
+                extended_data.DataSize);
+
+            // Check that the right GUID came out.
+            Assert::IsTrue(CONTAINER_GUID == krabs::guid(parsed_guid));
+        }
+
         private:
             krabs::schema_locator schema_locator_;
     };

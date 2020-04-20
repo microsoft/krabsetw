@@ -62,6 +62,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "testing", "testing", "{9ED1AE76-2EAA-4CCF-8F01-458BDC8BCD53}"
 	ProjectSection(SolutionItems) = preProject
 		krabs\testing\event_filter_proxy.hpp = krabs\testing\event_filter_proxy.hpp
+		krabs\testing\extended_data_builder.hpp = krabs\testing\extended_data_builder.hpp
 		krabs\testing\filler.hpp = krabs\testing\filler.hpp
 		krabs\testing\proxy.hpp = krabs\testing\proxy.hpp
 		krabs\testing\record_builder.hpp = krabs\testing\record_builder.hpp

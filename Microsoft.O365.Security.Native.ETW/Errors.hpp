@@ -43,6 +43,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     };
 
     /// <summary>
+    /// Thrown on internal parsing errors when retrieving container ID's.
+    /// </summary>
+    public ref struct ContainerIdFormatException : public System::Exception {
+        ContainerIdFormatException(System::String^ msg) : System::Exception(msg) {}
+    };
+
+    /// <summary>
     /// Thrown when no trace sessions remaining to register. An existing trace
     /// session must be deleted first.
     /// </summary>

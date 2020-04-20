@@ -27,6 +27,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             , header_(&record.EventHeader) { }
 
     public:
+        // For container ID's, we are expecting format "00000000-0000-0000-0000-0000000000000", 
+        // 32 hex digits with 4 hyphens, no braces.
+        static const size_t CONTAINER_ID_DATA_LENGTH_IN_BYTES = 36;
+
 #pragma region EventDescriptor
 
         /// <summary>
@@ -151,6 +155,51 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             Marshal::Copy(UserData, dest, 0, UserDataLength);
 
             return dest;
+        }
+
+#pragma endregion
+
+#pragma region ExtendedData
+
+        /// <summary>
+        /// If the event's extended data contains a Windows container ID (i.e. event came from inside
+        /// a container using process isolation), retrieve it.
+        /// Can be expensive, avoid calling more than once per event.
+        /// </summary>
+        /// <returns>
+        /// True if a Guid was present. False if not. If a Guid was present, it will be written into the result 
+        /// parameter. Throws a ContainerIdFormatException if the container ID is present but parsing fails.
+        /// </returns>
+        virtual bool TryGetContainerId([Out] System::Guid% result)
+        {
+            auto extended_data_count = record_->ExtendedDataCount;
+            for (USHORT i = 0; i < extended_data_count; i++)
+            {
+                auto& extended_data = record_->ExtendedData[i];
+
+                if (extended_data.ExtType == EVENT_HEADER_EXT_TYPE_CONTAINER_ID)
+                {
+                    try
+                    {
+                        // Convert to managed System::Guid for returning to managed code.
+                        result = ConvertGuid(
+                            krabs::guid_parser::parse_guid(
+                                reinterpret_cast<char*>(extended_data.DataPtr),
+                                extended_data.DataSize));
+                    }
+                    catch (const std::runtime_error& err)
+                    {
+                        // Convert to managed exception coming from managed function.
+                        throw gcnew ContainerIdFormatException(gcnew System::String(err.what()));
+                    }
+                    
+                    return true;
+                }
+            }
+
+            // Not found.
+            result = System::Guid::Empty;
+            return false;
         }
 
 #pragma endregion

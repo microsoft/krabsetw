@@ -209,6 +209,23 @@ namespace EtwTestsCS
                 proxy.PushEvent(WinINetEvent.CreateRecord(
                     String.Empty, String.Empty, data));
             }
+
+            [TestMethod]
+            public void it_should_read_container_id()
+            {
+                Guid guid = new Guid();
+                var provider = new Provider(PowerShellEvent.ProviderId);
+                provider.OnEvent += e =>
+                {
+                    Guid containerId;
+                    Assert.IsTrue(e.TryGetContainerId(out containerId));
+                    Assert.AreEqual(containerId, guid);
+                };
+
+                trace.Enable(provider);
+                proxy.PushEvent(PowerShellEvent.CreateRecordWithContainerId(
+                    "Test data", String.Empty, String.Empty, guid));
+            }
         }
 
         [TestClass]

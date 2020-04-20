@@ -46,5 +46,8 @@
     <ClCompile Include="test_trace_properties.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="test_guid_parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
