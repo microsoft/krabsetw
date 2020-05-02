@@ -10,6 +10,7 @@
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <sddl.h>
 
 #include <vector>
 #include <type_traits>
@@ -220,6 +221,38 @@ namespace krabs {
             return pPropertyIndex_ != nullptr;
         }
     };
+
+    /**
+    * <summary>
+    * Used to handle parsing of SIDs from either a
+    * SID or WBEMSID property
+    * </summary>
+    */
+    struct sid {
+        // SIDs are variable-length
+        // So the 'best' way to store them is to convert to a string
+        // The other-end can either print the string or call ConvertStringSidToSidA
+        // to get the SID back
+        std::string sid_string;
+
+        static sid from_bytes(const BYTE* bytes, size_t size_in_bytes)
+        {
+            sid ws;
+            LPSTR temp_sid_string;
+            UNREFERENCED_PARAMETER(size_in_bytes);
+
+            if (!ConvertSidToStringSidA((PSID)bytes, &temp_sid_string)) {
+                throw std::runtime_error(
+                    "Failed to get a SID from a property");
+            }
+            ws.sid_string = temp_sid_string;
+            LocalFree(temp_sid_string);
+            return ws;
+        }
+
+    private:
+    };
+
 
     /**
      * <summary>
