@@ -83,6 +83,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         property Guid ProviderId { Guid get(); }
 
+        /// <summary>
+        /// Returns the Activity ID associated with this event.
+        /// </summary>
+        property Guid ActivityId { Guid get(); }
+
 #pragma endregion
 
 #pragma region EventRecord
