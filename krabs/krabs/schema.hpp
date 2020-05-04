@@ -250,7 +250,7 @@ namespace krabs {
     {
         return reinterpret_cast<const wchar_t*>(
             reinterpret_cast<const char*>(pSchema_) +
-            pSchema_->OpcodeNameOffset);
+            pSchema_->EventNameOffset);
     }
 
     inline const wchar_t *schema::task_name() const
