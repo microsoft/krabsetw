@@ -206,6 +206,20 @@ namespace krabs {
         */
         LARGE_INTEGER timestamp() const;
 
+        /**
+        * <summary>
+        * Returns the Activity ID associated with the event via its schema.
+        * </summary>
+        * <example>
+        *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+        *    {
+        *        krabs::schema schema(record, trace_context.schema_locator);
+        *        GUID activity_id = krabs::activity_id(schema);
+        *    }
+        * </example>
+        */
+        GUID activity_id() const;
+
     private:
         const EVENT_RECORD &record_;
         TRACE_EVENT_INFO *pSchema_;
@@ -217,6 +231,7 @@ namespace krabs {
         friend std::wstring provider_name(const schema &);
         friend unsigned int process_id(const schema &);
         friend LARGE_INTEGER timestamp(const schema &);
+        friend GUID activity_id(const schema&);
         friend int event_id(const EVENT_RECORD &);
         friend int event_id(const schema &);
 
@@ -305,5 +320,10 @@ namespace krabs {
     inline LARGE_INTEGER schema::timestamp() const
     {
         return record_.EventHeader.TimeStamp;
+    }
+
+    inline GUID schema::activity_id() const
+    {
+        return record_.EventHeader.ActivityId;
     }
 }
