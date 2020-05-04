@@ -248,9 +248,20 @@ namespace krabs {
 
     inline const wchar_t *schema::event_name() const
     {
-        return reinterpret_cast<const wchar_t*>(
-            reinterpret_cast<const char*>(pSchema_) +
-            pSchema_->EventNameOffset);
+        /*
+        EventNameOffset will be 0 if the event does not have an assigned name or
+        if this event is decoded on a system that does not support decoding
+        manifest event names. Event name decoding is supported on Windows
+        10 Fall Creators Update (2017) and later.
+        */
+        if (pSchema_->EventNameOffset != 0) {
+            return reinterpret_cast<const wchar_t*>(
+                reinterpret_cast<const char*>(pSchema_) +
+                pSchema_->EventNameOffset);
+        }
+        else {
+            return L"";
+        }
     }
 
     inline const wchar_t *schema::task_name() const
