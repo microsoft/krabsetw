@@ -182,6 +182,18 @@ namespace krabs {
             }
         }
 
+        template <>
+        inline void assert_valid_assignment<sid>(
+            const std::wstring&, const property_info& info)
+        {
+            auto InType = info.pEventPropertyInfo_->nonStructType.InType;
+
+            if (InType != TDH_INTYPE_WBEMSID && InType != TDH_INTYPE_SID) {
+                throw std::runtime_error(
+                    "Requested a SID but was neither a SID nor WBEMSID");
+            }
+        }
+
 #endif // NDEBUG
 
     } /* namespace debug */
