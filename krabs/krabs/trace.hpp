@@ -183,10 +183,17 @@ namespace krabs {
 
         /**
         * <summary>
-        * This is an alias for start().
+        * Start processing events for an already opened session.
         * </summary>
+        * <example>
+        *    krabs::trace trace;
+        *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+        *    provider<> powershell(id);
+        *    trace.enable(powershell);
+        *    trace.open();
+        *    trace.process();
+        * </example>
         */
-        [[deprecated("use start() instead")]]
         void process();
 
         /**
@@ -330,7 +337,10 @@ namespace krabs {
     template <typename T>
     void trace<T>::process()
     {
-        trace<T>::start();
+        eventsHandled_ = 0;
+
+        details::trace_manager<trace> manager(*this);
+        manager.process();
     }
 
     template <typename T>
