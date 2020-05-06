@@ -82,6 +82,20 @@ namespace krabs {
 
         /*
          * <summary>
+         * Returns the name of an opcode via its schema.
+         * </summary>
+         * <example>
+         *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+         *    {
+         *        krabs::schema schema(record, trace_context.schema_locator);
+         *        std::wstring name = krabs::opcode_name(schema);
+         *    }
+         * </example>
+         */
+        const wchar_t* opcode_name() const;
+
+        /*
+         * <summary>
          * Returns the taskname of an event via its schema.
          * </summary>
          * <example>
@@ -226,6 +240,7 @@ namespace krabs {
 
     private:
         friend std::wstring event_name(const schema &);
+        friend std::wstring opcode_name(const schema &);
         friend std::wstring task_name(const schema &);
         friend DECODING_SOURCE decoding_source(const schema &);
         friend std::wstring provider_name(const schema &);
@@ -263,9 +278,35 @@ namespace krabs {
 
     inline const wchar_t *schema::event_name() const
     {
-        return reinterpret_cast<const wchar_t*>(
-            reinterpret_cast<const char*>(pSchema_) +
-            pSchema_->OpcodeNameOffset);
+        /*
+        EventNameOffset will be 0 if the event does not have an assigned name or
+        if this event is decoded on a system that does not support decoding
+        manifest event names. Event name decoding is supported on Windows
+        10 Fall Creators Update (2017) and later.
+        */
+        if (pSchema_->EventNameOffset != 0) {
+            return reinterpret_cast<const wchar_t*>(
+                reinterpret_cast<const char*>(pSchema_) +
+                pSchema_->EventNameOffset);
+        }
+        else {
+            return L"";
+        }
+    }
+
+    inline const wchar_t* schema::opcode_name() const
+    {
+        /*
+        In WPP Traces OpcodeName is not used
+        */
+        if (pSchema_->OpcodeNameOffset != 0) {
+            return reinterpret_cast<const wchar_t*>(
+                reinterpret_cast<const char*>(pSchema_) +
+                pSchema_->OpcodeNameOffset);
+        }
+        else {
+            return L"";
+        }
     }
 
     inline const wchar_t *schema::task_name() const
