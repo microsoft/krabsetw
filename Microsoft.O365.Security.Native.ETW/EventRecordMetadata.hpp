@@ -123,6 +123,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             Guid get() { return ConvertGuid(header_->ProviderId); }
         }
 
+        /// <summary>
+        /// Returns the Activity ID associated with the event.
+        /// </summary>
+        virtual property Guid ActivityId
+        {
+            Guid get() { return ConvertGuid(header_->ActivityId); }
+        }
+
 #pragma endregion
 
 #pragma region EventRecord

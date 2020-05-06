@@ -15,6 +15,7 @@
 using namespace System;
 using namespace System::Net;
 using namespace System::Runtime::InteropServices;
+using namespace System::Security::Principal;
 
 using namespace msclr::interop;
 
@@ -298,6 +299,53 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
             if (success)
                 result = ConvertToSocketAddress(addr);
+
+            return success;
+        }
+#pragma endregion
+
+#pragma region Security Identifier
+        /// <summary>
+        /// Get a Security Identifier (SID) from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <returns>the SID value associated with the specified property</returns>
+        virtual SecurityIdentifier^ GetSecurityIdentifier(String^ name)
+        {
+            const auto& addr = GetValue<krabs::sid>(name);
+            return ConvertToSecurityIdentifier(addr);
+        }
+
+        /// <summary>
+        /// Get a Security Identifier (SID) from the specified property name or returns
+        /// the specified default value.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="defaultValue">the default value to return if the property lookup fails</param>
+        /// <returns>the SocketAddress value associated with the specified property or the specified default value</returns>
+        virtual SecurityIdentifier^ GetSecurityIdentifier(String^ name, SecurityIdentifier^ defaultValue)
+        {
+            SecurityIdentifier^ addr;
+
+            if (TryGetSecurityIdentifier(name, addr))
+                return addr;
+
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// Attempt to get a Security Identifier (SID) from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="result">the resulting SocketAddress</param>
+        /// <returns>true if fetching the SocketAddress succeeded, false otherwise</returns>
+        virtual bool TryGetSecurityIdentifier(String^ name, [Out] SecurityIdentifier^% result)
+        {
+            krabs::sid addr;
+            bool success = TryGetValue(name, addr);
+
+            if (success)
+                result = ConvertToSecurityIdentifier(addr);
 
             return success;
         }
@@ -740,6 +788,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             for (int ii = 0; ii < size; ii++)
                 managed[ii] = ptr[ii];
 
+            return managed;
+        }
+
+        SecurityIdentifier^ ConvertToSecurityIdentifier(const krabs::sid& addr)
+        {
+            auto managed_string = gcnew String(addr.sid_string.c_str());
+            auto managed = gcnew SecurityIdentifier(managed_string);
             return managed;
         }
 
