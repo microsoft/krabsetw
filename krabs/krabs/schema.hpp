@@ -82,6 +82,20 @@ namespace krabs {
 
         /*
          * <summary>
+         * Returns the name of an opcode via its schema.
+         * </summary>
+         * <example>
+         *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+         *    {
+         *        krabs::schema schema(record, trace_context.schema_locator);
+         *        std::wstring name = krabs::opcode_name(schema);
+         *    }
+         * </example>
+         */
+        const wchar_t* opcode_name() const;
+
+        /*
+         * <summary>
          * Returns the taskname of an event via its schema.
          * </summary>
          * <example>
@@ -226,6 +240,7 @@ namespace krabs {
 
     private:
         friend std::wstring event_name(const schema &);
+        friend std::wstring opcode_name(const schema &);
         friend std::wstring task_name(const schema &);
         friend DECODING_SOURCE decoding_source(const schema &);
         friend std::wstring provider_name(const schema &);
@@ -273,6 +288,21 @@ namespace krabs {
             return reinterpret_cast<const wchar_t*>(
                 reinterpret_cast<const char*>(pSchema_) +
                 pSchema_->EventNameOffset);
+        }
+        else {
+            return L"";
+        }
+    }
+
+    inline const wchar_t* schema::opcode_name() const
+    {
+        /*
+        In WPP Traces OpcodeName is not used
+        */
+        if (pSchema_->OpcodeNameOffset != 0) {
+            return reinterpret_cast<const wchar_t*>(
+                reinterpret_cast<const char*>(pSchema_) +
+                pSchema_->OpcodeNameOffset);
         }
         else {
             return L"";
