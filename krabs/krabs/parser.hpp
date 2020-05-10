@@ -367,14 +367,14 @@ namespace krabs {
         //
         //      The size of the TOKEN_USER structure differs
         //      depending on whether the events were generated on a 32 - bit
-        //      or 64 - bit architecture.Also the structure is aligned
+        //      or 64 - bit architecture. Also the structure is aligned
         //      on an 8 - byte boundary, so its size is 8 bytes on a
         //      32 - bit computer and 16 bytes on a 64 - bit computer.
         //      Doubling the pointer size handles both cases.
-        //
-        // So as we are 64-bit, this means we the SID starts at
-        // 16 bytes into the data
-        static const int sid_start = 16;
+        ULONG sid_start = 16;
+        if (EVENT_HEADER_FLAG_32_BIT_HEADER == (schema_.record_.EventHeader.Flags & EVENT_HEADER_FLAG_32_BIT_HEADER)) {
+            sid_start = 8;
+        }
         switch (InType) {
         case TDH_INTYPE_SID:
             return sid::from_bytes(propInfo.pPropertyIndex_, propInfo.length_);
@@ -389,6 +389,17 @@ namespace krabs {
         default:
             throw std::runtime_error("SID was not a SID or WBEMSID");
         }
+    }
+
+    template<>
+    inline pointer parser::parse<pointer>(const std::wstring& name)
+    {
+        auto propInfo = find_property(name);
+        throw_if_property_not_found(propInfo);
+
+        krabs::debug::assert_valid_assignment<pointer>(name, propInfo);
+
+        return pointer::from_bytes(propInfo.pPropertyIndex_, propInfo.length_);
     }
 
     // view_of

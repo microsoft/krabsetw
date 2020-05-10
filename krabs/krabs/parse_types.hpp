@@ -253,6 +253,42 @@ namespace krabs {
     private:
     };
 
+    /**
+    * <summary>
+    * Used to handle parsing of POINTER types
+    */
+    struct pointer {
+        // Make the reference const and call it wild,
+        // As any attempt to derefernce or alter what it points to
+        // would be very undefined behaviour, as it
+        // is unlikley it is pointing to inside our process' memory
+        const void* wild_reference;
+
+        static pointer from_bytes(const BYTE* bytes, size_t size_in_bytes)
+        {
+            pointer pt;
+
+            // If 32-Bit, first parse as a uint32
+            // Then we can 'cast' that as pointer
+            if (size_in_bytes == sizeof(uint32_t)) {
+                uint64_t tmp = *(uint32_t*)bytes;
+                pt.wild_reference = (void*)(tmp);
+            }
+            else if (size_in_bytes == sizeof(uint64_t)) {
+                uint64_t tmp = *(uint64_t*)bytes;
+                pt.wild_reference = (void*)tmp;
+            }
+            else {
+                throw std::runtime_error(
+                    "Failed to get a POINTER from a property");
+            }
+
+            return pt;
+        }
+
+    private:
+    };
+
 
     /**
      * <summary>

@@ -186,11 +186,23 @@ namespace krabs {
         inline void assert_valid_assignment<sid>(
             const std::wstring&, const property_info& info)
         {
-            auto InType = info.pEventPropertyInfo_->nonStructType.InType;
+            auto inType = info.pEventPropertyInfo_->nonStructType.InType;
 
-            if (InType != TDH_INTYPE_WBEMSID && InType != TDH_INTYPE_SID) {
+            if (inType != TDH_INTYPE_WBEMSID && inType != TDH_INTYPE_SID) {
                 throw std::runtime_error(
                     "Requested a SID but was neither a SID nor WBEMSID");
+            }
+        }
+
+        template <>
+        inline void assert_valid_assignment<pointer>(
+            const std::wstring&, const property_info& info)
+        {
+            auto inType = info.pEventPropertyInfo_->nonStructType.InType;
+
+            if (inType != TDH_INTYPE_POINTER) {
+                throw std::runtime_error(
+                    "Requested a POINTER from property that is not one");
             }
         }
 
