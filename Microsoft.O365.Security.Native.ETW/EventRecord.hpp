@@ -356,7 +356,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// Get a Pointer type from the from the specified property name
         /// </summary>
         /// <param name="name">property name</param>
-        /// <returns>the IntPtr value associated with the specified property</returns>
+        /// <returns>The IntPtr associated with the specified property</returns>
         virtual IntPtr^ GetPointer(String^ name)
         {
             const auto& addr = GetValue<krabs::pointer>(name);
@@ -369,7 +369,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         /// <param name="name">property name</param>
         /// <param name="defaultValue">the default value to return if the property lookup fails</param>
-        /// <returns>the SocketAddress value associated with the specified property or the specified default value</returns>
+        /// <returns>the IntPtr value associated with the specified property or the specified default value</returns>
         virtual IntPtr^ GetPointer(String^ name, IntPtr^ defaultValue)
         {
             IntPtr^ addr;
@@ -381,11 +381,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 
         /// <summary>
-        /// Attempt to get a Security Identifier (SID) from the specified property name.
+        /// Attempt to get a Pointer from the specified property name.
         /// </summary>
         /// <param name="name">property name</param>
-        /// <param name="result">the resulting SocketAddress</param>
-        /// <returns>true if fetching the SocketAddress succeeded, false otherwise</returns>
+        /// <param name="result">the resulting IntPtr</param>
+        /// <returns>true if fetching the IntPtr succeeded, false otherwise</returns>
         virtual bool TryGetPointer(String^ name, [Out] IntPtr^% result)
         {
             krabs::pointer addr;
@@ -847,7 +847,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
         IntPtr^ ConvertToPointer(const krabs::pointer& addr)
         {
-            auto managed = gcnew IntPtr(reinterpret_cast<long long>(addr.wild_reference));
+            auto managed = gcnew IntPtr(static_cast<long long>(addr.address));
             return managed;
         }
 

@@ -255,28 +255,27 @@ namespace krabs {
 
     /**
     * <summary>
-    * Used to handle parsing of POINTER types
+    * Used to handle parsing of Pointer Address types.
+    * </summary>
     */
     struct pointer {
-        // Make the reference const and call it wild,
-        // As any attempt to derefernce or alter what it points to
-        // would be very undefined behaviour, as it
-        // is unlikley it is pointing to inside our process' memory
-        const void* wild_reference;
+        /**
+        * We store the pointer as an uint64_t, as it is highly unlikley
+        * to be pointing to somewhere accessible to our process
+        */
+        uint64_t address;
 
         static pointer from_bytes(const BYTE* bytes, size_t size_in_bytes)
         {
             pointer pt;
 
             // If 32-Bit, first parse as a uint32
-            // Then we can 'cast' that as pointer
+            // Then we can 'cast' that to our uint64_t
             if (size_in_bytes == sizeof(uint32_t)) {
-                uint64_t tmp = *(uint32_t*)bytes;
-                pt.wild_reference = (void*)(tmp);
+                pt.address = *reinterpret_cast<const uint32_t*>(bytes);
             }
             else if (size_in_bytes == sizeof(uint64_t)) {
-                uint64_t tmp = *(uint64_t*)bytes;
-                pt.wild_reference = (void*)tmp;
+                pt.address = *reinterpret_cast<const uint64_t*>(bytes);
             }
             else {
                 throw std::runtime_error(
