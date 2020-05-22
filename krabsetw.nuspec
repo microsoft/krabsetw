@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Krabsetw</id>
-        <version>4.1.11</version>
+        <version>4.1.12</version>
         <title>Krabs ETW Wrappers</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -11,7 +11,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</description>
         <summary>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</summary>
-        <releaseNotes>Fixed parsing event name and added ability to parse opcode name.</releaseNotes>
+        <releaseNotes>Added ability to parse TDH_INTYPE_POINTER data</releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs krabsetw native headers cpp</tags>
