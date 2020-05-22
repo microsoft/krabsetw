@@ -253,6 +253,41 @@ namespace krabs {
     private:
     };
 
+    /**
+    * <summary>
+    * Used to handle parsing of Pointer Address types.
+    * </summary>
+    */
+    struct pointer {
+        /**
+        * We store the pointer as an uint64_t, as it is highly unlikley
+        * to be pointing to somewhere accessible to our process
+        */
+        uint64_t address;
+
+        static pointer from_bytes(const BYTE* bytes, size_t size_in_bytes)
+        {
+            pointer pt;
+
+            // If 32-Bit, first parse as a uint32
+            // Then we can 'cast' that to our uint64_t
+            if (size_in_bytes == sizeof(uint32_t)) {
+                pt.address = *reinterpret_cast<const uint32_t*>(bytes);
+            }
+            else if (size_in_bytes == sizeof(uint64_t)) {
+                pt.address = *reinterpret_cast<const uint64_t*>(bytes);
+            }
+            else {
+                throw std::runtime_error(
+                    "Failed to get a POINTER from a property");
+            }
+
+            return pt;
+        }
+
+    private:
+    };
+
 
     /**
      * <summary>

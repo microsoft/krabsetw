@@ -351,6 +351,53 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 #pragma endregion
 
+#pragma region Pointer
+        /// <summary>
+        /// Get a Pointer type from the from the specified property name
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <returns>The IntPtr associated with the specified property</returns>
+        virtual IntPtr^ GetPointer(String^ name)
+        {
+            const auto& addr = GetValue<krabs::pointer>(name);
+            return ConvertToPointer(addr);
+        }
+
+        /// <summary>
+        /// Get a Pointer from the specified property name or returns
+        /// the specified default value.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="defaultValue">the default value to return if the property lookup fails</param>
+        /// <returns>the IntPtr value associated with the specified property or the specified default value</returns>
+        virtual IntPtr^ GetPointer(String^ name, IntPtr^ defaultValue)
+        {
+            IntPtr^ addr;
+
+            if (TryGetPointer(name, addr))
+                return addr;
+
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// Attempt to get a Pointer from the specified property name.
+        /// </summary>
+        /// <param name="name">property name</param>
+        /// <param name="result">the resulting IntPtr</param>
+        /// <returns>true if fetching the IntPtr succeeded, false otherwise</returns>
+        virtual bool TryGetPointer(String^ name, [Out] IntPtr^% result)
+        {
+            krabs::pointer addr;
+            bool success = TryGetValue(name, addr);
+
+            if (success)
+                result = ConvertToPointer(addr);
+
+            return success;
+        }
+#pragma endregion
+
 #pragma region DateTime
         /// <summary>
         /// Get a DateTime from the specified property name.
@@ -795,6 +842,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         {
             auto managed_string = gcnew String(addr.sid_string.c_str());
             auto managed = gcnew SecurityIdentifier(managed_string);
+            return managed;
+        }
+
+        IntPtr^ ConvertToPointer(const krabs::pointer& addr)
+        {
+            auto managed = gcnew IntPtr(static_cast<long long>(addr.address));
             return managed;
         }
 
