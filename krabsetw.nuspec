@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Krabsetw</id>
@@ -23,6 +23,7 @@
         <file src="krabs\krabs\filtering\predicates.hpp" target="lib\native\include\krabs\filtering\predicates.hpp" />
         <file src="krabs\krabs\filtering\view_adapters.hpp" target="lib\native\include\krabs\filtering\view_adapters.hpp" />
         <file src="krabs\krabs\testing\event_filter_proxy.hpp" target="lib\native\include\krabs\testing\event_filter_proxy.hpp" />
+        <file src="krabs\krabs\testing\extended_data_builder.hpp" target="lib\native\include\krabs\testing\extended_data_builder.hpp" />
         <file src="krabs\krabs\testing\filler.hpp" target="lib\native\include\krabs\testing\filler.hpp" />
         <file src="krabs\krabs\testing\proxy.hpp" target="lib\native\include\krabs\testing\proxy.hpp" />
         <file src="krabs\krabs\testing\record_builder.hpp" target="lib\native\include\krabs\testing\record_builder.hpp" />
