@@ -15,6 +15,7 @@ namespace ManagedExamples
             //UserTrace004.Start();
             //UserTrace005.Start();
             //FakingEvents001.Start();
+            //WppTrace001.Start();
         }
     }
 }
