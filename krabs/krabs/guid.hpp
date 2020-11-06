@@ -315,9 +315,10 @@ namespace std
     {
         size_t operator()(const krabs::guid& guid) const
         {
-            const char* guidBytes = (const char*)&guid;
+            // Shift-Add-XOR hash starts with this prime number
             size_t h = 2166136261;
 
+            const char* guidBytes = (const char*)&guid;
             for (auto i = 0; i < sizeof(guid); ++i)
             {
                 h ^= (h << 5) + (h >> 2) + guidBytes[i];
