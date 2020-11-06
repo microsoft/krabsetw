@@ -309,4 +309,21 @@ namespace std
 
         return { managed.get() };
     }
+
+    template<>
+    struct std::hash<krabs::guid>
+    {
+        size_t operator()(const krabs::guid& guid) const
+        {
+            const char* guidBytes = (const char*)&guid;
+            size_t h = 2166136261;
+
+            for (auto i = 0; i < sizeof(guid); ++i)
+            {
+                h ^= (h << 5) + (h >> 2) + guidBytes[i];
+            }
+
+            return h;
+        }
+    };
 }

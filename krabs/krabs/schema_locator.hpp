@@ -29,7 +29,6 @@ namespace krabs {
      * Type used as the key for cache lookup in a schema_locator.
      * </summary>
      */
-    #pragma pack(push, 1) // Ref: https://github.com/microsoft/krabsetw/issues/139
     struct schema_key
     {
         guid      provider;
@@ -56,7 +55,6 @@ namespace krabs {
 
         bool operator!=(const schema_key &rhs) const { return !(*this == rhs); }
     };
-    #pragma pack(pop)
 }
 
 namespace std {
@@ -72,13 +70,13 @@ namespace std {
         size_t operator()(const krabs::schema_key &key) const
         {
             // Shift-Add-XOR hash - good enough for the small sets we deal with
-            const char* p = (const char*)&key;
             size_t h = 2166136261;
 
-            for(auto i = 0; i < sizeof(key); ++i)
-            {
-                h ^= (h << 5) + (h >> 2) + p[i];
-            }
+            h ^= (h << 5) + (h >> 2) + std::hash<krabs::guid>()(key.provider);
+            h ^= (h << 5) + (h >> 2) + key.id;
+            h ^= (h << 5) + (h >> 2) + key.opcode;
+            h ^= (h << 5) + (h >> 2) + key.version;
+            h ^= (h << 5) + (h >> 2) + key.level;
 
             return h;
         }

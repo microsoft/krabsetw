@@ -82,6 +82,7 @@ namespace krabs { namespace testing {
             size_t id,
             size_t version,
             size_t opcode = 0,
+            size_t level = 0,
             bool trim_string_null_terminator = false);
 
         /**
@@ -150,8 +151,6 @@ namespace krabs { namespace testing {
          */
         EVENT_HEADER &header();
 
-    private:
-
         /**
          * <summary>
          *   Fills an EVENT_RECORD with the info necessary to grab its schema
@@ -159,6 +158,8 @@ namespace krabs { namespace testing {
          * </summary>
          */
          EVENT_RECORD create_stub_record() const;
+
+    private:
 
         /**
          * <summary>
@@ -178,6 +179,7 @@ namespace krabs { namespace testing {
         const size_t id_;
         const size_t version_;
         const size_t opcode_;
+        const size_t level_;
         EVENT_HEADER header_;
         std::vector<record_property_thunk> properties_;
         bool trim_string_null_terminator_;
@@ -211,17 +213,20 @@ namespace krabs { namespace testing {
         size_t id,
         size_t version,
         size_t opcode,
+        size_t level,
         bool trim_string_null_terminator)
     : providerId_(providerId)
     , id_(id)
     , version_(version)
     , opcode_(opcode)
+    , level_(level)
     , trim_string_null_terminator_(trim_string_null_terminator)
     {
         ZeroMemory(&header_, sizeof(EVENT_HEADER));
         header_.EventDescriptor.Id      = static_cast<USHORT>(id_);
         header_.EventDescriptor.Version = static_cast<UCHAR>(version_);
         header_.EventDescriptor.Opcode  = static_cast<UCHAR>(opcode_);
+        header_.EventDescriptor.Level   = static_cast<UCHAR>(level_);
         memcpy(&header_.ProviderId, (const GUID *)&providerId_, sizeof(GUID));
     }
 
