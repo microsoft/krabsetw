@@ -29,6 +29,7 @@ namespace krabs {
      * Type used as the key for cache lookup in a schema_locator.
      * </summary>
      */
+    #pragma pack(push, 1) // Ref: https://github.com/microsoft/krabsetw/issues/139
     struct schema_key
     {
         guid      provider;
@@ -55,6 +56,7 @@ namespace krabs {
 
         bool operator!=(const schema_key &rhs) const { return !(*this == rhs); }
     };
+    #pragma pack(pop)
 }
 
 namespace std {
