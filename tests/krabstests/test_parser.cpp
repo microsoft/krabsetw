@@ -129,7 +129,7 @@ namespace krabstests
 
             krabs::guid httpsys(L"{dd5ef90a-6398-47a4-ad34-4dcecdef795f}");
             // httpsys: parse event
-            krabs::testing::record_builder builder(httpsys, krabs::id(2), 0U, 12, true);
+            krabs::testing::record_builder builder(httpsys, krabs::id(2), 0U, 12, 1, true);
             builder.add_properties()
                 (L"Url", expectedUrl);
 
@@ -148,7 +148,7 @@ namespace krabstests
 
             krabs::guid httpsys(L"{dd5ef90a-6398-47a4-ad34-4dcecdef795f}");
             // httpsys: parse event
-            krabs::testing::record_builder builder(httpsys, krabs::id(2), 0U, 12, true);
+            krabs::testing::record_builder builder(httpsys, krabs::id(2), 0U, 12, 1, true);
             builder.add_properties()
                 (L"Url", expectedUrl);
 

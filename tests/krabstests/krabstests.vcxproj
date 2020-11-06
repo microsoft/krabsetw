@@ -201,9 +201,11 @@
     <ClCompile Include="test_collection_view.cpp" />
     <ClCompile Include="test_event_callbacks.cpp" />
     <ClCompile Include="test_filter.cpp" />
+    <ClCompile Include="test_guid.cpp" />
     <ClCompile Include="test_guid_parser.cpp" />
     <ClCompile Include="test_parser.cpp" />
     <ClCompile Include="test_parse_types.cpp" />
+    <ClCompile Include="test_schema_key.cpp" />
     <ClCompile Include="test_trace_properties.cpp" />
     <ClCompile Include="test_user_providers.cpp" />
     <ClCompile Include="test_record_builder.cpp" />

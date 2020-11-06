@@ -70,13 +70,13 @@ namespace std {
         size_t operator()(const krabs::schema_key &key) const
         {
             // Shift-Add-XOR hash - good enough for the small sets we deal with
-            const char* p = (const char*)&key;
             size_t h = 2166136261;
 
-            for(auto i = 0; i < sizeof(key); ++i)
-            {
-                h ^= (h << 5) + (h >> 2) + p[i];
-            }
+            h ^= (h << 5) + (h >> 2) + std::hash<krabs::guid>()(key.provider);
+            h ^= (h << 5) + (h >> 2) + key.id;
+            h ^= (h << 5) + (h >> 2) + key.opcode;
+            h ^= (h << 5) + (h >> 2) + key.version;
+            h ^= (h << 5) + (h >> 2) + key.level;
 
             return h;
         }
