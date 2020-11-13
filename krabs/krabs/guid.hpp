@@ -320,7 +320,7 @@ namespace std
             // This algorithm comes from .NET's reference source for Guid.GetHashCode()
             return guid.guid_.Data1 ^
                  ((guid.guid_.Data2    << 16) | guid.guid_.Data3   ) ^
-                 ((guid.guid_.Data4[3] << 24) | guid.guid_.Data4[7]);
+                 ((guid.guid_.Data4[2] << 24) | guid.guid_.Data4[7]);
         }
     };
 }
