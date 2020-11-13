@@ -47,6 +47,8 @@ namespace krabs {
 
     private:
         GUID guid_;
+
+        friend struct std::hash<guid>;
     };
 
     /** <summary>
@@ -315,16 +317,10 @@ namespace std
     {
         size_t operator()(const krabs::guid& guid) const
         {
-            // Shift-Add-XOR hash starts with this prime number
-            size_t h = 2166136261;
-
-            const char* guidBytes = (const char*)&guid;
-            for (auto i = 0; i < sizeof(guid); ++i)
-            {
-                h ^= (h << 5) + (h >> 2) + guidBytes[i];
-            }
-
-            return h;
+            // This algorithm comes from .NET's reference source for Guid.GetHashCode()
+            return guid.guid_.Data1 ^
+                 ((guid.guid_.Data2    << 16) | guid.guid_.Data3   ) ^
+                 ((guid.guid_.Data4[2] << 24) | guid.guid_.Data4[7]);
         }
     };
 }
