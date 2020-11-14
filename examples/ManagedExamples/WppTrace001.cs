@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 // This example shows how to use a UserTrace to monitor WPP providers.
-// This is a special case due slight differences in the event format,
+// This is a special case due to slight differences in the event format,
 // and the lack of schema information.
 
 using System;
@@ -15,7 +15,7 @@ namespace ManagedExamples
     {
         public static void Start()
         {
-            var trace = new UserTrace();
+            var trace = new UserTrace("WPP_OLE32");
 
             // WPP providers are basically legacy providers without a registered MOF.
             // They are intended for (internal) debugging purposes only.
@@ -40,13 +40,10 @@ namespace ManagedExamples
             //
             // The WPP macros generate control GUID globals named "WPP_ThisDir_CTLGUID_<name>"
             //
-            // For example, this control GUID in the symbols for combase.dll
+            // For example, this control GUID is in the symbols for combase.dll
             // WPP_ThisDir_CTLGUID_OLE32 = bda92ae8-9f11-4d49-ba1d-a4c2abca692e
             var ole32WppProvider = new Provider(Guid.Parse("{bda92ae8-9f11-4d49-ba1d-a4c2abca692e}"));
 
-            // We use the control GUID to enable WPP tracing for the provider, and to set 
-            // the filtering level and flags.
-            // 
             // In evntrace.h there are ten defined trace levels -
             // TRACE_LEVEL_NONE        0   // Tracing is not on
             // TRACE_LEVEL_CRITICAL    1   // Abnormal exit or termination
@@ -70,58 +67,87 @@ namespace ManagedExamples
             // Flags is a user-defined bitmask field the developer can use to group
             // related messages. 
             // Again, it is a UCHAR for WPP providers so 0xFF means trace everything.
-            ole32WppProvider.Any   = 0xFF;  // 'TRACE_FLAGS_ALL'
+            ole32WppProvider.Any = 0xFF;  // 'TRACE_FLAGS_ALL'
 
-            // WPP events are also a slightly different format to the modern ETW events. In particular,
-            // they include a message GUID rather than the control GUID. In order to convince krabs to
-            // forward events to us, we need to register an extra 'provider' using the message GUID.
+            // We need to enable this provider in order for krabs to correctly enable the OLE32 WPP events.
+            trace.Enable(ole32WppProvider);
+
+            // But we can't add any callbacks directly to krabs WPP providers though. Without the TMF
+            // information, krabs cannot determine which provider the event belongs to.
             //
-            // The WPP macros generate message GUID globals named "WPP_<guid>_Traceguids"
+            // WPP providers, like MOF providers, return the message GUID in the ProviderId field.
+            // So firstly krabs checks if the message GUID matches a provider GUID.
+            // If you know the message GUIDs then you can create individual dummy providers for those.
             //
-            // For example, these message GUIDs in the symbols for combase.dll
-            // WPP_c0e4dd87b1523146a49921a43cd25160_Traceguids = c0e4dd87-b152-3146-a499-21a43cd25160
-            // WPP_c1647dce9b833d97edb9721fff5f0606_Traceguids = c1647dce-9b83-3d97-edb9-721fff5f0606
-            var messageGuid_S = new Provider(Guid.Parse("{c0e4dd87-b152-3146-a499-21a43cd25160}"));
-            messageGuid_S.OnEvent += (record) =>
+            // Secondly krabs queries TDH to see if it knows the provider GUID for the message GUID.
+            // https://docs.microsoft.com/en-us/windows/win32/etw/retrieving-event-data-using-tdh
+            // This works for registered MOF providers - but not for WPP providers. In this case, TDH returns
+            // an all zero GUID - so we can create a dummy provider for that and add our callbacks there instead.
+            // If you subscribe to multiple WPP providers, the events from *all* of them will be delivered to this dummy provider.
+            var allWppDummyProvider = new Provider(Guid.Empty);
+            allWppDummyProvider.OnEvent += (record) =>
             {
+                // Here be dragons.
+                //
                 // krabs does not currently support TMF files for parsing WPP messages.
                 // Instead you need to manually parse the UserData.
                 //
-                // The WPP macros generate logging staging functions named "WPP_SF_<format specifiers>"
-                // In this case this message GUID is always associate with a WPP_SF_S(...) call.
-                // This tells us that the event contains a single unicode string.
-                var message = Marshal.PtrToStringUni(record.UserData);
-                Console.WriteLine($"Id:{record.Id} WPP_SF_S({message})");
-            };
+                // The WPP macros generate message GUID globals named "WPP_<guid>_Traceguids"
+                // They also generate logging staging functions named "WPP_SF_<format specifiers>"
+                //
+                // There seems to be a one-to-one mapping between message GUIDs and staging functions.
+                // WPP events are a slightly different format to the modern ETW events. In particular,
+                // they include this message GUID rather than the provider's control GUID.
+                //
+                // So message GUIDs would be a good candidate for filtering...
+                // ... but my experience is that they may change between builds.
+                // So I've subscribed to the zero GUID instead.
+                //
+                // Event ids seem more stable, but they are only unique per message GUID.
+                //
+                // In this case, combase.dll only has two logging staging functions.
+                // WPP_SF_S(...) - which tells us that the event contains a single unicode string.
+                // WPP_SF_ssdDsS(...) - which tells us that there are 3 ansi strings, a unicode string and dword.
+                //
+                // So we can brute force the format...
 
-            var messageGuid_ssdDsS = new Provider(Guid.Parse("{c1647dce-9b83-3d97-edb9-721fff5f0606}"));
-            messageGuid_ssdDsS.OnEvent += (record) =>
-            {
-                // WPP_SF_ssdDsS(...) 
+                var message = $"Message:{record.ProviderId} Id:{record.Id} ";
                 var userData = record.UserData;
-                var string_1 = Marshal.PtrToStringAnsi(userData);
-                userData += string_1.Length+1;
-                var string_2 = Marshal.PtrToStringAnsi(userData);
-                userData += string_2.Length+1;
-                var int32_3 = Marshal.ReadInt32(userData);
-                userData += sizeof(Int32);
-                var uint32_4 = (UInt32)Marshal.ReadInt32(userData);
-                userData += sizeof(UInt32);
-                var string_5 = Marshal.PtrToStringAnsi(userData);
-                userData += string_5.Length+1;
-                var string_6 = Marshal.PtrToStringUni(userData);
-                Console.WriteLine($"Id:{record.Id} WPP_SF_ssdDsS({string_1}, {string_2}, {int32_3}, {uint32_4}, {string_5}, {string_6})");
+                var string_1 = Marshal.PtrToStringAnsi(record.UserData);
+                if (string_1.Length != 1)  // definitely an ansi string...
+                {
+                    // WPP_SF_ssdDsS(...)
+                    userData += string_1.Length + 1;
+                    var string_2 = Marshal.PtrToStringAnsi(userData);
+                    userData += string_2.Length + 1;
+                    var int32_3 = Marshal.ReadInt32(userData);
+                    userData += sizeof(Int32);
+                    var uint32_4 = (UInt32)Marshal.ReadInt32(userData);
+                    userData += sizeof(UInt32);
+                    var string_5 = Marshal.PtrToStringAnsi(userData);
+                    userData += string_5.Length + 1;
+                    var string_6 = Marshal.PtrToStringUni(userData);
+                    message += $"WPP_SF_ssdDsS({string_1}, {string_2}, {int32_3}, {uint32_4}, {string_5}, {string_6})";
+                }
+                else // probably a unicode string... (but possibly a single character ansi string)
+                {
+                    // WPP_SF_S(...)
+                    string_1 = Marshal.PtrToStringUni(record.UserData);
+                    message += $"WPP_SF_S({string_1})";
+                }
+
+                // In this example we only print messages that contain COM class ids.
+                if (message.Contains(" clsid"))
+                    Console.WriteLine(message);
             };
-            
+            trace.Enable(allWppDummyProvider);
+
             // Side note - if you want to turn up the verbosity of your COM WPP diagnostic tracing, then enable
             // OLE32 tracing via the registry following the instruction here -
             // https://support.microsoft.com/en-us/help/926098/how-to-enable-com-and-com-diagnostic-tracing
             //
             // Alternatively call _ControlTracing (4) via combase's 18f70770-8e64-11cf-9af1-0020af6e72f4 RPC interface.
 
-            trace.Enable(ole32WppProvider);
-            trace.Enable(messageGuid_S);
-            trace.Enable(messageGuid_ssdDsS);
             trace.Start();
         }
     }
