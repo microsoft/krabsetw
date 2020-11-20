@@ -1,9 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-// This example shows how to use a user_trace to extract powershell command
-// invocations. It demonstrates provider-level filtering to make event handling
-// code a little simpler.
+// This example shows how to use the any_of/all_of/none_of filter predicate vectors.
 
 #include <iostream>
 #include <cassert>
@@ -19,7 +17,7 @@ void user_trace_006_predicate_vectors::start()
     krabs::provider<> provider(L"Microsoft-Windows-Kernel-Process");
     provider.any(0x10);
 
-    // We'll log events where ome of the following is true
+    // We'll log events where one of the following is true
     //  - The Opcode is 1,
     //  - The Event ID is 2, or
     //  - The Version is 3
