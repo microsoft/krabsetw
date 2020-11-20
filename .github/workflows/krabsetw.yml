@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: microsoft/setup-msbuild@v1
-    - uses: NuGet/setup-nuget@v1.0.2
+    - uses: NuGet/setup-nuget@v1.0.5
     - uses: darenm/Setup-VSTest@v1
     - name: nuget restore
       run: nuget.exe restore krabs\krabs.sln
