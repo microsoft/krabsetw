@@ -65,6 +65,7 @@
   <ItemGroup>
     <Compile Include="FakingEvents001.cs" />
     <Compile Include="KernelTrace001.cs" />
+    <Compile Include="KernelTrace002.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="UserTrace001.cs" />
     <Compile Include="UserTrace004.cs" />

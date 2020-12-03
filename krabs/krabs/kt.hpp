@@ -141,8 +141,12 @@ namespace krabs { namespace details {
         for (auto &provider : trace.providers_) {
             if (provider.get().id() == record.EventHeader.ProviderId) {
                 provider.get().on_event(record, trace.context_);
+                return;
             }
         }
+
+        if (trace.default_callback_ != nullptr)
+            trace.default_callback_(record, trace.context_);
     }
 
     inline unsigned long kt::augment_file_mode()
