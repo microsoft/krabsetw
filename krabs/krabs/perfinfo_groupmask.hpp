@@ -13,10 +13,11 @@
 #define PERF_NUM_MASKS          8
 
 typedef ULONG PERFINFO_MASK;
-
+#ifndef _PHNT_H
 typedef struct _PERFINFO_GROUPMASK {
     ULONG Masks[PERF_NUM_MASKS];
 } PERFINFO_GROUPMASK, *PPERFINFO_GROUPMASK;
+#endif // _PHNT_H
 
 #define PERF_GET_MASK_INDEX(GM) (((GM) & PERF_MASK_INDEX) >> 29)
 #define PERF_GET_MASK_GROUP(GM) ((GM) & PERF_MASK_GROUP)
@@ -151,6 +152,7 @@ typedef struct _PERFINFO_GROUPMASK {
 #define PERF_CLUSTER_OFF        0xE0000001
 #define PERF_MEMORY_CONTROL     0xE0000002
 
+#ifndef _PHNT_H
 
 // TraceQueryInformation wasn't introduced until Windows 8, so we need to use
 // NtQuerySystemInformation instead in order to maintain support for Windows 7.
@@ -207,3 +209,5 @@ extern "C" NTSTATUS NTAPI NtSetSystemInformation(
 );
 
 constexpr auto SystemPerformanceTraceInformation{ static_cast<SYSTEM_INFORMATION_CLASS>(0x1f) };
+
+#endif // _PHNT_H
