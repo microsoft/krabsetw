@@ -206,6 +206,18 @@ namespace krabs {
             }
         }
 
+        template <>
+        inline void assert_valid_assignment<bool>(
+            const std::wstring&, const property_info& info)
+        {
+            auto inType = info.pEventPropertyInfo_->nonStructType.InType;
+
+            if (inType != TDH_INTYPE_BOOLEAN) {
+                throw std::runtime_error(
+                    "Requested a BOOLEAN from property that is not one");
+            }
+        }
+
 #endif // NDEBUG
 
     } /* namespace debug */
