@@ -267,6 +267,18 @@ namespace krabs {
         return *(T*)propInfo.pPropertyIndex_;
     }
 
+    template<>
+    inline bool parser::parse<bool>(const std::wstring& name)
+    {
+        auto propInfo = find_property(name);
+        throw_if_property_not_found(propInfo);
+
+        krabs::debug::assert_valid_assignment<bool>(name, propInfo);
+
+        // Boolean in ETW is 4 bytes long
+        return static_cast<bool>(*(unsigned*)propInfo.pPropertyIndex_);
+    }
+
     template <>
     inline std::wstring parser::parse<std::wstring>(const std::wstring &name)
     {
