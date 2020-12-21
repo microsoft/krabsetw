@@ -57,3 +57,8 @@ struct user_trace_006_predicate_vectors
 {
     static void start();
 };
+
+struct user_trace_007_rundown
+{
+    static void start();
+};

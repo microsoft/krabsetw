@@ -59,7 +59,7 @@ namespace krabs {
              *
              * <param name="callback">the function to call into</param>
              * <example>
-             *    void my_fun(const EVENT_RECORD &record) { ... }
+             *    void my_fun(const EVENT_RECORD &record, const krabs::trace_context &trace_context) { ... }
              *    // ...
              *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
              *    provider<> powershell(id);
@@ -67,7 +67,7 @@ namespace krabs {
              * </example>
              *
              * <example>
-             *    auto fun = [&](const EVENT_RECORD &record) {...}
+             *    auto fun = [&](const EVENT_RECORD &record, const krabs::trace_context &trace_context) {...}
              *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
              *    provider<> powershell(id);
              *    provider.add_on_event_callback(fun);
@@ -90,7 +90,7 @@ namespace krabs {
              *   krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
              *   krabs::provider<> powershell(id);
              *   krabs::event_filter filter(krabs::filtering::any_event);
-             *   filter.add_on_event_callback([&](const EVENT_RECORD &record) {});
+             *   filter.add_on_event_callback([&](const EVENT_RECORD &record, const krabs::trace_context &trace_context) {...});
              *   powershell.add_filter(filter);
              * </example>
              */
@@ -242,6 +242,20 @@ namespace krabs {
         T trace_flags() const;
 
         /**
+        * <summary>
+        * Requests that the provider log its state information. See:
+        *   https://docs.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-enabletraceex2
+        * </summary>
+        *
+        * <example>
+        *     krabs::provider<> process_provider(L"Microsoft-Windows-Kernel-Process");
+        *     process_provider.any(0x10);  // WINEVENT_KEYWORD_PROCESS
+        *     process_provider.enable_rundown_events();
+        * </example>
+        */
+        void enable_rundown_events();
+
+        /**
          * <summary>
          * Turns a strongly typed provider<T> to provider<> (useful for
          * creating collections of providers).
@@ -261,6 +275,7 @@ namespace krabs {
         T all_;
         T level_;
         T trace_flags_;
+        bool rundown_enabled_;
 
     private:
         template <typename T>
@@ -410,6 +425,7 @@ namespace krabs {
     , all_(0)
     , level_(5)
     , trace_flags_(0)
+    , rundown_enabled_(false)
     {}
 
 
@@ -498,6 +514,7 @@ namespace krabs {
             all_ = 0;
             level_ = 5;
             trace_flags_ = 0;
+            rundown_enabled_ = false;
         }
 
         CoUninitialize();
@@ -531,6 +548,12 @@ namespace krabs {
     T provider<T>::trace_flags() const
     {
         return static_cast<T>(trace_flags_);
+    }
+
+    template <typename T>
+    void provider<T>::enable_rundown_events()
+    {
+        rundown_enabled_ = true;
     }
 
     template <typename T>

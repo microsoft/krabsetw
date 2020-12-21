@@ -32,6 +32,7 @@ namespace krabs { namespace details {
         struct filter_settings{
             std::set<unsigned short> provider_filter_event_ids_;
             filter_flags filter_flags_{};
+            bool rundown_enabled_ = false;
         };
 
         typedef std::map<krabs::guid, filter_settings> provider_filter_settings;
@@ -129,6 +130,7 @@ namespace krabs { namespace details {
             settings.filter_flags_.any_         |= provider.get().any_;
             settings.filter_flags_.all_         |= provider.get().all_;
             settings.filter_flags_.trace_flags_ |= provider.get().trace_flags_;
+            settings.rundown_enabled_           |= provider.get().rundown_enabled_;
 
             for (const auto& filter : provider.get().filters_) {
                 settings.provider_filter_event_ids_.insert(
@@ -186,7 +188,20 @@ namespace krabs { namespace details {
                                           settings.filter_flags_.all_,
                                           0,
                                           &parameters);
-            UNREFERENCED_PARAMETER(status);
+
+        for (auto& provider : trace.providers_) {
+            if (!provider.get().rundown_enabled_)
+                continue;
+
+            ULONG status = EnableTraceEx2(trace.registrationHandle_,
+                &provider.get().guid_,
+                EVENT_CONTROL_CODE_CAPTURE_STATE,
+                0,
+                0,
+                0,
+                0,
+                NULL);
+            error_check_common_conditions(status);
         }
     }
 
