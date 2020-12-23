@@ -220,6 +220,27 @@ namespace krabs {
          */
         size_t buffers_processed() const;
 
+        /**
+         * <summary>
+         * Adds a function to call when an event is fired which has no corresponding provider.
+         * </summary>
+         *
+         * <param name="callback">the function to call into</param>
+         * <example>
+         *    void my_fun(const EVENT_RECORD &record) { ... }
+         *    // ...
+         *    krabs::trace trace;
+         *    trace.set_default_event_callback(my_fun);
+         * </example>
+         *
+         * <example>
+         *    auto fun = [&](const EVENT_RECORD &record) {...}
+         *    krabs::trace trace;
+         *    trace.set_default_event_callback(fun);
+         * </example>
+         */
+        void set_default_event_callback(c_provider_callback callback);
+
     private:
 
         /**
@@ -242,6 +263,8 @@ namespace krabs {
         EVENT_TRACE_PROPERTIES properties_;
 
         const trace_context context_;
+
+        provider_callback default_callback_ = nullptr;
 
     private:
         template <typename T>
@@ -354,6 +377,12 @@ namespace krabs {
     size_t trace<T>::buffers_processed() const
     {
         return buffersRead_;
+    }
+
+    template <typename T>
+    void trace<T>::set_default_event_callback(c_provider_callback callback)
+    {
+        default_callback_ = callback;
     }
 
 }
