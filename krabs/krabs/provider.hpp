@@ -310,6 +310,8 @@ namespace krabs {
         : p_(flags)
         , id_(id)
         , gm_(0)
+        , r_(0)
+        , rundown_enabled_(false)
         {}
 
         /**
@@ -322,9 +324,11 @@ namespace krabs {
          * </remarks>
          */
         kernel_provider(const GUID& id, PERFINFO_MASK group_mask)
-            : p_(0)
-            , id_(id)
-            , gm_(group_mask)
+        : p_(0)
+        , id_(id)
+        , gm_(group_mask)
+        , r_(0)
+        , rundown_enabled_(false)
         {}
 
         /**
@@ -333,6 +337,19 @@ namespace krabs {
          * </summary>
          */
          const krabs::guid &id() const;
+
+         /**
+         * <summary>
+         *   Sets flags to be enabled for the kernel rundown GUID.
+         * </summary>
+         * <remarks>
+         *   This ETW feature is undocumented and should be used with caution.
+         * </remarks>
+         */
+         void set_rundown_flags(unsigned long rundown_flags) {
+             r_ = rundown_flags;
+             rundown_enabled_ = true;
+         };
 
     private:
 
@@ -350,10 +367,26 @@ namespace krabs {
          */
         PERFINFO_MASK group_mask() const { return gm_; }
 
+        /**
+         * <summary>
+         *   Retrieves the rundown flag value associated with this provider.
+         * </summary>
+         */
+        unsigned long rundown_flags() const { return r_; }
+
+        /**
+         * <summary>
+         *   Have rundown flags been set for this this provider?
+         * </summary>
+         */
+        bool rundown_enabled() const { return rundown_enabled_; }
+
     private:
         unsigned long p_;
         const krabs::guid id_;
         PERFINFO_MASK gm_;
+        unsigned long r_;
+        bool rundown_enabled_;
 
     private:
         friend struct details::kt;

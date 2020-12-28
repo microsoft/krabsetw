@@ -328,6 +328,12 @@ namespace krabs { namespace details {
             throw open_trace_failure();
         }
 
+        // Refactoring warning.
+        // During the testing of the (slower) C++/CLI implementation it became evident that
+        // EnableTraceEx2(EVENT_CONTROL_CODE_CAPTURE_STATE) must be called very shortly
+        // before ProcessTrace() in order for the rundown events to be generated.
+        T::trace_type::enable_rundown(trace_);
+
         ::FILETIME now;
         GetSystemTimeAsFileTime(&now);
         ULONG status = ProcessTrace(&trace_.sessionHandle_, 1, &now, NULL);

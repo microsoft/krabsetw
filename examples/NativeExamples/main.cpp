@@ -9,6 +9,7 @@ int main(void)
     kernel_and_user_trace_001::start();
     //kernel_trace_001::start();
     //kernel_trace_002::start();
+    //kernel_trace_003_rundown::start();
     //multiple_providers_001::start();
     //testing_001::start();
     //user_trace_001::start();

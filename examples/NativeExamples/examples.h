@@ -18,6 +18,11 @@ struct kernel_trace_002
     static void start();
 };
 
+struct kernel_trace_003_rundown
+{
+    static void start();
+};
+
 struct multiple_providers_001
 {
     static void start();

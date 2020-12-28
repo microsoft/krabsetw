@@ -4,6 +4,7 @@
 #pragma once
 
 #include "compiler_check.hpp"
+#include "kernel_guids.hpp"
 #include "perfinfo_groupmask.hpp"
 #include "provider.hpp"
 #include "trace.hpp"
@@ -57,6 +58,17 @@ namespace krabs { namespace details {
          */
         static void enable_providers(
             const krabs::trace<krabs::details::kt> &trace);
+
+        /**
+         * <summary>
+         *   Enables the configured kernel rundown flags.
+         * </summary>
+         * <remarks>
+         *   This ETW feature is undocumented and should be used with caution.
+         * </remarks>
+         */
+        static void enable_rundown(
+            const krabs::trace<krabs::details::kt>& trace);
 
         /**
          * <summary>
@@ -134,6 +146,30 @@ namespace krabs { namespace details {
         return;
     }
 
+    inline void kt::enable_rundown(
+        const krabs::trace<krabs::details::kt>& trace)
+    {
+        bool rundown_enabled = false;
+        ULONG rundown_flags = 0;
+        for (auto& provider : trace.providers_) {
+            rundown_enabled |= provider.get().rundown_enabled();
+            rundown_flags |= provider.get().rundown_flags();
+        }
+
+        if (rundown_enabled) {
+            ULONG status = EnableTraceEx2(trace.registrationHandle_,
+                                          &krabs::guids::rundown,
+                                          EVENT_CONTROL_CODE_ENABLE_PROVIDER,
+                                          0,
+                                          rundown_flags,
+                                          0,
+                                          0,
+                                          NULL);
+            error_check_common_conditions(status);
+        }
+    }
+
+
     inline void kt::forward_events(
         const EVENT_RECORD &record,
         const krabs::trace<krabs::details::kt> &trace)
@@ -166,7 +202,5 @@ namespace krabs { namespace details {
 
         return krabs::guid(SystemTraceControlGuid);
     }
-
-
 
 } /* namespace details */ } /* namespace krabs */

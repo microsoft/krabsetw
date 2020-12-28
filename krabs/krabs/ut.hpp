@@ -70,6 +70,15 @@ namespace krabs { namespace details {
 
         /**
          * <summary>
+         *   Enables the configured rundown events for each provider.
+         *   Should be called immediately prior to ProcessTrace.
+         * </summary>
+         */
+        static void enable_rundown(
+            const krabs::trace<krabs::details::ut>& trace);
+
+        /**
+         * <summary>
          *   Decides to forward an event to any of the providers in the trace.
          * </summary>
          */
@@ -188,6 +197,15 @@ namespace krabs { namespace details {
                                           settings.filter_flags_.all_,
                                           0,
                                           &parameters);
+            error_check_common_conditions(status);
+        }
+    }
+
+    inline void ut::enable_rundown(
+        const krabs::trace<krabs::details::ut>& trace)
+    {
+        if (trace.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE)
+            return;
 
         for (auto& provider : trace.providers_) {
             if (!provider.get().rundown_enabled_)
