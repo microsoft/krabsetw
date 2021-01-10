@@ -1,7 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-#pragma once
+#ifndef PERFINFO_GROUPMASK_HPP
+#define PERFINFO_GROUPMASK_HPP
 
 #include <Windows.h>
 #pragma comment(lib, "ntdll")
@@ -13,7 +14,6 @@
 #define PERF_NUM_MASKS          8
 
 typedef ULONG PERFINFO_MASK;
-
 typedef struct _PERFINFO_GROUPMASK {
     ULONG Masks[PERF_NUM_MASKS];
 } PERFINFO_GROUPMASK, *PPERFINFO_GROUPMASK;
@@ -151,7 +151,6 @@ typedef struct _PERFINFO_GROUPMASK {
 #define PERF_CLUSTER_OFF        0xE0000001
 #define PERF_MEMORY_CONTROL     0xE0000002
 
-
 // TraceQueryInformation wasn't introduced until Windows 8, so we need to use
 // NtQuerySystemInformation instead in order to maintain support for Windows 7.
 // This requires the below additional definitions.
@@ -207,3 +206,5 @@ extern "C" NTSTATUS NTAPI NtSetSystemInformation(
 );
 
 constexpr auto SystemPerformanceTraceInformation{ static_cast<SYSTEM_INFORMATION_CLASS>(0x1f) };
+
+#endif // PERFINFO_GROUPMASK_HPP

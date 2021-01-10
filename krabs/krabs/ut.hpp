@@ -213,6 +213,9 @@ namespace krabs { namespace details {
                 return;
             }
         }
+
+        if (trace.default_callback_ != nullptr)
+            trace.default_callback_(record, trace.context_);
     }
 
     inline unsigned long ut::augment_file_mode()

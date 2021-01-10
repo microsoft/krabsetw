@@ -152,6 +152,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="kernel_trace_002.cpp" />
     <ClCompile Include="user_trace_005.cpp" />
     <ClCompile Include="kernel_and_user_trace_001.cpp" />
     <ClCompile Include="kernel_trace_001.cpp" />

@@ -52,6 +52,22 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 
         /// <summary>
+        /// Retrieves the opcode_name of the event.
+        /// </summary>
+        virtual property String^ OpcodeName
+        {
+            String^ get() { return gcnew String(schema_->opcode_name()); }
+        }
+
+        /// <summary>
+        /// Retrieves the task_name of the event.
+        /// </summary>
+        virtual property String^ TaskName
+        {
+            String^ get() { return gcnew String(schema_->task_name()); }
+        }
+
+        /// <summary>
         /// Retrieves the name of the provider that fires this event.
         /// </summary>
         virtual property String^ ProviderName

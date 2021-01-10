@@ -142,9 +142,26 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>a <see cref="O365::Security::ETW::TraceStats"/> object representing the stats of the current trace</returns>
         virtual TraceStats QueryStats();
 
+        /// <summary>
+        /// Adds a function to call when an event is fired which has no corresponding provider.
+        /// </summary>
+        /// <param name="callback">the function to call into</param>
+        /// <example>
+        ///     KernelTrace trace = new KernelTrace();
+        ///     trace.SetDefaultEventCallback((record) => { ... });
+        /// </example>
+        virtual void SetDefaultEventCallback(IEventRecordDelegate^ callback);
+
     internal:
         bool disposed_ = false;
         O365::Security::ETW::NativePtr<krabs::kernel_trace> trace_;
+
+        IEventRecordDelegate^ callback_;
+        void EventNotification(const EVENT_RECORD&, const krabs::trace_context&);
+        delegate void NativeHookDelegate(const EVENT_RECORD&, const krabs::trace_context&);
+        NativeHookDelegate^ del_;
+        GCHandle delegateHandle_;
+        GCHandle delegateHookHandle_;
     };
 
     // Implementation
@@ -162,6 +179,16 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
         Stop();
         disposed_ = true;
+
+        if (delegateHandle_.IsAllocated)
+        {
+            delegateHandle_.Free();
+        }
+
+        if (delegateHookHandle_.IsAllocated)
+        {
+            delegateHookHandle_.Free();
+        }
     }
 
     inline KernelTrace::KernelTrace(String ^name)
@@ -205,6 +232,26 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline TraceStats KernelTrace::QueryStats()
     {
         ExecuteAndConvertExceptions(return TraceStats(trace_->query_stats()));
+    }
+
+    inline void KernelTrace::SetDefaultEventCallback(IEventRecordDelegate^ callback)
+    {
+        callback_ = callback;
+
+        if (!delegateHandle_.IsAllocated) {
+            del_ = gcnew NativeHookDelegate(this, &KernelTrace::EventNotification);
+            delegateHandle_ = GCHandle::Alloc(del_);
+            auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
+            delegateHookHandle_ = GCHandle::Alloc(bridged);
+            ExecuteAndConvertExceptions((void)trace_->set_default_event_callback((krabs::c_provider_callback)bridged.ToPointer()));
+        }
+    }
+
+    inline void KernelTrace::EventNotification(const EVENT_RECORD& record, const krabs::trace_context& trace_context)
+    {
+            krabs::schema schema(record, trace_context.schema_locator);
+            krabs::parser parser(schema);
+            callback_(gcnew EventRecord(record, schema, parser));
     }
 
 } } } }
