@@ -182,11 +182,13 @@ namespace krabs {
             struct sockaddr_in6 sa_in6;
             struct sockaddr_storage sa_stor;
         };
+        size_t size;
 
         static socket_address from_bytes(const BYTE* bytes, size_t size_in_bytes)
         {
             socket_address sa;
             memcpy_s(&(sa.sa_stor), sizeof sa.sa_stor, bytes, size_in_bytes);
+            sa.size = size_in_bytes;
             return sa;
         }
     };
