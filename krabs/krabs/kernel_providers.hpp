@@ -58,8 +58,8 @@ namespace krabs { namespace kernel {
      */
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         disk_file_io_provider,
-        EVENT_TRACE_FLAG_DISK_FILE_IO | EVENT_TRACE_FLAG_DISK_IO,
-        krabs::guids::disk_io);
+        EVENT_TRACE_FLAG_DISK_FILE_IO,
+        krabs::guids::file_io);
 
     /**
      * <summary>A provider that enables disk I/O completion events.</summary>
