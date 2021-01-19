@@ -9,6 +9,7 @@ int main(void)
     kernel_and_user_trace_001::start();
     //kernel_trace_001::start();
     //kernel_trace_002::start();
+    //kernel_trace_003_rundown::start();
     //multiple_providers_001::start();
     //testing_001::start();
     //user_trace_001::start();
@@ -17,4 +18,5 @@ int main(void)
     //user_trace_004::start();
     //user_trace_005::start();
     //user_trace_006_predicate_vectors::start();
+    //user_trace_007_rundown::start();
 }

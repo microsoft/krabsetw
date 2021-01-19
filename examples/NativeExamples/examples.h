@@ -18,6 +18,11 @@ struct kernel_trace_002
     static void start();
 };
 
+struct kernel_trace_003_rundown
+{
+    static void start();
+};
+
 struct multiple_providers_001
 {
     static void start();
@@ -54,6 +59,11 @@ struct user_trace_005
 };
 
 struct user_trace_006_predicate_vectors
+{
+    static void start();
+};
+
+struct user_trace_007_rundown
 {
     static void start();
 };

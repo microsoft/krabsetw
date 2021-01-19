@@ -132,6 +132,19 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 
         /// <summary>
+        /// Requests that the provider log its state information. See:
+        ///   https://docs.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-enabletraceex2
+        /// </summary>
+        /// <example>
+        /// var provider = new Provider("Microsoft-Windows-Kernel-Process");
+        /// provider.Any = 0x10;  // WINEVENT_KEYWORD_PROCESS
+        /// provider.EnableRundownEvents();
+        /// </example>
+        void EnableRundownEvents() {
+            provider_->enable_rundown_events();
+        }
+
+        /// <summary>
         /// Adds a new EventFilter to the provider.
         /// </summary>
         /// <param name="filter">the <see cref="O365::Security::ETW::EventFilter"/> to add</param>
