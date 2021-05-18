@@ -305,6 +305,12 @@ namespace krabs { namespace details {
                 // StartTrace() actually sets this to 0 on failure
                 trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
             }
+            catch (invalid_parameter) {
+                (void)open_trace();
+                close_trace();
+                status = ERROR_SUCCESS;
+                trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
+            }
         }
 
         error_check_common_conditions(status);
