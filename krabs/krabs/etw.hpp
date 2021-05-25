@@ -305,6 +305,15 @@ namespace krabs { namespace details {
                 // StartTrace() actually sets this to 0 on failure
                 trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
             }
+            catch (invalid_parameter) {
+                // In some versions, the error code is 87 when using
+                // SystemTraceControlGuid session. If open/close doesn't
+                // throw, then we can continually processing events.
+                (void)open_trace();
+                close_trace();
+                status = ERROR_SUCCESS;
+                trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
+            }
         }
 
         error_check_common_conditions(status);
