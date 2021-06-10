@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <vector>
 #include <memory>
 
@@ -140,17 +141,20 @@ namespace krabs { namespace testing {
             // 2a: write the struct
             auto& destination = array_ptr[i];
             const auto& thunk = items_[i];
-            
+            const size_t thunk_size = thunk.bytes_.size();
+
             destination.ExtType = thunk.ext_type_;
-            destination.DataSize = static_cast<USHORT>(thunk.bytes_.size());
+            destination.DataSize = static_cast<USHORT>(thunk_size);
+            // Assert that the conversion did not truncate thunk_size.
+            assert(static_cast<size_t>(destination.DataSize) == thunk_size);
 
             // 2b: Write the data
             assert((data_buffer + data_buffer_size) > data_ptr); // prevent wraparound with unsigned int math
             size_t remaining = (data_buffer + data_buffer_size) - (data_ptr);
             // Assert that we will not truncate the data due to not allocating enough space in the buffer.
-            assert(remaining >= destination.DataSize);
+            assert(remaining >= thunk_size);
             // Make sure we rather not copy all of the data than overrun the buffer.
-            memcpy_s(data_ptr, min(remaining, destination.DataSize), thunk.bytes_.data(), thunk.bytes_.size());
+            memcpy_s(data_ptr, std::min<size_t>(remaining, thunk_size), thunk.bytes_.data(), thunk_size);
 
             // 2c: point the DataPtr field at the data
             destination.DataPtr = reinterpret_cast<ULONGLONG>(data_ptr);
