@@ -49,6 +49,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs", "krabs", "{371361C8
 		krabs\trace_context.hpp = krabs\trace_context.hpp
 		krabs\ut.hpp = krabs\ut.hpp
 		krabs\version_helpers.hpp = krabs\version_helpers.hpp
+		krabs\wstring_convert.hpp = krabs\wstring_convert.hpp
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "filtering", "filtering", "{96FA58B5-A1F6-4107-9FB4-226290F9D696}"

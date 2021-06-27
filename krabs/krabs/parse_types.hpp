@@ -325,6 +325,6 @@ namespace krabs {
     };
 #pragma pack(pop)
 
-    static_assert(std::is_pod<counted_string>::value, "Do not modify counted_string");
+    static_assert(std::is_trivial<counted_string>::value && std::is_standard_layout<counted_string>::value , "Do not modify counted_string");
 
 } /* namespace krabs */

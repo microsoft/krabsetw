@@ -12,6 +12,7 @@
 #include "filtering/event_filter.hpp"
 #include "perfinfo_groupmask.hpp"
 #include "trace_context.hpp"
+#include "wstring_convert.hpp"
 
 #include <evntcons.h>
 #include <guiddef.h>
@@ -476,7 +477,7 @@ namespace krabs {
         if (FAILED(hr)) {
             std::stringstream stream;
             stream << "Error in constructing guid from provider name (";
-            stream << providerName.c_str();
+            stream << from_wstring(providerName);
             stream << "), hr = 0x";
             stream << std::hex << hr;
             throw std::runtime_error(stream.str());
@@ -536,7 +537,7 @@ namespace krabs {
             {
                 std::stringstream stream;
                 stream << "Provider name does not exist. (";
-                stream << providerName.c_str();
+                stream << from_wstring(providerName);
                 stream << "), hr = 0x";
                 stream << std::hex << hr;
                 throw std::runtime_error(stream.str());
