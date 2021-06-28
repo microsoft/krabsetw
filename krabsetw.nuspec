@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Krabsetw</id>
-        <version>4.1.20</version>
+        <version>4.1.21</version>
         <title>Krabs ETW Wrappers</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -51,6 +51,7 @@
         <file src="krabs\krabs\trace_context.hpp" target="lib\native\include\krabs\trace_context.hpp" />
         <file src="krabs\krabs\ut.hpp" target="lib\native\include\krabs\ut.hpp" />
         <file src="krabs\krabs\version_helpers.hpp" target="lib\native\include\krabs\version_helpers.hpp" />
+        <file src="krabs\krabs\wstring_convert.hpp" target="lib\native\include\krabs\wstring_convert.hpp" />
         <file src="krabs\krabs.hpp" target="lib\native\include\krabs.hpp" />
         <file src="krabs\Readme.md" target="Readme.md" />
     </files>
