@@ -2,16 +2,16 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Native.ETW.Debug</id>
-        <version>4.1.22</version>
+        <version>4.1.23</version>
         <title>Microsoft.O365.Security.Native.ETW Debug - managed wrappers for krabsetw</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
-        <licenseUrl>https://opensource.org/licenses/MIT</licenseUrl>
+        <license type="expression">MIT</license>
         <projectUrl>https://github.com/Microsoft/krabsetw</projectUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. Also known as "Lobsters." This is the Debug build.</description>
         <summary>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. Also known as "Lobsters." This is the Debug build.</summary>
-        <releaseNotes>Added support for rundown events</releaseNotes>
+        <releaseNotes>Updated license information</releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs lobsters managed cppcli</tags>

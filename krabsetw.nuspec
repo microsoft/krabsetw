@@ -2,16 +2,16 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Krabsetw</id>
-        <version>4.1.22</version>
+        <version>4.1.23</version>
         <title>Krabs ETW Wrappers</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
-        <licenseUrl>https://opensource.org/licenses/MIT</licenseUrl>
+        <license type="expression">MIT</license>
         <projectUrl>https://github.com/Microsoft/krabsetw</projectUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</description>
         <summary>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</summary>
-        <releaseNotes>Added support for rundown events</releaseNotes>
+        <releaseNotes>Updated license information</releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs krabsetw native headers cpp</tags>
