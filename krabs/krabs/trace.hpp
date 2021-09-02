@@ -96,7 +96,7 @@ namespace krabs {
         /**
          * <summary>
          * Sets the trace properties for a session.
-         * Must be called before open()/start().
+         * Must be called before create()/open()/start().
          * See https://docs.microsoft.com/en-us/windows/win32/etw/event-trace-properties
          * for important details and restrictions.
          * Configurable properties are ->
@@ -135,6 +135,25 @@ namespace krabs {
          * </example>
          */
         void enable(const typename T::provider_type &p);
+
+        /**
+         * <summary>
+         * Creates a trace session and returns a TRACEHANDLE.
+         * This method is optional. If not called, the trace session will be created automatically
+         * when calling start(). The method gives access to the TRACEHANDLE before the blocking
+         * call to start(), giving an opportunity to use TraceSetInformation whith the returned handle.
+         * </summary>
+         * <example>
+         *    krabs::trace trace;
+         *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+         *    provider<> powershell(id);
+         *    trace.enable(powershell);
+         *    TRACEHANDLE trace_handle = trace.create();
+         *    TraceSetInformation(trace_handle, ...);
+         *    trace.start();
+         * </example>
+         */
+        TRACEHANDLE create();
 
         /**
          * <summary>
@@ -330,6 +349,12 @@ namespace krabs {
     void trace<T>::enable(const typename T::provider_type &p)
     {
         providers_.push_back(std::ref(p));
+    }
+
+    template <typename T>
+    TRACEHANDLE trace<T>::create() {
+        details::trace_manager<trace> manager(*this);
+        return manager.register_trace();
     }
 
     template <typename T>
