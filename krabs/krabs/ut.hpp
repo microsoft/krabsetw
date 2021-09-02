@@ -230,7 +230,33 @@ namespace krabs { namespace details {
         // for manifest providers, EventHeader.ProviderId is the Provider GUID
         for (auto& provider : trace.providers_) {
             if (record.EventHeader.ProviderId == provider.get().guid_) {
-                provider.get().on_event(record, trace.context_);
+                // in some cases we receive events that should have been filtered
+                // by the provider-based filter (EnableFilterDesc) and whose schema
+                // cannot be found, leading to a could_not_find_schema exception.
+                // this seems to occur when another trace session is registered on
+                // the same machine.
+                // to avoid this, check against the list of provider-based filter
+                // event IDs and do not forward the event if it is not on the list.
+                if (provider.get().filters_.empty()) {
+                    // no provider-based filters were specified, so forward the record
+                    provider.get().on_event(record, trace.context_);
+                    return;
+                }
+
+                // provider-based filters are present, so we need to check against them
+                for (const auto& filter : provider.get().filters_) {
+                    for (const auto& provider_filter_event_id : filter.provider_filter_event_ids()) {
+                        if (record.EventHeader.EventDescriptor.Id == provider_filter_event_id)
+                        {
+                            // we found a provider filter that matches this event id
+                            provider.get().on_event(record, trace.context_);
+                            return;
+                        }
+                    }
+                }
+
+                // provider-based filtering was configured, but this event
+                // did not match the filter so we will not forward it
                 return;
             }
         }
