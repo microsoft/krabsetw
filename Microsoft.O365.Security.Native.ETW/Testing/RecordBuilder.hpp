@@ -97,9 +97,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
             SynthRecord^ managed = gcnew SynthRecord(nativeRecord);
             return managed;
         }
-        catch (const krabs::could_not_find_schema&)
+        catch (const krabs::could_not_find_schema& ex)
         {
-            throw gcnew CouldNotFindSchema();
+            auto msg = gcnew String(ex.what());
+            throw gcnew CouldNotFindSchema(msg);
         }
         catch (const std::invalid_argument& ex)
         {
@@ -122,9 +123,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
             SynthRecord^ managed = gcnew SynthRecord(nativeRecord);
             return managed;
         }
-        catch (const krabs::could_not_find_schema&)
+        catch (const krabs::could_not_find_schema& ex)
         {
-            throw gcnew CouldNotFindSchema();
+            auto msg = gcnew String(ex.what());
+            throw gcnew CouldNotFindSchema(msg);
         }
         catch (const std::invalid_argument& ex)
         {

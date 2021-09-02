@@ -23,7 +23,18 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// <summary>
     /// Thrown when the schema for an event could not be found.
     /// </summary>
-    public ref struct CouldNotFindSchema : public System::Exception {};
+    public ref struct CouldNotFindSchema : public System::Exception {
+        /// <param name="msg">Additional context related to the error</param>
+        CouldNotFindSchema(System::String^ msg) : System::Exception(msg) { }
+    };
+
+    /// <summary>
+    /// Thrown when an error occurs that we did not explicitly handle.
+    /// </summary>
+    public ref struct UnexpectedError : public System::Exception {
+        /// <param name="msg">Additional context related to the error</param>
+        UnexpectedError(System::String^ msg) : System::Exception(msg) { }
+    };
 
     /// <summary>
     /// Thrown when an error is encountered parsing an ETW property.
@@ -76,6 +87,18 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         catch (const krabs::need_to_be_admin_failure &) \
         { \
             throw gcnew UnauthorizedAccessException("Need to be admin"); \
+        } \
+        catch (const krabs::function_not_supported &) \
+        { \
+            throw gcnew NotSupportedException(); \
+        } \
+        catch (const krabs::could_not_find_schema &ex) \
+        { \
+            throw gcnew CouldNotFindSchema(gcnew String(ex.what())); \
+        } \
+        catch (const krabs::unexpected_error &ex) \
+        { \
+            throw gcnew UnexpectedError(gcnew String(ex.what())); \
         } \
 
 } } } }
