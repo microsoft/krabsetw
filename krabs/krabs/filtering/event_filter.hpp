@@ -216,21 +216,19 @@ namespace krabs {
             if (predicate_ != nullptr && !predicate_(record, trace_context)) {
                 return;
             }
+
+            for (auto& callback : event_callbacks_) {
+                callback(record, trace_context);
+            }
         }
         catch (const krabs::could_not_find_schema& ex)
         {
-            // this occurs when a filter is applied to an event for which
+            // this occurs when a predicate is applied to an event for which
             // no schema exists. instead of allowing the exception to halt
-            // the entire trace, we send a notification using the error callback
+            // the entire trace, send a notification to the filter's error callback
             for (auto& error_callback : error_callbacks_) {
                 error_callback(record, ex.what());
             }
-
-            return;
-        }
-
-        for (auto &callback : event_callbacks_) {
-            callback(record, trace_context);
         }
     }
 } /* namespace krabs */

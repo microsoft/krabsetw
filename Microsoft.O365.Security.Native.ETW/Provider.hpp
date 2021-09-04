@@ -173,7 +173,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         delegate void OnErrorNativeHookDelegate(const EVENT_RECORD&, const std::string&);
 
         NativePtr<krabs::provider<>> provider_;
-        OnEventNativeHookDelegate^onEventDelegate_;
+        OnEventNativeHookDelegate^ onEventDelegate_;
         OnErrorNativeHookDelegate^ onErrorDelegate_;
         GCHandle onEventDelegateHookHandle_;
         GCHandle onErrorDelegateHookHandle_;
