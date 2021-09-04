@@ -166,14 +166,19 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     internal:
         void EventNotification(const EVENT_RECORD &, const krabs::trace_context &);
+        void ErrorNotification(const EVENT_RECORD&, const std::string&);
 
     internal:
-        delegate void NativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
+        delegate void OnEventNativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
+        delegate void OnErrorNativeHookDelegate(const EVENT_RECORD&, const std::string&);
 
-        NativeHookDelegate ^del_;
         NativePtr<krabs::provider<>> provider_;
-        GCHandle delegateHookHandle_;
-        GCHandle delegateHandle_;
+        OnEventNativeHookDelegate^onEventDelegate_;
+        OnErrorNativeHookDelegate^ onErrorDelegate_;
+        GCHandle onEventDelegateHookHandle_;
+        GCHandle onErrorDelegateHookHandle_;
+        GCHandle onEventDelegateHandle_;
+        GCHandle onErrorDelegateHandle_;
         void SetUpProvider();
     };
 
@@ -194,24 +199,31 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void Provider::SetUpProvider() 
     {
-        del_ = gcnew NativeHookDelegate(this, &Provider::EventNotification);
-        delegateHandle_ = GCHandle::Alloc(del_);
-        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
-        delegateHookHandle_ = GCHandle::Alloc(bridged);
+        onEventDelegate_ = gcnew OnEventNativeHookDelegate(this, &Provider::EventNotification);
+        onEventDelegateHandle_ = GCHandle::Alloc(onEventDelegate_);
+        auto bridgedOnEventDelegate = Marshal::GetFunctionPointerForDelegate(onEventDelegate_);
+        onEventDelegateHookHandle_ = GCHandle::Alloc(bridgedOnEventDelegate);
 
-        provider_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+        provider_->add_on_event_callback((krabs::c_provider_callback)bridgedOnEventDelegate.ToPointer());
+
+        onErrorDelegate_ = gcnew OnErrorNativeHookDelegate(this, &Provider::ErrorNotification);
+        onErrorDelegateHandle_ = GCHandle::Alloc(onErrorDelegate_);
+        auto bridgedOnErrorDelegate = Marshal::GetFunctionPointerForDelegate(onErrorDelegate_);
+        onErrorDelegateHookHandle_ = GCHandle::Alloc(bridgedOnErrorDelegate);
+
+        provider_->add_on_error_callback((krabs::c_provider_error_callback)bridgedOnErrorDelegate.ToPointer());
     }
 
     inline Provider::~Provider()
     {
-        if (delegateHandle_.IsAllocated)
+        if (onEventDelegateHandle_.IsAllocated)
         {
-            delegateHandle_.Free();
+            onEventDelegateHandle_.Free();
         }
 
-        if (delegateHookHandle_.IsAllocated)
+        if (onEventDelegateHookHandle_.IsAllocated)
         {
-            delegateHookHandle_.Free();
+            onEventDelegateHookHandle_.Free();
         }
     }
 
@@ -226,11 +238,16 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
         catch (const krabs::could_not_find_schema& ex)
         {
-            auto msg = gcnew String(ex.what());
-            auto metadata = gcnew EventRecordMetadata(record);
-
-            OnError(gcnew EventRecordError(msg, metadata));
+            ErrorNotification(record, ex.what());
         }
+    }
+
+    inline void Provider::ErrorNotification(const EVENT_RECORD& record, const std::string& error_message)
+    {
+        auto msg = gcnew String(error_message.c_str());
+        auto metadata = gcnew EventRecordMetadata(record);
+
+        OnError(gcnew EventRecordError(msg, metadata));
     }
 
 } } } }
