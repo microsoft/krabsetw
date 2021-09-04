@@ -243,7 +243,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             delegateHandle_ = GCHandle::Alloc(del_);
             auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
             delegateHookHandle_ = GCHandle::Alloc(bridged);
-            ExecuteAndConvertExceptions((void)trace_->set_default_event_callback((krabs::c_provider_callback)bridged.ToPointer()));
+            ExecuteAndConvertExceptions((void)trace_->set_default_event_callback((krabs::c_provider_event_callback)bridged.ToPointer()));
         }
     }
 

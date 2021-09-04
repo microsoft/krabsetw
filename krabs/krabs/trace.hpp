@@ -239,7 +239,7 @@ namespace krabs {
          *    trace.set_default_event_callback(fun);
          * </example>
          */
-        void set_default_event_callback(c_provider_callback callback);
+        void set_default_event_callback(c_provider_event_callback callback);
 
     private:
 
@@ -380,7 +380,7 @@ namespace krabs {
     }
 
     template <typename T>
-    void trace<T>::set_default_event_callback(c_provider_callback callback)
+    void trace<T>::set_default_event_callback(c_provider_event_callback callback)
     {
         default_callback_ = callback;
     }

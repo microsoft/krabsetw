@@ -38,7 +38,7 @@ namespace krabs {
     template <typename T>
     class trace;
 
-    typedef void(*c_provider_callback)(const EVENT_RECORD &, const krabs::trace_context &);
+    typedef void(*c_provider_event_callback)(const EVENT_RECORD &, const krabs::trace_context &);
     typedef void(*c_provider_error_callback)(const EVENT_RECORD&, const std::string&);
     typedef std::function<void(const EVENT_RECORD &, const krabs::trace_context &)> provider_callback;
     typedef std::function<void(const EVENT_RECORD&, const std::string&)> provider_error_callback;
@@ -76,7 +76,7 @@ namespace krabs {
              *    provider.add_on_event_callback(fun);
              * </example>
              */
-            void add_on_event_callback(c_provider_callback callback);
+            void add_on_event_callback(c_provider_event_callback callback);
 
             template <typename U>
             void add_on_event_callback(U &callback);
@@ -416,7 +416,7 @@ namespace krabs {
     namespace details {
 
         template <typename T>
-        void base_provider<T>::add_on_event_callback(c_provider_callback callback)
+        void base_provider<T>::add_on_event_callback(c_provider_event_callback callback)
         {
             // C function pointers don't interact well with std::ref, so we
             // overload to take care of this scenario.

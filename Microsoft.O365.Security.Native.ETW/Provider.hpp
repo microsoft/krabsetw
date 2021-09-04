@@ -204,7 +204,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         auto bridgedOnEventDelegate = Marshal::GetFunctionPointerForDelegate(onEventDelegate_);
         onEventDelegateHookHandle_ = GCHandle::Alloc(bridgedOnEventDelegate);
 
-        provider_->add_on_event_callback((krabs::c_provider_callback)bridgedOnEventDelegate.ToPointer());
+        provider_->add_on_event_callback((krabs::c_provider_event_callback)bridgedOnEventDelegate.ToPointer());
 
         onErrorDelegate_ = gcnew OnErrorNativeHookDelegate(this, &Provider::ErrorNotification);
         onErrorDelegateHandle_ = GCHandle::Alloc(onErrorDelegate_);
