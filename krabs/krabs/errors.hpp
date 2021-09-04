@@ -44,7 +44,7 @@ namespace krabs {
         {}
 
         could_not_find_schema(const std::string& context)
-            : std::runtime_error(std::string("An unexpected error occurred: ") + context)
+            : std::runtime_error(std::string("Could not find the schema: ") + context)
         {}
     };
 

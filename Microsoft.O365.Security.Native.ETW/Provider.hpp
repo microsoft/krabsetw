@@ -225,6 +225,16 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         {
             onEventDelegateHookHandle_.Free();
         }
+
+        if (onErrorDelegateHandle_.IsAllocated)
+        {
+            onErrorDelegateHandle_.Free();
+        }
+
+        if (onErrorDelegateHookHandle_.IsAllocated)
+        {
+            onErrorDelegateHookHandle_.Free();
+        }
     }
 
     inline void Provider::EventNotification(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
