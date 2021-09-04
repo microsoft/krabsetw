@@ -76,7 +76,7 @@ namespace krabs {
     class unexpected_error : public std::runtime_error {
     public:
         unexpected_error(ULONG status)
-            : std::runtime_error(std::string("An unexpected error occurred: status=") +
+            : std::runtime_error(std::string("An unexpected error occurred: status_code=") +
                 std::to_string(status))
         {}
 
