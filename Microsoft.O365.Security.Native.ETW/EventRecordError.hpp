@@ -17,8 +17,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         initonly System::String^ msg_;
         initonly IEventRecordMetadata^ record_;
 
-        // TODO: additional info like provider, event id?
-
     public:
         /// <summary>
         /// Returns a string representing a message about the
