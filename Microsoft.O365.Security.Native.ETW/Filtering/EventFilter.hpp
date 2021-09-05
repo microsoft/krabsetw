@@ -11,6 +11,7 @@
 #include "../EventRecordMetadata.hpp"
 #include "../Guid.hpp"
 #include "../IEventRecord.hpp"
+#include "../IEventRecordError.hpp"
 #include "../NativePtr.hpp"
 #include "Predicate.hpp"
 
@@ -27,7 +28,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// <summary>
     /// Delegate called on errors when processing an <see cref="O365::Security::ETW::EventRecord"/>.
     /// </summary>
-    public delegate void EventRecordErrorDelegate(O365::Security::ETW::EventRecordError^ error);
+    public delegate void EventRecordErrorDelegate(O365::Security::ETW::IEventRecordError^ error);
 
     /// <summary>
     /// Allows for filtering an event in the native layer before it bubbles
