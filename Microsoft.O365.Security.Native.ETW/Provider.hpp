@@ -42,7 +42,27 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         // The Process Start Key is a sequence number that identifies the process.
         // While the Process ID may be reused within a session, the Process Start Key
         // is guaranteed uniqueness in the current boot session.
-        IncludeProcessStartKey = 0x00000080
+        IncludeProcessStartKey = 0x00000080,
+
+        // Include the Event Key in the extended data.
+        // The Event Key is a unique identifier for the event instance that will be
+        // constant across multiple trace sessions listening to this event.
+        // It can be used to correlate simultaneous trace sessions.
+        IncludeProcessEventKey = 0x00000100,
+
+        // Filters out all events that are either marked as an InPrivate event
+        // or come from a process that is marked as InPrivate.
+        // InPrivate implies that the event or process contains some data that would be
+        // considered private or personal. It is up to the process or event to designate
+        // itself as InPrivate for this to work.
+        ExcludeInPrivateEventKey = 0x00000200,
+
+        // Receive events from processes running inside Windows containers
+        EnableSilosEventKey = 0x00000400,
+
+        // The container ID is included in the ExtendedData field of events
+        // emitted from processes running inside Windows containers
+        SourceContainerTrackingEventKey = 0x00000800,
     };
 
     /// <summary>
