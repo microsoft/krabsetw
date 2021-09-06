@@ -190,7 +190,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     internal:
         delegate void EventReceivedNativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
-        delegate void ErrorReceivedNativeHookDelegate(const EVENT_RECORD&, const std::string&);
+        delegate void ErrorReceivedNativeHookDelegate(const EVENT_RECORD &, const std::string &);
 
         NativePtr<krabs::provider<>> provider_;
         EventReceivedNativeHookDelegate^ eventReceivedDelegate_;
