@@ -22,7 +22,7 @@ namespace krabs { namespace details {
 
 namespace krabs {
 
-    typedef void(*c_provider_event_callback)(const EVENT_RECORD &, const krabs::trace_context &);
+    typedef void(*c_provider_callback)(const EVENT_RECORD &, const krabs::trace_context &);
     typedef void(*c_provider_error_callback)(const EVENT_RECORD&, const std::string&);
     typedef std::function<void(const EVENT_RECORD &, const krabs::trace_context &)> provider_event_callback;
     typedef std::function<void(const EVENT_RECORD&, const std::string&)> provider_error_callback;
@@ -78,7 +78,7 @@ namespace krabs {
          * Adds a function to call when an event for this filter is fired.
          * </summary>
          */
-        void add_on_event_callback(c_provider_event_callback callback);
+        void add_on_event_callback(c_provider_callback callback);
 
         template <typename U>
         void add_on_event_callback(U &callback);
@@ -151,7 +151,7 @@ namespace krabs {
       predicate_(predicate)
     {}
 
-    inline void event_filter::add_on_event_callback(c_provider_event_callback callback)
+    inline void event_filter::add_on_event_callback(c_provider_callback callback)
     {
         // C function pointers don't interact well with std::ref, so we
         // overload to take care of this scenario.

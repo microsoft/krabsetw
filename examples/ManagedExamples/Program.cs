@@ -8,10 +8,10 @@ namespace ManagedExamples
         static void Main(string[] args)
         {
             // Comment in/out the particular example you'd like to run.
-            KernelTrace001.Start();
+            //KernelTrace001.Start();
             //KernelTrace002.Start();
             //UserTrace001.Start();
-            //UserTrace002.Start();
+            UserTrace002.Start();
             //UserTrace003.Start();
             //UserTrace004.Start();
             //UserTrace005.Start();
