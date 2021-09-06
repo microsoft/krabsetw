@@ -101,12 +101,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         void ErrorNotification(const EVENT_RECORD&, const std::string&);
 
     internal:
-        delegate void OnEventNativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
-        delegate void OnErrorNativeHookDelegate(const EVENT_RECORD&, const std::string&);
+        delegate void EventReceivedNativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
+        delegate void ErrorReceivedNativeHookDelegate(const EVENT_RECORD&, const std::string&);
 
         NativePtr<krabs::event_filter> filter_;
-        OnEventNativeHookDelegate ^eventReceivedDelegate_;
-        OnErrorNativeHookDelegate ^errorReceivedDelegate_;
+        EventReceivedNativeHookDelegate ^eventReceivedDelegate_;
+        ErrorReceivedNativeHookDelegate ^errorReceivedDelegate_;
         GCHandle eventReceivedDelegateHookHandle_;
         GCHandle errorReceivedDelegateHookHandle_;
         GCHandle eventReceivedDelegateHandle_;
@@ -172,14 +172,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void EventFilter::RegisterCallbacks()
     {
-        eventReceivedDelegate_ = gcnew OnEventNativeHookDelegate(this, &EventFilter::EventNotification);
+        eventReceivedDelegate_ = gcnew EventReceivedNativeHookDelegate(this, &EventFilter::EventNotification);
         eventReceivedDelegateHandle_ = GCHandle::Alloc(eventReceivedDelegate_);
         auto bridgedEventDelegate = Marshal::GetFunctionPointerForDelegate(eventReceivedDelegate_);
         eventReceivedDelegateHookHandle_ = GCHandle::Alloc(bridgedEventDelegate);
 
         filter_->add_on_event_callback((krabs::c_provider_callback)bridgedEventDelegate.ToPointer());
 
-        errorReceivedDelegate_ = gcnew OnErrorNativeHookDelegate(this, &EventFilter::ErrorNotification);
+        errorReceivedDelegate_ = gcnew ErrorReceivedNativeHookDelegate(this, &EventFilter::ErrorNotification);
         errorReceivedDelegateHandle_ = GCHandle::Alloc(errorReceivedDelegate_);
         auto bridgedErrorDelegate = Marshal::GetFunctionPointerForDelegate(errorReceivedDelegate_);
         errorReceivedDelegateHookHandle_ = GCHandle::Alloc(bridgedErrorDelegate);
