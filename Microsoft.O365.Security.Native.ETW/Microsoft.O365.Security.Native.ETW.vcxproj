@@ -204,6 +204,7 @@
     <ClInclude Include="Filtering\Predicate.hpp" />
     <ClInclude Include="Filtering\UnicodeString.hpp" />
     <ClInclude Include="Guid.hpp" />
+    <ClInclude Include="IEventRecordError.hpp" />
     <ClInclude Include="IEventRecordMetadata.hpp" />
     <ClInclude Include="IEventRecord.hpp" />
     <ClInclude Include="ITrace.hpp" />

@@ -55,6 +55,16 @@ namespace ManagedExamples
                 Console.WriteLine("Event 7937 received");
             };
 
+            filter.OnError += (error) =>
+            {
+                Console.WriteLine($"Filter error: {error.Record.Id} {error.Message}");
+            };
+
+            powershellProvider.OnError += (error) =>
+            {
+                Console.WriteLine($"Provider error: {error.Record.Id} {error.Message}");
+            };
+
             // EventFilters are attached to providers. Events that are attached to the filter
             // will only be called when the filter allows the event through. Any events attached
             // to the provider directly will be called for all events that are fired by the ETW
