@@ -42,7 +42,27 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         // The Process Start Key is a sequence number that identifies the process.
         // While the Process ID may be reused within a session, the Process Start Key
         // is guaranteed uniqueness in the current boot session.
-        IncludeProcessStartKey = 0x00000080
+        IncludeProcessStartKey = 0x00000080,
+
+        // Include the Event Key in the extended data.
+        // The Event Key is a unique identifier for the event instance that will be
+        // constant across multiple trace sessions listening to this event.
+        // It can be used to correlate simultaneous trace sessions.
+        IncludeProcessEventKey = 0x00000100,
+
+        // Filters out all events that are either marked as an InPrivate event
+        // or come from a process that is marked as InPrivate.
+        // InPrivate implies that the event or process contains some data that would be
+        // considered private or personal. It is up to the process or event to designate
+        // itself as InPrivate for this to work.
+        ExcludeInPrivateEventKey = 0x00000200,
+
+        // Receive events from processes running inside Windows containers
+        EnableSilosEventKey = 0x00000400,
+
+        // The container ID is included in the ExtendedData field of events
+        // emitted from processes running inside Windows containers
+        SourceContainerTrackingEventKey = 0x00000800,
     };
 
     /// <summary>
@@ -166,15 +186,20 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     internal:
         void EventNotification(const EVENT_RECORD &, const krabs::trace_context &);
+        void ErrorNotification(const EVENT_RECORD&, const std::string&);
 
     internal:
-        delegate void NativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
+        delegate void EventReceivedNativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
+        delegate void ErrorReceivedNativeHookDelegate(const EVENT_RECORD &, const std::string &);
 
-        NativeHookDelegate ^del_;
         NativePtr<krabs::provider<>> provider_;
-        GCHandle delegateHookHandle_;
-        GCHandle delegateHandle_;
-        void SetUpProvider();
+        EventReceivedNativeHookDelegate^ eventReceivedDelegate_;
+        ErrorReceivedNativeHookDelegate^ errorReceivedDelegate_;
+        GCHandle eventReceivedDelegateHookHandle_;
+        GCHandle errorReceivedDelegateHookHandle_;
+        GCHandle eventReceivedDelegateHandle_;
+        GCHandle errorReceivedDelegateHandle_;
+        void RegisterCallbacks();
     };
 
     // Implementation
@@ -183,36 +208,53 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline Provider::Provider(System::Guid id)
     : provider_(ConvertGuid(id))
     {
-        SetUpProvider();
+        RegisterCallbacks();
     }
 
     inline Provider::Provider(String^ providerName)
     : provider_(msclr::interop::marshal_as<std::wstring>(providerName))
     {
-        SetUpProvider();
-    }
-
-    inline void Provider::SetUpProvider() 
-    {
-        del_ = gcnew NativeHookDelegate(this, &Provider::EventNotification);
-        delegateHandle_ = GCHandle::Alloc(del_);
-        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
-        delegateHookHandle_ = GCHandle::Alloc(bridged);
-
-        provider_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+        RegisterCallbacks();
     }
 
     inline Provider::~Provider()
     {
-        if (delegateHandle_.IsAllocated)
+        if (eventReceivedDelegateHandle_.IsAllocated)
         {
-            delegateHandle_.Free();
+            eventReceivedDelegateHandle_.Free();
         }
 
-        if (delegateHookHandle_.IsAllocated)
+        if (eventReceivedDelegateHookHandle_.IsAllocated)
         {
-            delegateHookHandle_.Free();
+            eventReceivedDelegateHookHandle_.Free();
         }
+
+        if (errorReceivedDelegateHandle_.IsAllocated)
+        {
+            errorReceivedDelegateHandle_.Free();
+        }
+
+        if (errorReceivedDelegateHookHandle_.IsAllocated)
+        {
+            errorReceivedDelegateHookHandle_.Free();
+        }
+    }
+
+    inline void Provider::RegisterCallbacks() 
+    {
+        eventReceivedDelegate_ = gcnew EventReceivedNativeHookDelegate(this, &Provider::EventNotification);
+        eventReceivedDelegateHandle_ = GCHandle::Alloc(eventReceivedDelegate_);
+        auto bridgedEventDelegate = Marshal::GetFunctionPointerForDelegate(eventReceivedDelegate_);
+        eventReceivedDelegateHookHandle_ = GCHandle::Alloc(bridgedEventDelegate);
+
+        provider_->add_on_event_callback((krabs::c_provider_callback)bridgedEventDelegate.ToPointer());
+
+        errorReceivedDelegate_ = gcnew ErrorReceivedNativeHookDelegate(this, &Provider::ErrorNotification);
+        errorReceivedDelegateHandle_ = GCHandle::Alloc(errorReceivedDelegate_);
+        auto bridgedErrorDelegate = Marshal::GetFunctionPointerForDelegate(errorReceivedDelegate_);
+        errorReceivedDelegateHookHandle_ = GCHandle::Alloc(bridgedErrorDelegate);
+
+        provider_->add_on_error_callback((krabs::c_provider_error_callback)bridgedErrorDelegate.ToPointer());
     }
 
     inline void Provider::EventNotification(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
@@ -226,11 +268,16 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
         catch (const krabs::could_not_find_schema& ex)
         {
-            auto msg = gcnew String(ex.what());
-            auto metadata = gcnew EventRecordMetadata(record);
-
-            OnError(gcnew EventRecordError(msg, metadata));
+            ErrorNotification(record, ex.what());
         }
+    }
+
+    inline void Provider::ErrorNotification(const EVENT_RECORD& record, const std::string& error_message)
+    {
+        auto msg = gcnew String(error_message.c_str());
+        auto metadata = gcnew EventRecordMetadata(record);
+
+        OnError(gcnew EventRecordError(msg, metadata));
     }
 
 } } } }

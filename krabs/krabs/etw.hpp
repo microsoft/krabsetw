@@ -374,9 +374,7 @@ namespace krabs { namespace details {
         // before ProcessTrace() in order for the rundown events to be generated.
         T::trace_type::enable_rundown(trace_);
 
-        ::FILETIME now;
-        GetSystemTimeAsFileTime(&now);
-        ULONG status = ProcessTrace(&trace_.sessionHandle_, 1, &now, NULL);
+        ULONG status = ProcessTrace(&trace_.sessionHandle_, 1, NULL, NULL);
         error_check_common_conditions(status);
     }
 

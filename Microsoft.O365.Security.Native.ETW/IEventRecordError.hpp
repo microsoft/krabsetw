@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "IEventRecordError.hpp"
 #include "IEventRecordMetadata.hpp"
 
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
@@ -12,41 +11,20 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// Item passed to OnError handlers when an error is encountered
     /// handling an event on the worker thread.
     /// </summary>
-    public ref struct EventRecordError : public IEventRecordError
+    public interface struct IEventRecordError
     {
-    private:
-        initonly System::String^ msg_;
-        initonly IEventRecordMetadata^ record_;
-
-    public:
         /// <summary>
         /// Returns a string representing a message about the
         /// error that was encountered in the EventRecord.
         /// </summary>
-        virtual property System::String^ Message {
-            System::String^ get() {
-                return msg_;
-            }
-        }
+        property System::String^ Message { System::String^ get(); }
 
         /// <summary>
         /// Returns an object representing metadata about the
         /// record that was being processed when the error was
         /// encountered.
         /// </summary>
-        virtual property IEventRecordMetadata^ Record {
-            IEventRecordMetadata^ get() {
-                return record_;
-            }
-        }
-
-    internal:
-        EventRecordError(
-            System::String^ message,
-            IEventRecordMetadata^ record)
-            : msg_(message)
-            , record_(record)
-        { }
+        property IEventRecordMetadata^ Record { IEventRecordMetadata^ get(); }
     };
 
 } } } }
