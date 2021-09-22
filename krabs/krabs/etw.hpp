@@ -79,6 +79,16 @@ namespace krabs { namespace details {
 
         /**
          * <summary>
+         * Configures the ETW trace session settings.
+         * </summary>
+         */
+        void set_trace_information(
+            TRACE_INFO_CLASS informationClass,
+            PVOID traceInformation,
+            ULONG informationLength);
+
+        /**
+         * <summary>
          * Notifies the underlying trace of the buffers that were processed.
          * </summary>
          */
@@ -168,7 +178,9 @@ namespace krabs { namespace details {
     template <typename T>
     EVENT_TRACE_LOGFILE trace_manager<T>::open()
     {
-        register_trace();
+        if (trace_.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE) {
+            (void)register_trace();
+        }
         enable_providers();
         return open_trace();
     }
@@ -183,6 +195,25 @@ namespace krabs { namespace details {
     EVENT_TRACE_PROPERTIES trace_manager<T>::query()
     {
         return query_trace();
+    }
+
+    template <typename T>
+    void trace_manager<T>::set_trace_information(
+        TRACE_INFO_CLASS informationClass,
+        PVOID traceInformation,
+        ULONG informationLength)
+    {
+        if (trace_.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE) {
+            (void)register_trace();
+        }
+
+        ULONG status = TraceSetInformation(
+            trace_.registrationHandle_, 
+            informationClass, 
+            traceInformation, 
+            informationLength);
+
+        error_check_common_conditions(status);
     }
 
     template <typename T>
