@@ -11,7 +11,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</description>
         <summary>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</summary>
-        <releaseNotes>Do not specify start time when starting trace session.</releaseNotes>
+        <releaseNotes>Do not specify start time when starting trace session. Check offset before accessing task name property.</releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs managed cppcli</tags>
