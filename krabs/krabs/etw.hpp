@@ -80,12 +80,13 @@ namespace krabs { namespace details {
         /**
          * <summary>
          * Configures the ETW trace session settings.
+         * See https://docs.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-tracesetinformation.
          * </summary>
          */
         void set_trace_information(
-            TRACE_INFO_CLASS informationClass,
-            PVOID traceInformation,
-            ULONG informationLength);
+            TRACE_INFO_CLASS information_class,
+            PVOID trace_information,
+            ULONG information_length);
 
         /**
          * <summary>
@@ -199,9 +200,9 @@ namespace krabs { namespace details {
 
     template <typename T>
     void trace_manager<T>::set_trace_information(
-        TRACE_INFO_CLASS informationClass,
-        PVOID traceInformation,
-        ULONG informationLength)
+        TRACE_INFO_CLASS information_class,
+        PVOID trace_information,
+        ULONG information_length)
     {
         if (trace_.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE) {
             (void)register_trace();
@@ -209,9 +210,9 @@ namespace krabs { namespace details {
 
         ULONG status = TraceSetInformation(
             trace_.registrationHandle_, 
-            informationClass, 
-            traceInformation, 
-            informationLength);
+            information_class,
+            trace_information,
+            information_length);
 
         error_check_common_conditions(status);
     }

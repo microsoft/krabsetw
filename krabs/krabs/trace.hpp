@@ -143,9 +143,9 @@ namespace krabs {
          * </example>
          */
         void set_trace_information(
-            TRACE_INFO_CLASS informationClass,
-            PVOID traceInformation,
-            ULONG informationLength);
+            TRACE_INFO_CLASS information_class,
+            PVOID trace_information,
+            ULONG information_length);
 
         /**
          * <summary>
@@ -345,12 +345,12 @@ namespace krabs {
 
     template <typename T>
     void trace<T>::set_trace_information(
-        TRACE_INFO_CLASS informationClass,
-        PVOID traceInformation,
-        ULONG informationLength)
+        TRACE_INFO_CLASS information_class,
+        PVOID trace_information,
+        ULONG information_length)
     {
         details::trace_manager<trace> manager(*this);
-        manager.set_trace_information(informationClass, traceInformation, informationLength);
+        manager.set_trace_information(information_class, trace_information, information_length);
     }
 
     template <typename T>
