@@ -79,6 +79,17 @@ namespace krabs { namespace details {
 
         /**
          * <summary>
+         * Configures the ETW trace session settings.
+         * See https://docs.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-tracesetinformation.
+         * </summary>
+         */
+        void set_trace_information(
+            TRACE_INFO_CLASS information_class,
+            PVOID trace_information,
+            ULONG information_length);
+
+        /**
+         * <summary>
          * Notifies the underlying trace of the buffers that were processed.
          * </summary>
          */
@@ -183,6 +194,21 @@ namespace krabs { namespace details {
     EVENT_TRACE_PROPERTIES trace_manager<T>::query()
     {
         return query_trace();
+    }
+
+    template <typename T>
+    void trace_manager<T>::set_trace_information(
+        TRACE_INFO_CLASS information_class,
+        PVOID trace_information,
+        ULONG information_length)
+    {
+        ULONG status = TraceSetInformation(
+            trace_.registrationHandle_, 
+            information_class,
+            trace_information,
+            information_length);
+
+        error_check_common_conditions(status);
     }
 
     template <typename T>
