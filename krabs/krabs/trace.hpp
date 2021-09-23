@@ -126,6 +126,7 @@ namespace krabs {
         /**
          * <summary>
          * Configures trace session settings.
+         * Must be called after open().
          * See https://docs.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-tracesetinformation
          * for more information.
          * </summary>
@@ -136,10 +137,11 @@ namespace krabs {
          *    STACK_TRACING_EVENT_ID event_id = {0};
          *    event_id.EventGuid = krabs::guids::perf_info;
          *    event_id.Type = 46; // SampleProfile
+         *    trace_.open();
          *    trace_.set_trace_information(TraceStackTracingInfo, &event_id, sizeof(STACK_TRACING_EVENT_ID));
          *    krabs::kernel_provider stack_walk_provider(EVENT_TRACE_FLAG_PROFILE, krabs::guids::stack_walk);
          *    trace_.enable(stack_walk_provider);
-         *    trace.start();
+         *    trace.process();
          * </example>
          */
         void set_trace_information(

@@ -179,9 +179,7 @@ namespace krabs { namespace details {
     template <typename T>
     EVENT_TRACE_LOGFILE trace_manager<T>::open()
     {
-        if (trace_.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE) {
-            (void)register_trace();
-        }
+        register_trace();
         enable_providers();
         return open_trace();
     }
@@ -204,10 +202,6 @@ namespace krabs { namespace details {
         PVOID trace_information,
         ULONG information_length)
     {
-        if (trace_.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE) {
-            (void)register_trace();
-        }
-
         ULONG status = TraceSetInformation(
             trace_.registrationHandle_, 
             information_class,
