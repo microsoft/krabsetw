@@ -17,7 +17,7 @@
         <tags>ETW krabs krabsetw native headers cpp</tags>
     </metadata>
     <files>
-        <file src="build\native\krabsetw.targets" target="build\native\krabsetw.targets" />
+        <file src="build\native\Microsoft.O365.Security.Krabsetw.targets" target="build\native\Microsoft.O365.Security.Krabsetw.targets" />
         <file src="krabs\krabs\filtering\comparers.hpp" target="lib\native\include\krabs\filtering\comparers.hpp" />
         <file src="krabs\krabs\filtering\event_filter.hpp" target="lib\native\include\krabs\filtering\event_filter.hpp" />
         <file src="krabs\krabs\filtering\predicates.hpp" target="lib\native\include\krabs\filtering\predicates.hpp" />
