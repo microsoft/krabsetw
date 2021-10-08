@@ -147,6 +147,9 @@ namespace krabs {
         BUILD_ASSERT(int64_t, TDH_INTYPE_INT64);
         BUILD_ASSERT(uint64_t, TDH_INTYPE_UINT64);
 
+        // boolean
+        BUILD_ASSERT(bool, TDH_INTYPE_BOOLEAN);
+
         // floating
         BUILD_ASSERT(float, TDH_INTYPE_FLOAT);
         BUILD_ASSERT(double, TDH_INTYPE_DOUBLE);
