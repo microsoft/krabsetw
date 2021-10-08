@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Krabsetw</id>
-        <version>4.2.1</version>
+        <version>4.2.2</version>
         <title>Krabs ETW Wrappers</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -11,13 +11,13 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</description>
         <summary>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</summary>
-        <releaseNotes>Do not specify start time when starting trace session. Check offset before accessing task name property.</releaseNotes>
+        <releaseNotes>Rename targets file to match nuget id.</releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs krabsetw native headers cpp</tags>
     </metadata>
     <files>
-        <file src="build\native\krabsetw.targets" target="build\native\krabsetw.targets" />
+        <file src="build\native\Microsoft.O365.Security.Krabsetw.targets" target="build\native\Microsoft.O365.Security.Krabsetw.targets" />
         <file src="krabs\krabs\filtering\comparers.hpp" target="lib\native\include\krabs\filtering\comparers.hpp" />
         <file src="krabs\krabs\filtering\event_filter.hpp" target="lib\native\include\krabs\filtering\event_filter.hpp" />
         <file src="krabs\krabs\filtering\predicates.hpp" target="lib\native\include\krabs\filtering\predicates.hpp" />
