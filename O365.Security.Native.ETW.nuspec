@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Native.ETW</id>
-        <version>4.2.2</version>
+        <version>4.2.3</version>
         <title>Microsoft.O365.Security.Native.ETW - managed wrappers for krabsetw</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -11,7 +11,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Microsoft.O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library.</description>
         <summary>Microsoft.O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library.</summary>
-        <releaseNotes>Rename targets file to match nuget id.</releaseNotes>
+        <releaseNotes>Added stack tracing helpers.</releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs managed cppcli</tags>

@@ -67,3 +67,8 @@ struct user_trace_007_rundown
 {
     static void start();
 };
+
+struct user_trace_008_stacktrace
+{
+    static void start();
+};

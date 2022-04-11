@@ -52,6 +52,9 @@
     <ClCompile Include="kernel_trace_003_rundown.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="user_trace_008_stacktrace.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="examples.h">

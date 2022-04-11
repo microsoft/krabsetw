@@ -402,6 +402,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <param name="result">the resulting byte array</param>
         /// <returns>true if fetching the data succeeded, false otherwise</returns>
         bool TryGetBinary(String^ name, [Out] array<Byte>^% result);
+
+        /// <summary>
+        ///  Retrieves the call stack associated with the record, if enabled.
+        /// </summary>
+        /// <returns>a list of return addresses</returns>
+        List<UIntPtr>^ StackTrace();
     };
 
 } } } }

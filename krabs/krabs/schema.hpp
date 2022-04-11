@@ -234,6 +234,20 @@ namespace krabs {
         */
         GUID activity_id() const;
 
+        /**
+        * <summary>
+        * Retrieves the call stack associated with the record, if enabled.
+        * </summary>
+        * <example>
+        *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+        *    {
+        *        krabs::schema schema(record, trace_context.schema_locator);
+        *        std::vector<ULONG_PTR> stack_trace = schema.stack_trace();
+        *    }
+        * </example>
+        */
+        std::vector<ULONG_PTR> stack_trace() const;
+
     private:
         const EVENT_RECORD &record_;
         TRACE_EVENT_INFO *pSchema_;
@@ -249,6 +263,8 @@ namespace krabs {
         friend GUID activity_id(const schema&);
         friend int event_id(const EVENT_RECORD &);
         friend int event_id(const schema &);
+        friend std::vector<ULONG_PTR> stack_trace(const schema&);
+        friend std::vector<ULONG_PTR> stack_trace(const EVENT_RECORD&);
 
         friend class parser;
         friend class property_iterator;
@@ -371,5 +387,34 @@ namespace krabs {
     inline GUID schema::activity_id() const
     {
         return record_.EventHeader.ActivityId;
+    }
+
+    inline std::vector<ULONG_PTR> schema::stack_trace() const
+    {
+        std::vector<ULONG_PTR> call_stack;
+        if (record_.ExtendedDataCount != 0) {
+            for (USHORT i = 0; i < record_.ExtendedDataCount; i++)
+            {
+                auto item = record_.ExtendedData[i];
+                if (item.ExtType == EVENT_HEADER_EXT_TYPE_STACK_TRACE64) {
+                    auto stacktrace = reinterpret_cast<PEVENT_EXTENDED_ITEM_STACK_TRACE64>(item.DataPtr);
+                    auto stack_length = (item.DataSize - sizeof(ULONG64)) / sizeof(ULONG64);
+                    for (size_t j = 0; j < stack_length; j++)
+                    {
+                        call_stack.push_back(stacktrace->Address[j]);
+                    }
+                }
+                else if (item.ExtType == EVENT_HEADER_EXT_TYPE_STACK_TRACE32) {
+                    auto stacktrace = reinterpret_cast<PEVENT_EXTENDED_ITEM_STACK_TRACE32>(item.DataPtr);
+                    auto stack_length = (item.DataSize - sizeof(ULONG64)) / sizeof(ULONG);
+                    for (size_t j = 0; j < stack_length; j++)
+                    {
+                        call_stack.push_back(stacktrace->Address[j]);
+                    }
+                }
+            }
+        }
+
+        return call_stack;
     }
 }
