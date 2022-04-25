@@ -23,7 +23,7 @@ namespace ManagedExamples
                 var pid = record.GetUInt32("ProcessID");
                 var imageName = record.GetUnicodeString("ImageName");
                 Console.WriteLine($"{record.TaskName} pid={pid} ImageName={imageName}\nCallStack:");
-                foreach (var returnAddress in record.StackTrace())
+                foreach (var returnAddress in record.GetStackTrace())
                 {
                     Console.WriteLine($"    0x{returnAddress.ToUInt64():x}");
                 }

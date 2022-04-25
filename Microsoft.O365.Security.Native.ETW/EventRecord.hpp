@@ -774,7 +774,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// Retrieves the call stack associated with the record, if enabled.
         /// </summary>
         /// <returns>a list of return addresses</returns>
-        virtual List<UIntPtr>^ StackTrace()
+        virtual List<UIntPtr>^ GetStackTrace()
         {
             auto stackTrace = gcnew List<UIntPtr>();
             for (auto& returnAddress : schema_->stack_trace())
