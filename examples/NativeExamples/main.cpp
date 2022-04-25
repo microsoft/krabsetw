@@ -19,4 +19,5 @@ int main(void)
     //user_trace_005::start();
     //user_trace_006_predicate_vectors::start();
     //user_trace_007_rundown::start();
+    //user_trace_008_stacktrace::start();
 }

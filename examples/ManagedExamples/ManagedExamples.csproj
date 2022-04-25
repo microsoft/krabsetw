@@ -73,6 +73,7 @@
     <Compile Include="UserTrace002.cs" />
     <Compile Include="UserTrace005.cs" />
     <Compile Include="UserTrace006_Rundown.cs" />
+    <Compile Include="UserTrace007_StackTrace.cs" />
     <Compile Include="WppTrace001.cs" />
   </ItemGroup>
   <ItemGroup>
