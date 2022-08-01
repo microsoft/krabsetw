@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27428.2027
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32317.152
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{5C9E224B-AEB7-456B-B309-92292ACE1A0D}"
 	ProjectSection(SolutionItems) = preProject
@@ -36,8 +36,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "krabs", "krabs", "{371361C8
 		krabs\kernel_guids.hpp = krabs\kernel_guids.hpp
 		krabs\kernel_providers.hpp = krabs\kernel_providers.hpp
 		krabs\kt.hpp = krabs\kt.hpp
-		krabs\parse_types.hpp = krabs\parse_types.hpp
 		krabs\parser.hpp = krabs\parser.hpp
+		krabs\parse_types.hpp = krabs\parse_types.hpp
 		krabs\perfinfo_groupmask.hpp = krabs\perfinfo_groupmask.hpp
 		krabs\property.hpp = krabs\property.hpp
 		krabs\provider.hpp = krabs\provider.hpp
@@ -83,6 +83,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NativeExamples", "..\exampl
 	ProjectSection(ProjectDependencies) = postProject
 		{ED4E6027-541F-440A-A5EE-15DBB7B89423} = {ED4E6027-541F-440A-A5EE-15DBB7B89423}
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Microsoft.O365.Security.Native.ETW.NetCore", "..\Microsoft.O365.Security.Native.ETW.NetCore\Microsoft.O365.Security.Native.ETW.NetCore.vcxproj", "{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -132,6 +134,14 @@ Global
 		{D31B1A4B-8282-4AED-99FC-9AA5974B9134}.Release|x64.Build.0 = Release|x64
 		{D31B1A4B-8282-4AED-99FC-9AA5974B9134}.ReleaseSigning|x64.ActiveCfg = ReleaseSigning|x64
 		{D31B1A4B-8282-4AED-99FC-9AA5974B9134}.ReleaseSigning|x64.Build.0 = ReleaseSigning|x64
+		{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}.Debug|x64.ActiveCfg = Debug|x64
+		{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}.Debug|x64.Build.0 = Debug|x64
+		{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}.DebugSigning|x64.ActiveCfg = DebugSigning|x64
+		{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}.DebugSigning|x64.Build.0 = DebugSigning|x64
+		{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}.Release|x64.ActiveCfg = Release|x64
+		{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}.Release|x64.Build.0 = Release|x64
+		{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}.ReleaseSigning|x64.ActiveCfg = ReleaseSigning|x64
+		{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}.ReleaseSigning|x64.Build.0 = ReleaseSigning|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

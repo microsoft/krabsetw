@@ -19,39 +19,44 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{ED4E6027-541F-440A-A5EE-15DBB7B89423}</ProjectGuid>
-    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
-    <Keyword>ManagedCProj</Keyword>
+    <ProjectGuid>{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}</ProjectGuid>
+    <TargetFramework>net6.0</TargetFramework>
+    <Keyword>NetCoreCProj</Keyword>
     <RootNamespace>ETWLib</RootNamespace>
-    <ProjectName>Microsoft.O365.Security.Native.ETW</ProjectName>
+    <ProjectName>Microsoft.O365.Security.Native.ETW.NetCore</ProjectName>
+    <AssemblyName>Microsoft.O365.Security.Native.ETW</AssemblyName>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">.\</SolutionDir>
     <RestorePackages>true</RestorePackages>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <ReadOnlyProject>true</ReadOnlyProject>
+    <ReplaceWildcardsInProjectItems>true</ReplaceWildcardsInProjectItems>
+    <!-- <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net6.0\</OutDir> -->
+    <IntDir>$(Platform)\$(Configuration)_netcore\</IntDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <PlatformToolset>v143</PlatformToolset>
-    <CLRSupport>true</CLRSupport>
+    <CLRSupport>NetCore</CLRSupport>
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugSigning|x64'" Label="Configuration">
     <PlatformToolset>v143</PlatformToolset>
-    <CLRSupport>true</CLRSupport>
+    <CLRSupport>NetCore</CLRSupport>
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <PlatformToolset>v143</PlatformToolset>
     <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <CLRSupport>true</CLRSupport>
+    <CLRSupport>NetCore</CLRSupport>
     <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigning|x64'" Label="Configuration">
     <PlatformToolset>v143</PlatformToolset>
     <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <CLRSupport>true</CLRSupport>
+    <CLRSupport>NetCore</CLRSupport>
     <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -65,7 +70,6 @@
     <LinkIncremental>true</LinkIncremental>
     <LinkKeyFile>
     </LinkKeyFile>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net462\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugSigning|x64'">
     <EmbedManifest>false</EmbedManifest>
@@ -73,19 +77,16 @@
     <LinkIncremental>true</LinkIncremental>
     <LinkKeyFile>$(SolutionDir)..\35MSSharedLib1024.snk</LinkKeyFile>
     <LinkDelaySign>true</LinkDelaySign>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net462\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(SolutionDir);$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <LinkKeyFile>
     </LinkKeyFile>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net462\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigning|x64'">
     <IncludePath>$(SolutionDir);$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <LinkKeyFile>$(SolutionDir)..\35MSSharedLib1024.snk</LinkKeyFile>
     <LinkDelaySign>true</LinkDelaySign>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net462\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -188,50 +189,10 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
+    <ClCompile Include="*.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AssemblyInfo.cpp" />
-    <ClCompile Include="ETWLib.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Conversions.hpp" />
-    <ClInclude Include="Errors.hpp" />
-    <ClInclude Include="EventRecordError.hpp" />
-    <ClInclude Include="EventRecordMetadata.hpp" />
-    <ClInclude Include="EventTraceProperties.hpp" />
-    <ClInclude Include="Filtering\AnsiString.hpp" />
-    <ClInclude Include="Filtering\CountedString.hpp" />
-    <ClInclude Include="Filtering\EventFilter.hpp" />
-    <ClInclude Include="Filtering\Fluent.hpp" />
-    <ClInclude Include="Filtering\Predicate.hpp" />
-    <ClInclude Include="Filtering\UnicodeString.hpp" />
-    <ClInclude Include="Guid.hpp" />
-    <ClInclude Include="IEventRecordError.hpp" />
-    <ClInclude Include="IEventRecordMetadata.hpp" />
-    <ClInclude Include="IEventRecord.hpp" />
-    <ClInclude Include="ITrace.hpp" />
-    <ClInclude Include="KernelProvider.hpp" />
-    <ClInclude Include="KernelTrace.hpp" />
-    <ClInclude Include="Kernel\KernelProviders.hpp" />
-    <ClInclude Include="NativePtr.hpp" />
-    <ClInclude Include="Property.hpp" />
-    <ClInclude Include="Provider.hpp" />
-    <ClInclude Include="EventRecord.hpp" />
-    <ClInclude Include="RawProvider.hpp" />
-    <ClInclude Include="Testing\EventHeader.hpp" />
-    <ClInclude Include="Testing\RecordBuilder.hpp" />
-    <ClInclude Include="Testing\SynthRecord.hpp" />
-    <ClInclude Include="Testing\Proxy.hpp" />
-    <ClInclude Include="TraceStats.hpp" />
-    <ClInclude Include="UserTrace.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include=".nuget\NuGet.Config" />
-    <None Include=".nuget\NuGet.exe" />
-    <None Include=".nuget\NuGet.targets" />
+    <ClInclude Include="**\*.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
