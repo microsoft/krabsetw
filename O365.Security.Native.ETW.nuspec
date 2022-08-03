@@ -33,5 +33,6 @@
         <file src="krabs\x64\ReleaseSigning\net6.0\Microsoft.O365.Security.Native.ETW.dll" target="lib\net6.0\Microsoft.O365.Security.Native.ETW.dll" />
         <file src="krabs\x64\ReleaseSigning\net6.0\Microsoft.O365.Security.Native.ETW.pdb" target="lib\net6.0\Microsoft.O365.Security.Native.ETW.pdb" />
         <file src="krabs\x64\ReleaseSigning\net6.0\Microsoft.O365.Security.Native.ETW.xml" target="lib\net6.0\Microsoft.O365.Security.Native.ETW.xml" />
+        <file src="krabs\x64\ReleaseSigning\net6.0\Ijwhost.dll" target="runtimes\win-x64\native\Ijwhost.dll" />
     </files>
 </package>

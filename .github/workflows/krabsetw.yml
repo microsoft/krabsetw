@@ -9,7 +9,7 @@ on:
 jobs:
   build:
 
-    runs-on: windows-2019
+    runs-on: windows-2022
     
     steps:
     - uses: actions/checkout@v2
@@ -24,5 +24,7 @@ jobs:
       run: msbuild.exe /nologo /m /t:Rebuild /p:Configuration=Debug krabs\krabs.sln
     - name: test native debug
       run: vstest.console.exe krabs\x64\Debug\krabstests.dll
-    - name: test debug
-      run: vstest.console.exe tests\ManagedETWTests\bin\x64\Debug\EtwTestsCS.dll
+    - name: test debug net462
+      run: vstest.console.exe tests\ManagedETWTests\bin\Debug\net462\EtwTestsCS.dll
+    - name: test debug net6.0
+      run: vstest.console.exe tests\ManagedETWTests\bin\Debug\net6.0\EtwTestsCS.dll

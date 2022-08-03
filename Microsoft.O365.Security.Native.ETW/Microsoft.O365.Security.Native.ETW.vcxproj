@@ -28,6 +28,7 @@
     <RestorePackages>true</RestorePackages>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net462\</OutDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -65,7 +66,6 @@
     <LinkIncremental>true</LinkIncremental>
     <LinkKeyFile>
     </LinkKeyFile>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net462\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugSigning|x64'">
     <EmbedManifest>false</EmbedManifest>
@@ -73,19 +73,16 @@
     <LinkIncremental>true</LinkIncremental>
     <LinkKeyFile>$(SolutionDir)..\35MSSharedLib1024.snk</LinkKeyFile>
     <LinkDelaySign>true</LinkDelaySign>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net462\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(SolutionDir);$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <LinkKeyFile>
     </LinkKeyFile>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net462\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseSigning|x64'">
     <IncludePath>$(SolutionDir);$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <LinkKeyFile>$(SolutionDir)..\35MSSharedLib1024.snk</LinkKeyFile>
     <LinkDelaySign>true</LinkDelaySign>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\net462\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

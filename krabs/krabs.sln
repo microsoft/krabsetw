@@ -71,7 +71,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "testing", "testing", "{9ED1
 		krabs\testing\synth_record.hpp = krabs\testing\synth_record.hpp
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtwTestsCS", "..\tests\ManagedETWTests\EtwTestsCS.csproj", "{600CFE03-FD84-4323-9439-839D81C31972}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EtwTestsCS", "..\tests\ManagedETWTests\EtwTestsCS.csproj", "{600CFE03-FD84-4323-9439-839D81C31972}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C4AB7F5F-2FB3-4C16-A1F3-F6700C655B02}"
 EndProject
@@ -110,12 +110,12 @@ Global
 		{880977B8-15CA-421B-BF48-D01626A530A2}.Release|x64.Build.0 = Release|x64
 		{880977B8-15CA-421B-BF48-D01626A530A2}.ReleaseSigning|x64.ActiveCfg = ReleaseSigning|x64
 		{880977B8-15CA-421B-BF48-D01626A530A2}.ReleaseSigning|x64.Build.0 = ReleaseSigning|x64
-		{600CFE03-FD84-4323-9439-839D81C31972}.Debug|x64.ActiveCfg = Debug|x64
-		{600CFE03-FD84-4323-9439-839D81C31972}.Debug|x64.Build.0 = Debug|x64
+		{600CFE03-FD84-4323-9439-839D81C31972}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{600CFE03-FD84-4323-9439-839D81C31972}.Debug|x64.Build.0 = Debug|Any CPU
 		{600CFE03-FD84-4323-9439-839D81C31972}.DebugSigning|x64.ActiveCfg = DebugSigning|x64
 		{600CFE03-FD84-4323-9439-839D81C31972}.DebugSigning|x64.Build.0 = DebugSigning|x64
-		{600CFE03-FD84-4323-9439-839D81C31972}.Release|x64.ActiveCfg = Release|x64
-		{600CFE03-FD84-4323-9439-839D81C31972}.Release|x64.Build.0 = Release|x64
+		{600CFE03-FD84-4323-9439-839D81C31972}.Release|x64.ActiveCfg = Release|Any CPU
+		{600CFE03-FD84-4323-9439-839D81C31972}.Release|x64.Build.0 = Release|Any CPU
 		{600CFE03-FD84-4323-9439-839D81C31972}.ReleaseSigning|x64.ActiveCfg = ReleaseSigning|x64
 		{600CFE03-FD84-4323-9439-839D81C31972}.ReleaseSigning|x64.Build.0 = ReleaseSigning|x64
 		{32E71DD0-D11A-44DE-8CA8-572995AF2373}.Debug|x64.ActiveCfg = Debug|Any CPU
