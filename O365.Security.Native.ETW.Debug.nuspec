@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Native.ETW.Debug</id>
-        <version>4.2.3</version>
+        <version>4.3.0</version>
         <title>Microsoft.O365.Security.Native.ETW Debug - managed wrappers for krabsetw</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -11,14 +11,29 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</description>
         <summary>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</summary>
-        <releaseNotes>Added stack tracing helpers.</releaseNotes>
+        <releaseNotes>
+            Version 4.3.0:
+              - Add support for .NET 6.0
+              - Update minimum .net framework version to 4.6.2
+              - Use visual studio v14.3 toolchain (VS2022)
+        </releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
         <tags>ETW krabs managed cppcli</tags>
+        <dependencies>
+            <group targetFramework=".NETFramework4.6.2" />
+            <group targetFramework="net6.0" />
+        </dependencies>
     </metadata>
+
     <files>
-        <file src="krabs\x64\DebugSigning\Microsoft.O365.Security.Native.ETW.dll" target="lib\net45\Microsoft.O365.Security.Native.ETW.dll" />
-        <file src="krabs\x64\DebugSigning\Microsoft.O365.Security.Native.ETW.pdb" target="lib\net45\Microsoft.O365.Security.Native.ETW.pdb" />
-        <file src="krabs\x64\DebugSigning\Microsoft.O365.Security.Native.ETW.xml" target="lib\net45\Microsoft.O365.Security.Native.ETW.xml" />
+        <file src="krabs\x64\DebugSigning\net462\Microsoft.O365.Security.Native.ETW.dll" target="lib\net462\Microsoft.O365.Security.Native.ETW.dll" />
+        <file src="krabs\x64\DebugSigning\net462\Microsoft.O365.Security.Native.ETW.pdb" target="lib\net462\Microsoft.O365.Security.Native.ETW.pdb" />
+        <file src="krabs\x64\DebugSigning\net462\Microsoft.O365.Security.Native.ETW.xml" target="lib\net462\Microsoft.O365.Security.Native.ETW.xml" />
+        <file src="krabs\x64\DebugSigning\net6.0\Microsoft.O365.Security.Native.ETW.dll" target="lib\net6.0\Microsoft.O365.Security.Native.ETW.dll" />
+        <file src="krabs\x64\DebugSigning\net6.0\Microsoft.O365.Security.Native.ETW.pdb" target="lib\net6.0\Microsoft.O365.Security.Native.ETW.pdb" />
+        <file src="krabs\x64\DebugSigning\net6.0\Microsoft.O365.Security.Native.ETW.xml" target="lib\net6.0\Microsoft.O365.Security.Native.ETW.xml" />
+        <file src="krabs\x64\DebugSigning\net6.0\Ijwhost.dll" target="runtimes\win-x64\native\Ijwhost.dll" />
     </files>
+
 </package>

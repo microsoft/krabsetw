@@ -96,7 +96,7 @@ namespace krabs { namespace testing {
         // No null terminator
         BYTE guid_data[GUID_STRING_LENGTH_NO_BRACES] = {};
 
-        StringFromGUID2(container_id, wide_guid_buffer, sizeof(wide_guid_buffer));
+        StringFromGUID2(container_id, wide_guid_buffer, GUID_STRING_LENGTH_WITH_BRACES + 1);
 
         for (int i = 0; i < GUID_STRING_LENGTH_NO_BRACES; i++)
         {
