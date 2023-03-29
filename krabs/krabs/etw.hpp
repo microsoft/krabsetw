@@ -262,9 +262,18 @@ namespace krabs { namespace details {
     EVENT_TRACE_LOGFILE trace_manager<T>::fill_logfile()
     {
         EVENT_TRACE_LOGFILE file = {};
-        file.LoggerName          = const_cast<wchar_t*>(trace_.name_.c_str());
-        file.ProcessTraceMode    = PROCESS_TRACE_MODE_EVENT_RECORD |
-                                   PROCESS_TRACE_MODE_REAL_TIME;
+
+        if (!trace_.logFilename_.empty())
+        {
+            file.LogFileName = const_cast<wchar_t*>(trace_.logFilename_.c_str());
+            file.ProcessTraceMode = PROCESS_TRACE_MODE_EVENT_RECORD;
+        }
+        else
+        {
+            file.LoggerName          = const_cast<wchar_t*>(trace_.name_.c_str());
+            file.ProcessTraceMode = PROCESS_TRACE_MODE_EVENT_RECORD |
+                PROCESS_TRACE_MODE_REAL_TIME;
+        }
         file.Context             = (void *)&trace_;
         file.EventRecordCallback = trace_callback_thunk<T>;
         file.BufferCallback      = trace_buffer_callback<T>;
