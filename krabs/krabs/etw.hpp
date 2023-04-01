@@ -265,12 +265,12 @@ namespace krabs { namespace details {
 
         if (!trace_.logFilename_.empty())
         {
-            file.LogFileName = const_cast<wchar_t*>(trace_.logFilename_.c_str());
+            file.LogFileName      = const_cast<wchar_t*>(trace_.logFilename_.c_str());
             file.ProcessTraceMode = PROCESS_TRACE_MODE_EVENT_RECORD;
         }
         else
         {
-            file.LoggerName          = const_cast<wchar_t*>(trace_.name_.c_str());
+            file.LoggerName       = const_cast<wchar_t*>(trace_.name_.c_str());
             file.ProcessTraceMode = PROCESS_TRACE_MODE_EVENT_RECORD |
                 PROCESS_TRACE_MODE_REAL_TIME;
         }

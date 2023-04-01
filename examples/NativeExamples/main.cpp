@@ -6,7 +6,7 @@
 int main(void)
 {
     // Comment in/out the particular example you'd like to run.
-    //kernel_and_user_trace_001::start();
+    kernel_and_user_trace_001::start();
     //kernel_trace_001::start();
     //kernel_trace_002::start();
     //kernel_trace_003_rundown::start();
@@ -20,5 +20,5 @@ int main(void)
     //user_trace_006_predicate_vectors::start();
     //user_trace_007_rundown::start();
     //user_trace_008_stacktrace::start();
-    user_trace_009_from_file::start();
+    //user_trace_009_from_file::start();
 }

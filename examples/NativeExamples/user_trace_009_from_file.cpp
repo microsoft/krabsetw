@@ -1,16 +1,13 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-// This example shows how to use a user_trace and a kernel_trace in the same program.
+// This example shows how to use a user_trace with an ETL file
 
 #include <iostream>
 #include <thread>
 #include <condition_variable>
 #include "..\..\krabs\krabs.hpp"
 #include "examples.h"
-
-static void setup_ps_provider(krabs::provider<>& provider);
-static void setup_image_load_provider(krabs::kernel::image_load_provider& provider);
 
 void user_trace_009_from_file::start()
 {
@@ -61,7 +58,10 @@ void user_trace_009_from_file::start()
     // specify a filename to read from, will disable realtime and source from file instead
     trace.set_trace_filename(L"..\\..\\examples\\NativeExamples\\powershell.etl");
 
-    // begin listening for events. This call blocks, so if you want to do other things
-    // while this runs, you'll need to call this on another thread.
+    // begin listening for events. This call blocks until the end of file is reached, so if
+    // you want to do other things while this runs, you'll need to call this on another thread.
     trace.start();
+
+    // stop the trace and close the trace file
+    trace.stop();
 }
