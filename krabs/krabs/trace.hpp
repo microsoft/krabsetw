@@ -137,10 +137,10 @@ namespace krabs {
          *    STACK_TRACING_EVENT_ID event_id = {0};
          *    event_id.EventGuid = krabs::guids::perf_info;
          *    event_id.Type = 46; // SampleProfile
-         *    trace_.open();
-         *    trace_.set_trace_information(TraceStackTracingInfo, &event_id, sizeof(STACK_TRACING_EVENT_ID));
+         *    trace.open();
+         *    trace.set_trace_information(TraceStackTracingInfo, &event_id, sizeof(STACK_TRACING_EVENT_ID));
          *    krabs::kernel_provider stack_walk_provider(EVENT_TRACE_FLAG_PROFILE, krabs::guids::stack_walk);
-         *    trace_.enable(stack_walk_provider);
+         *    trace.enable(stack_walk_provider);
          *    trace.process();
          * </example>
          */
@@ -148,6 +148,21 @@ namespace krabs {
             TRACE_INFO_CLASS information_class,
             PVOID trace_information,
             ULONG information_length);
+
+        /**
+         * <summary>
+         * Configures trace to read from a file instead of realtime
+         * Must be called before open().
+         * See https://docs.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-tracesetinformation
+         * for more information.
+         * </summary>
+         * <example>
+         *    krabs::trace trace;
+         *    trace.set_trace_filename(L"C:\merged.etl");
+         *    trace.process();
+         * </example>
+         */
+        void set_trace_filename(const std::wstring& filename);
 
         /**
          * <summary>
@@ -278,6 +293,7 @@ namespace krabs {
 
     private:
         std::wstring name_;
+        std::wstring logFilename_;
         std::deque<std::reference_wrapper<const typename T::provider_type>> providers_;
 
         TRACEHANDLE registrationHandle_;
@@ -353,6 +369,12 @@ namespace krabs {
     {
         details::trace_manager<trace> manager(*this);
         manager.set_trace_information(information_class, trace_information, information_length);
+    }
+
+    template <typename T>
+    void trace<T>::set_trace_filename(const std::wstring& filename)
+    {
+        logFilename_ = filename;
     }
 
     template <typename T>

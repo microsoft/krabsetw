@@ -72,3 +72,8 @@ struct user_trace_008_stacktrace
 {
     static void start();
 };
+
+struct user_trace_009_from_file
+{
+    static void start();
+};
