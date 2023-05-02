@@ -166,6 +166,20 @@ namespace krabs {
 
         /**
          * <summary>
+         * Returns the provider GUID of an event via its schema.
+         * </summary>
+         * <example>
+         *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+         *    {
+         *        krabs::schema schema(record, trace_context.schema_locator);
+         *        GUID guid = krabs::provider_id(schema);
+         *    }
+         * </example>
+         */
+        GUID provider_id() const;
+
+        /**
+         * <summary>
          * Returns the provider name of an event via its schema.
          * </summary>
          * <example>
@@ -360,6 +374,11 @@ namespace krabs {
     inline unsigned int schema::event_flags() const
     {
         return record_.EventHeader.Flags;
+    }
+
+    inline GUID schema::provider_id() const
+    {
+        return record_.EventHeader.ProviderId;
     }
 
     inline const wchar_t *schema::provider_name() const
