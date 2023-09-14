@@ -29,11 +29,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         /// <param name="name">the property's name</param>
         /// <param name="type">the property's type</param>
+        /// <param name="outType">the property's out type</param>
         /// <remarks>
         /// See <see href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa964763(v=vs.85).aspx"/>
         /// for more information about property types. In particular, the TDH_INTYPE_* values.
         /// </remarks>
-        Property(String ^name, unsigned int type);
+        Property(String ^name, unsigned int type, unsigned int outType);
 
         /// <summary>Returns the name of this property.</summary>
         /// <returns>the name of this property</returns>
@@ -48,6 +49,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         property int Type {
             int get() {
                 return property_->type();
+            }
+        }
+
+        /// <summary>Returns the out type of this property.</summary>
+        /// <returns>the out type of this property</returns>
+        property int OutType {
+            int get() {
+                return property_->out_type();
             }
         }
 
@@ -108,7 +117,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the current element in the enumeration as a <see cref="O365::Security::ETW::Property"/></returns>
         property Property^ Current {
             virtual Property ^get() = IEnumerator<Property^>::Current::get {
-                return gcnew Property(gcnew String((*vecIterator_.Get())->name().c_str()), (*vecIterator_.Get())->type());
+                return gcnew Property(gcnew String((*vecIterator_.Get())->name().c_str()), (*vecIterator_.Get())->type(), (*vecIterator_.Get())->out_type());
             }
         };
 
@@ -116,7 +125,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the current element in the enumeration as a <see cref="System::Object"/></returns>
         property Object ^Current2 {
             virtual Object ^get() = System::Collections::IEnumerator::Current::get {
-                return gcnew Property(gcnew String((*vecIterator_.Get())->name().c_str()), (*vecIterator_.Get())->type());
+                return gcnew Property(gcnew String((*vecIterator_.Get())->name().c_str()), (*vecIterator_.Get())->type(), (*vecIterator_.Get())->out_type());
             }
         }
 
@@ -174,8 +183,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     // Implementation
     // ------------------------------------------------------------------------
 
-    inline Property::Property(String ^name, unsigned int type)
-    : property_(msclr::interop::marshal_as<std::wstring>(name), (_TDH_IN_TYPE)type)
+    inline Property::Property(String ^name, unsigned int type, unsigned int outType)
+    : property_(msclr::interop::marshal_as<std::wstring>(name), (_TDH_IN_TYPE)type, (_TDH_OUT_TYPE)outType)
     {
     }
 
