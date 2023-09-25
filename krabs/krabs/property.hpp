@@ -48,7 +48,7 @@ namespace krabs {
          *   object do this for you with its `properties` method.
          * </remarks>
          */
-        property(const std::wstring &name, _TDH_IN_TYPE type);
+        property(const std::wstring &name, _TDH_IN_TYPE type, _TDH_OUT_TYPE outType);
 
         /**
          * <summary>
@@ -64,9 +64,17 @@ namespace krabs {
          */
         _TDH_IN_TYPE type() const;
 
+        /**
+         * <summary>
+         * Retrieves the Tdh type of the property.
+         * </summary>
+         */
+        _TDH_OUT_TYPE out_type() const;
+
     private:
         std::wstring name_;
         _TDH_IN_TYPE type_;
+        _TDH_OUT_TYPE outType_;
     };
 
 
@@ -138,9 +146,10 @@ namespace krabs {
     // Implementation
     // ------------------------------------------------------------------------
 
-    inline property::property(const std::wstring &name, _TDH_IN_TYPE type)
+    inline property::property(const std::wstring &name, _TDH_IN_TYPE type, _TDH_OUT_TYPE outType)
     : name_(name)
     , type_(type)
+    , outType_(outType)
     {}
 
     inline const std::wstring &property::name() const
@@ -151,6 +160,11 @@ namespace krabs {
     inline _TDH_IN_TYPE property::type() const
     {
         return type_;
+    }
+
+    inline _TDH_OUT_TYPE property::out_type() const
+    {
+        return outType_;
     }
 
     // ------------------------------------------------------------------------
@@ -183,8 +197,9 @@ namespace krabs {
             curr_prop.NameOffset);
 
         auto tdh_type = (_TDH_IN_TYPE)curr_prop.nonStructType.InType;
+        auto tdh_out_type = (_TDH_OUT_TYPE)curr_prop.nonStructType.OutType;
 
-        return property(pName, tdh_type);
+        return property(pName, tdh_type, tdh_out_type);
     }
 
     inline std::vector<property> property_iterator::enum_properties() const
