@@ -282,6 +282,12 @@ namespace krabs {
          */
         void set_default_event_callback(c_provider_callback callback);
 
+        template <typename U>
+        void set_default_event_callback(U& callback);
+
+        template <typename U>
+        void set_default_event_callback(const U& callback);
+
     private:
 
         /**
@@ -348,7 +354,8 @@ namespace krabs {
     template <typename T>
     trace<T>::~trace()
     {
-        stop();
+        // Never throw in destructor
+        try { stop(); } catch (...) {}
     }
 
     template <typename T>
@@ -440,7 +447,30 @@ namespace krabs {
     template <typename T>
     void trace<T>::set_default_event_callback(c_provider_callback callback)
     {
+        // C function pointers don't interact well with std::ref, so we
+        // overload to take care of this scenario.
         default_callback_ = callback;
     }
 
+    template <typename T>
+    template <typename U>
+    void trace<T>::set_default_event_callback(U& callback)
+    {
+        // std::function copies its argument -- because our callbacks list
+        // is a list of std::function, this causes problems when a user
+        // intended for their particular instance to be called.
+        // std::ref lets us get around this and point to a specific instance
+        // that they handed us.
+        default_callback_ = std::ref(callback);
+    }
+
+    template <typename T>
+    template <typename U>
+    void trace<T>::set_default_event_callback(const U& callback)
+    {
+        // This is where temporaries bind to. Temporaries can't be wrapped in
+        // a std::ref because they'll go away very quickly. We are forced to
+        // actually copy these.
+        default_callback_ = callback;
+    }
 }

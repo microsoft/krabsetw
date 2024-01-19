@@ -202,6 +202,9 @@ namespace krabs { namespace details {
         PVOID trace_information,
         ULONG information_length)
     {
+        if (trace_.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE)
+            return;
+
         ULONG status = TraceSetInformation(
             trace_.registrationHandle_, 
             information_class,
@@ -283,12 +286,16 @@ namespace krabs { namespace details {
     template <typename T>
     void trace_manager<T>::stop_trace()
     {
+        if (trace_.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE)
+            return;
+
         trace_info info = fill_trace_info();
         ULONG status = ControlTrace(
             NULL,
             trace_.name_.c_str(),
             &info.properties,
             EVENT_TRACE_CONTROL_STOP);
+        trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
 
         if (status != ERROR_WMI_INSTANCE_NOT_FOUND) {
             error_check_common_conditions(status);
@@ -328,6 +335,7 @@ namespace krabs { namespace details {
                 status = StartTrace(&trace_.registrationHandle_,
                     trace_.name_.c_str(),
                     &info.properties);
+                error_check_common_conditions(status);
             }
             catch (need_to_be_admin_failure) {
                 (void)open_trace();
@@ -344,6 +352,15 @@ namespace krabs { namespace details {
                 // In some versions, the error code is 87 when using
                 // SystemTraceControlGuid session. If open/close doesn't
                 // throw, then we can continually processing events.
+                (void)open_trace();
+                close_trace();
+                status = ERROR_SUCCESS;
+                trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
+            }
+            catch (trace_already_registered) {
+                // We can't StartTrace for "Microsoft-Windows-Security-Auditing"
+                // provider. If open/close doesn't throw, then we can continually
+                // processing events.
                 (void)open_trace();
                 close_trace();
                 status = ERROR_SUCCESS;
