@@ -335,7 +335,6 @@ namespace krabs { namespace details {
                 status = StartTrace(&trace_.registrationHandle_,
                     trace_.name_.c_str(),
                     &info.properties);
-                error_check_common_conditions(status);
             }
             catch (need_to_be_admin_failure) {
                 (void)open_trace();
@@ -352,15 +351,6 @@ namespace krabs { namespace details {
                 // In some versions, the error code is 87 when using
                 // SystemTraceControlGuid session. If open/close doesn't
                 // throw, then we can continually processing events.
-                (void)open_trace();
-                close_trace();
-                status = ERROR_SUCCESS;
-                trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
-            }
-            catch (trace_already_registered) {
-                // We can't StartTrace for "Microsoft-Windows-Security-Auditing"
-                // provider. If open/close doesn't throw, then we can continually
-                // processing events.
                 (void)open_trace();
                 close_trace();
                 status = ERROR_SUCCESS;
