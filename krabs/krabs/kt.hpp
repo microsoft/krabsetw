@@ -122,7 +122,7 @@ namespace krabs { namespace details {
     inline void kt::enable_providers(
         const krabs::trace<krabs::details::kt> &trace)
     {
-        EVENT_TRACE_GROUPMASK_INFORMATION gmi = { 0 };
+        EVENT_TRACE_GROUPMASK_INFORMATION gmi = {};
         gmi.EventTraceInformationClass = EventTraceGroupMaskInformation;
         gmi.TraceHandle = trace.registrationHandle_;
 
