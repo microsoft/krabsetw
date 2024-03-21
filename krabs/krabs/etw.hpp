@@ -202,6 +202,9 @@ namespace krabs { namespace details {
         PVOID trace_information,
         ULONG information_length)
     {
+        if (trace_.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE)
+            return;
+
         ULONG status = TraceSetInformation(
             trace_.registrationHandle_, 
             information_class,
@@ -283,12 +286,16 @@ namespace krabs { namespace details {
     template <typename T>
     void trace_manager<T>::stop_trace()
     {
+        if (trace_.registrationHandle_ == INVALID_PROCESSTRACE_HANDLE)
+            return;
+
         trace_info info = fill_trace_info();
         ULONG status = ControlTrace(
             NULL,
             trace_.name_.c_str(),
             &info.properties,
             EVENT_TRACE_CONTROL_STOP);
+        trace_.registrationHandle_ = INVALID_PROCESSTRACE_HANDLE;
 
         if (status != ERROR_WMI_INSTANCE_NOT_FOUND) {
             error_check_common_conditions(status);
