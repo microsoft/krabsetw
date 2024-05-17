@@ -3,6 +3,7 @@
 
 bin
 obj
+ref
 *.user
 *.suo
 *.VC.opendb
@@ -17,6 +18,7 @@ FakesAssemblies/
 [Dd]ebug/
 [Rr]elease/
 x64/
+ARM64/
 
 # NuGet Packages
 **/packages/*
