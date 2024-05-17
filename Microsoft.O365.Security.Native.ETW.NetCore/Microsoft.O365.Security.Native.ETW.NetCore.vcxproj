@@ -34,9 +34,6 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <PropertyGroup>
-    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
-  </PropertyGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9DE6788C-5759-4A75-B484-ABA4C7EF5F08}</ProjectGuid>
     <TargetFramework>net6.0</TargetFramework>
