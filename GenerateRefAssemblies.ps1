@@ -3,7 +3,7 @@ $command = Get-Command $refasmer -ErrorAction SilentlyContinue
 
 if ($command -eq $null) {
     Write-Host "Refasmer not found. Install it as global .NET tool."
-    Write-Host "dotnet tool install -g refasmer"
+    Write-Host "dotnet tool install -g JetBrains.Refasmer.CliTool"
     dotnet tool install -g JetBrains.Refasmer.CliTool
 }
 
