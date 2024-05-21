@@ -18,10 +18,14 @@ jobs:
     - uses: darenm/Setup-VSTest@v1
     - name: nuget restore
       run: nuget.exe restore krabs\krabs.sln
-    - name: build release
-      run: msbuild.exe /nologo /m /t:Rebuild /p:Configuration=Release krabs\krabs.sln
-    - name: build debug
-      run: msbuild.exe /nologo /m /t:Rebuild /p:Configuration=Debug krabs\krabs.sln
+    - name: build release x64
+      run: msbuild.exe /nologo /m /t:Rebuild /p:Configuration=Release /p:Platform=x64 krabs\krabs.sln
+    - name: build debug x64
+      run: msbuild.exe /nologo /m /t:Rebuild /p:Configuration=Debug /p:Platform=x64 krabs\krabs.sln
+    - name: build release ARM64
+      run: msbuild.exe /nologo /m /t:Rebuild /p:Configuration=Release /p:Platform=ARM64 krabs\krabs.sln
+    - name: build debug ARM64
+      run: msbuild.exe /nologo /m /t:Rebuild /p:Configuration=Debug /p:Platform=ARM64 krabs\krabs.sln
     - name: test native debug
       run: vstest.console.exe krabs\x64\Debug\krabstests.dll
     - name: test debug net462
