@@ -4,12 +4,13 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>ManagedExamples</RootNamespace>
     <AssemblyName>ManagedExamples</AssemblyName>
-    <TargetFrameworks>net462;net6.0</TargetFrameworks>
+    <TargetFrameworks>net462;net6.0-windows</TargetFrameworks>
     <Company>Microsoft Corporation</Company>
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
     <Configurations>Debug;DebugSigning;Release;ReleaseSigning</Configurations>
-    <Platforms>AnyCPU;ARM64;x64</Platforms>
+    <Platforms>AnyCPU;x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Platform)' == 'x64'">
@@ -38,7 +39,7 @@
     <ProjectReference Include="..\..\Microsoft.O365.Security.Native.ETW\Microsoft.O365.Security.Native.ETW.vcxproj" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net6.0' ">
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net6.0-windows' ">
     <ProjectReference Include="..\..\Microsoft.O365.Security.Native.ETW.NetCore\Microsoft.O365.Security.Native.ETW.NetCore.vcxproj" />
   </ItemGroup>
 
