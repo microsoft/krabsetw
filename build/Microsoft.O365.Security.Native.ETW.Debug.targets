@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Target Name="CheckPlatform" BeforeTargets="Build"
+        Condition="('$(Platform)' != 'x64' and '$(Platform)' != 'ARM64')">
+        <Error
+            Text="$(MSBuildThisFileName) is not built for '$(Platform)'. You need to specify either platform x64 or ARM64." />
+    </Target>
+    <ItemGroup>
+        <NativeLibs Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-x64\lib\net462\*.*"
+            Condition="'$(Platform)' == 'x64'" />
+        <NativeLibs Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-arm64\lib\net462\*.*"
+            Condition="'$(Platform)' == 'ARM64'" />
+        <Content Include="@(NativeLibs)">
+            <Link>%(RecursiveDir)%(FileName)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+</Project>
