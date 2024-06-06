@@ -19,7 +19,7 @@ Examples & Documentation
 
 Important Notes
 ==============
-* `krabsetw` and `Microsoft.O365.Security.Native.ETW` only support x64. No effort has been made to support x86.
+* `krabsetw` and `Microsoft.O365.Security.Native.ETW` only support x64 and ARM64. No effort has been made to support x86.
 * `krabsetw` and `Microsoft.O365.Security.Native.ETW` are only supported on Windows 7 or Windows 2008R2 machines and above.
 * Throwing exceptions in the event handler callback or krabsetw or Microsoft.O365.Security.Native.ETW will cause the trace to stop processing events.
 * The call to "start" on the trace object is blocking so thread management may be necessary.

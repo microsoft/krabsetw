@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Native.ETW</id>
-        <version>4.3.2</version>
+        <version>4.4.0</version>
         <title>Microsoft.O365.Security.Native.ETW - managed wrappers for krabsetw</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -12,8 +12,8 @@
         <description>Microsoft.O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library.</description>
         <summary>Microsoft.O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library.</summary>
         <releaseNotes>
-            Version 4.3.2:
-              - Add support for ETL file sources
+            Version 4.4.0:
+              - Add support for Windows ARM64
         </releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
