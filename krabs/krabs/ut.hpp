@@ -235,15 +235,18 @@ namespace krabs { namespace details {
             }
         }
 
-        // for MOF providers, EventHeader.Provider is the *Message* GUID
-        // we need to ask TDH for event information in order to determine the
-        // correct provider to pass this event to
-        auto schema = get_event_schema_from_tdh(record);
-        auto eventInfo = reinterpret_cast<PTRACE_EVENT_INFO>(schema.get());
-        for (auto& provider : trace.providers_) {
-            if (eventInfo->ProviderGuid == provider.get().guid_) {
-                provider.get().on_event(record, trace.context_);
-                return;
+        if (!trace.ignore_mof_events_)
+        {
+            // for MOF providers, EventHeader.Provider is the *Message* GUID
+            // we need to ask TDH for event information in order to determine the
+            // correct provider to pass this event to
+            auto schema = get_event_schema_from_tdh(record);
+            auto eventInfo = reinterpret_cast<PTRACE_EVENT_INFO>(schema.get());
+            for (auto& provider : trace.providers_) {
+                if (eventInfo->ProviderGuid == provider.get().guid_) {
+                    provider.get().on_event(record, trace.context_);
+                    return;
+                }
             }
         }
 
