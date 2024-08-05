@@ -136,7 +136,7 @@ namespace krabs { namespace testing {
         auto array_ptr = reinterpret_cast<EVENT_HEADER_EXTENDED_DATA_ITEM*>(data_buffer);
         auto data_ptr = data_buffer + array_part_size;
 
-        for (int i = 0; i < items_.size(); i++)
+        for (size_t i = 0; i < items_.size(); i++)
         {
             // 2a: write the struct
             auto& destination = array_ptr[i];

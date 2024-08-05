@@ -47,7 +47,6 @@ namespace ManagedExamples
                     return; // ignore failures
 
                 var callStack = record.GetStackTrace()
-                                .Select(a => a.ToUInt64())
                                 .Where(a => a < 0xFFFF000000000000) // skip kernel addresses (for now)
                                 .Select(a => MemoryMap.GetClosestSymbol(processId, a));
 
