@@ -256,11 +256,11 @@ namespace krabs {
         *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
         *    {
         *        krabs::schema schema(record, trace_context.schema_locator);
-        *        std::vector<ULONG_PTR> stack_trace = schema.stack_trace();
+        *        std::vector<ULONG64> stack_trace = schema.stack_trace();
         *    }
         * </example>
         */
-        std::vector<ULONG_PTR> stack_trace() const;
+        std::vector<ULONG64> stack_trace() const;
 
     private:
         const EVENT_RECORD &record_;
@@ -277,8 +277,8 @@ namespace krabs {
         friend GUID activity_id(const schema&);
         friend int event_id(const EVENT_RECORD &);
         friend int event_id(const schema &);
-        friend std::vector<ULONG_PTR> stack_trace(const schema&);
-        friend std::vector<ULONG_PTR> stack_trace(const EVENT_RECORD&);
+        friend std::vector<ULONG64> stack_trace(const schema&);
+        friend std::vector<ULONG64> stack_trace(const EVENT_RECORD&);
 
         friend class parser;
         friend class property_iterator;
@@ -408,9 +408,9 @@ namespace krabs {
         return record_.EventHeader.ActivityId;
     }
 
-    inline std::vector<ULONG_PTR> schema::stack_trace() const
+    inline std::vector<ULONG64> schema::stack_trace() const
     {
-        std::vector<ULONG_PTR> call_stack;
+        std::vector<ULONG64> call_stack;
         if (record_.ExtendedDataCount != 0) {
             for (USHORT i = 0; i < record_.ExtendedDataCount; i++)
             {

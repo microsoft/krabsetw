@@ -774,12 +774,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// Retrieves the call stack associated with the record, if enabled.
         /// </summary>
         /// <returns>a list of return addresses</returns>
-        virtual List<UIntPtr>^ GetStackTrace()
+        virtual List<UInt64>^ GetStackTrace()
         {
-            auto stackTrace = gcnew List<UIntPtr>();
+            auto stackTrace = gcnew List<UInt64>();
             for (auto& returnAddress : schema_->stack_trace())
             {
-                stackTrace->Add(UIntPtr(returnAddress));
+                stackTrace->Add(UInt64(returnAddress));
             }
             return stackTrace;
         }

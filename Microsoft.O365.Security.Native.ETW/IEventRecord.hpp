@@ -407,7 +407,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         ///  Retrieves the call stack associated with the record, if enabled.
         /// </summary>
         /// <returns>a list of return addresses</returns>
-        List<UIntPtr>^ GetStackTrace();
+        List<UInt64>^ GetStackTrace();
     };
 
 } } } }
