@@ -32,28 +32,84 @@ namespace krabs {
     struct schema_key
     {
         guid      provider;
-        uint16_t  id;
-        uint8_t   opcode;
-        uint8_t   version;
-        uint8_t   level;
 
-        schema_key(const EVENT_RECORD &record)
+        // Using a string_view for name so that keys can be constructed from
+        // EVENT_RECORD pointers without allocation. If the key instance is
+        // added to the cache, 'internalize_name' must be called first so that
+        // the name points to owned memory and doesn't dangle.
+        // Only events logged with the TraceLogger API will have a name set
+        // in the key because it's available as part of the EVENT_RECORD.
+        // Other events are uniquely distinguished by their event Id.
+        std::string_view name;
+
+        uint16_t  id;
+        uint8_t   version;
+        uint8_t   opcode;
+        uint8_t   level;
+        uint64_t  keyword;
+
+    private:
+        // See note on 'name', this is only set when internalized and
+        // provides memory ownership for the string_view.
+        std::unique_ptr<std::string> backing_name;
+
+    public:
+        schema_key(const EVENT_RECORD &record, const char* name = nullptr)
             : provider(record.EventHeader.ProviderId)
+            , name(name ? std::string_view{name} : std::string_view{})
             , id(record.EventHeader.EventDescriptor.Id)
+            , version(record.EventHeader.EventDescriptor.Version)
             , opcode(record.EventHeader.EventDescriptor.Opcode)
             , level(record.EventHeader.EventDescriptor.Level)
-            , version(record.EventHeader.EventDescriptor.Version) { }
+            , keyword(record.EventHeader.EventDescriptor.Keyword) { }
+
+        schema_key(const schema_key &rhs)
+            : provider(rhs.provider)
+            , name(rhs.name)
+            , id(rhs.id)
+            , version(rhs.version)
+            , opcode(rhs.opcode)
+            , level(rhs.level)
+            , keyword(rhs.keyword)
+        {
+            internalize_name();
+        }
+
+        schema_key& operator=(const schema_key &rhs)
+        {
+            schema_key temp(rhs);
+            std::swap(*this, temp);
+            return *this;
+        }
 
         bool operator==(const schema_key &rhs) const
         {
+            // NB: Compare 'name' last for perf. Do not compare 'backing_name'.
             return provider == rhs.provider &&
                    id == rhs.id &&
+                   version == rhs.version &&
                    opcode == rhs.opcode &&
                    level == rhs.level &&
-                   version == rhs.version;
+                   keyword == rhs.keyword &&
+                   name == rhs.name;
         }
 
         bool operator!=(const schema_key &rhs) const { return !(*this == rhs); }
+
+        /**
+         * <summary>
+         * Allocate the 'backing_name' and set 'name' to point at it. This must be
+         * called before adding the key to a cache so that the lifetime of the
+         * 'name' string_view matches the lifetime of the cached instance.
+         * </summary>
+         */
+        void internalize_name()
+        {
+            if (!name.empty()) {
+                backing_name = std::make_unique<std::string>(name);
+                name = *backing_name;
+            }
+        }
     };
 }
 
@@ -73,10 +129,12 @@ namespace std {
             size_t h = 2166136261;
 
             h ^= (h << 5) + (h >> 2) + std::hash<krabs::guid>()(key.provider);
+            h ^= (h << 5) + (h >> 2) + std::hash<std::string_view>()(key.name);
             h ^= (h << 5) + (h >> 2) + key.id;
-            h ^= (h << 5) + (h >> 2) + key.opcode;
             h ^= (h << 5) + (h >> 2) + key.version;
+            h ^= (h << 5) + (h >> 2) + key.opcode;
             h ^= (h << 5) + (h >> 2) + key.level;
+            h ^= (h << 5) + (h >> 2) + key.keyword;
 
             return h;
         }
@@ -91,6 +149,14 @@ namespace krabs {
      * </summary>
      */
     std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD &);
+
+    /**
+     * <summary>
+     * Returns a pointer to the event name if the specified event was logged
+     * with the TraceLogger API otherwise returns nullptr.
+     * </summary>
+     */
+    const char* get_trace_logger_event_name(const EVENT_RECORD &);
 
     /**
      * <summary>
@@ -117,18 +183,73 @@ namespace krabs {
     // Implementation
     // ------------------------------------------------------------------------
 
-    inline const PTRACE_EVENT_INFO schema_locator::get_event_schema(const EVENT_RECORD &record) const
+    inline const char* get_trace_logger_event_name(const EVENT_RECORD & record)
     {
-        // check the cache
-        auto key = schema_key(record);
-        auto& buffer = cache_[key];
+        char* metadataPtr = nullptr;
+        USHORT metadataSize = 0;
 
-        if (!buffer) {
-            auto temp = get_event_schema_from_tdh(record);
-            buffer.swap(temp);
+        // Look for a TraceLogger event schema in the extended data.
+        for (USHORT i = 0; i < record.ExtendedDataCount; ++i) {
+            auto& dataItem = record.ExtendedData[i];
+            if (dataItem.ExtType == EVENT_HEADER_EXT_TYPE_EVENT_SCHEMA_TL) {
+                metadataSize = dataItem.DataSize;
+                metadataPtr = (char*)dataItem.DataPtr;
+                break;
+            }
         }
 
-        return (PTRACE_EVENT_INFO)(buffer.get());
+        // Didn't find one or it was too small.
+        if (metadataPtr == nullptr || metadataSize < sizeof(USHORT)) {
+            return nullptr;
+        }
+
+        // Ensure that the sizes match to prevent reading off the buffer.
+        USHORT structSize = *(USHORT*)metadataPtr;
+        if (structSize != metadataSize) {
+            return nullptr;
+        }
+
+        // Skipping over the 'Extension' field of the block to find the name offset.
+        // Per code comment: Read until you hit a byte with high bit unset.
+        USHORT nameOffset = sizeof(USHORT);
+        while (nameOffset < structSize) {
+            char c = *(metadataPtr + nameOffset);
+            nameOffset++; // NB: always consume the character.
+
+            // High-bit set?
+            if ((c & 0x80) != 0x80) {
+                break;
+            }
+        }
+
+        // Ensure the offset found is valid.
+        if (nameOffset >= structSize) {
+            return nullptr;
+        }
+
+        return metadataPtr + nameOffset;
+    }
+
+    inline const PTRACE_EVENT_INFO schema_locator::get_event_schema(const EVENT_RECORD &record) const
+    {
+        auto eventName = get_trace_logger_event_name(record);
+        auto key = schema_key(record, eventName);
+
+        // Check the cache...
+        auto it = cache_.find(key);
+        if (it != cache_.end()) {
+            return (PTRACE_EVENT_INFO)it->second.get();
+        }
+
+        // Cache miss. Fetch the schema...
+        auto buffer = get_event_schema_from_tdh(record);
+        auto returnVal = (PTRACE_EVENT_INFO)buffer.get();
+
+        // Add the new instance to the cache.
+        // NB: key's 'internalize_name' gets called by the cctor here.
+        cache_.emplace(key, std::move(buffer));
+
+        return returnVal;
     }
 
     inline std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD &record)
