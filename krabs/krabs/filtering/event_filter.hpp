@@ -61,7 +61,7 @@ namespace krabs {
          *   Given optional predicate will be applied to ETW API filtered results
          * </summary>
          */
-        event_filter(unsigned short event_id, filter_predicate predicate=nullptr);
+        event_filter(unsigned short event_id, filter_predicate predicate = nullptr);
 
         /**
          * <summary>

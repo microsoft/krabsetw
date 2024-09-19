@@ -83,6 +83,7 @@ namespace krabs { namespace testing {
             size_t version,
             size_t opcode = 0,
             size_t level = 0,
+            size_t keyword = 0,
             bool trim_string_null_terminator = false);
 
         /**
@@ -180,6 +181,7 @@ namespace krabs { namespace testing {
         const size_t version_;
         const size_t opcode_;
         const size_t level_;
+        const size_t keyword_;
         EVENT_HEADER header_;
         std::vector<record_property_thunk> properties_;
         bool trim_string_null_terminator_;
@@ -214,12 +216,14 @@ namespace krabs { namespace testing {
         size_t version,
         size_t opcode,
         size_t level,
+        size_t keyword,
         bool trim_string_null_terminator)
     : providerId_(providerId)
     , id_(id)
     , version_(version)
     , opcode_(opcode)
     , level_(level)
+    , keyword_(keyword)
     , trim_string_null_terminator_(trim_string_null_terminator)
     {
         ZeroMemory(&header_, sizeof(EVENT_HEADER));
@@ -227,6 +231,7 @@ namespace krabs { namespace testing {
         header_.EventDescriptor.Version = static_cast<UCHAR>(version_);
         header_.EventDescriptor.Opcode  = static_cast<UCHAR>(opcode_);
         header_.EventDescriptor.Level   = static_cast<UCHAR>(level_);
+        header_.EventDescriptor.Keyword = static_cast<ULONGLONG>(keyword_);
         memcpy(&header_.ProviderId, (const GUID *)&providerId_, sizeof(GUID));
     }
 
