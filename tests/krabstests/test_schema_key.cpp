@@ -174,7 +174,7 @@ namespace krabstests
             auto key2 = key1;
             key1.internalize_name();
 
-            Assert::IsFalse(key1 == key2);
+            Assert::IsTrue(key1 == key2);
         }
         TEST_METHOD(should_hash_same_after_internalizing)
         {
@@ -182,7 +182,7 @@ namespace krabstests
             auto key2 = key1;
             key1.internalize_name();
 
-            Assert::IsFalse(hash(key1) == hash(key2));
+            Assert::IsTrue(hash(key1) == hash(key2));
         }
     };
 }
