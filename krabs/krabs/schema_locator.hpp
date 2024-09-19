@@ -54,9 +54,9 @@ namespace krabs {
         std::unique_ptr<std::string> backing_name;
 
     public:
-        schema_key(const EVENT_RECORD &record, const char* name = nullptr)
+        schema_key(const EVENT_RECORD &record, std::string_view name)
             : provider(record.EventHeader.ProviderId)
-            , name(name ? std::string_view{name} : std::string_view{})
+            , name(name)
             , id(record.EventHeader.EventDescriptor.Id)
             , version(record.EventHeader.EventDescriptor.Version)
             , opcode(record.EventHeader.EventDescriptor.Opcode)
@@ -152,11 +152,11 @@ namespace krabs {
 
     /**
      * <summary>
-     * Returns a pointer to the event name if the specified event was logged
-     * with the TraceLogger API otherwise returns nullptr.
+     * Returns a string_view to the event name if the specified event was logged
+     * with the TraceLogger API otherwise returns an empty string_view.
      * </summary>
      */
-    const char* get_trace_logger_event_name(const EVENT_RECORD &);
+    std::string_view get_trace_logger_event_name(const EVENT_RECORD &);
 
     /**
      * <summary>
@@ -183,8 +183,25 @@ namespace krabs {
     // Implementation
     // ------------------------------------------------------------------------
 
-    inline const char* get_trace_logger_event_name(const EVENT_RECORD & record)
+    inline std::string_view get_trace_logger_event_name(const EVENT_RECORD & record)
     {
+        /* This implements part of the parsing that TDH would normally do so that
+         * a schema_key can be built without calling TDH (which is expensive).
+         * Here's pseudo code from the TraceLogger header describing the layout.
+         *
+         * // EventMetadata:
+         * // This pseudo-structure is the layout of the "event metadata" referenced by
+         * // EVENT_DATA_DESCRIPTOR_TYPE_EVENT_METADATA.
+         * // It provides the event's name, event tags, and field information.
+         * struct EventMetadata // Variable-length pseudo-structure, byte-aligned, tightly-packed.
+         * {
+         *     UINT16 Size; // = sizeof(EventMetadata)
+         *     UINT8 Extension[]; // 1 or more bytes. Read until you hit a byte with high bit unset.
+         *     char Name[]; // UTF-8 nul-terminated event name
+         *     FieldMetadata Fields[]; // 0 or more field definitions.
+         * };
+         */
+
         char* metadataPtr = nullptr;
         USHORT metadataSize = 0;
 
@@ -200,13 +217,13 @@ namespace krabs {
 
         // Didn't find one or it was too small.
         if (metadataPtr == nullptr || metadataSize < sizeof(USHORT)) {
-            return nullptr;
+            return {};
         }
 
         // Ensure that the sizes match to prevent reading off the buffer.
         USHORT structSize = *(USHORT*)metadataPtr;
         if (structSize != metadataSize) {
-            return nullptr;
+            return {};
         }
 
         // Skipping over the 'Extension' field of the block to find the name offset.
@@ -224,10 +241,10 @@ namespace krabs {
 
         // Ensure the offset found is valid.
         if (nameOffset >= structSize) {
-            return nullptr;
+            return {};
         }
 
-        return metadataPtr + nameOffset;
+        return {metadataPtr + nameOffset};
     }
 
     inline const PTRACE_EVENT_INFO schema_locator::get_event_schema(const EVENT_RECORD &record) const
