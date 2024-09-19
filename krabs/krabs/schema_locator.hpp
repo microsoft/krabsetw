@@ -33,13 +33,15 @@ namespace krabs {
     {
         guid      provider;
 
-        // Using a string_view for name so that keys can be constructed from
-        // EVENT_RECORD pointers without allocation. If the key instance is
-        // added to the cache, 'internalize_name' must be called first so that
-        // the name points to owned memory and doesn't dangle.
-        // Only events logged with the TraceLogger API will have a name set
-        // in the key because it's available as part of the EVENT_RECORD.
-        // Other events are uniquely distinguished by their event Id.
+        /**
+         * Using a string_view for name so that keys can be constructed from
+         * EVENT_RECORD pointers without allocation. If the key instance is
+         * added to the cache, 'internalize_name' must be called first so that
+         * the name points to owned memory and doesn't dangle.
+         * Only events logged with the TraceLogger API will have a name set
+         * in the key because it's available as part of the EVENT_RECORD.
+         * Other events are uniquely distinguished by their event Id.
+         */
         std::string_view name;
 
         uint16_t  id;
@@ -49,8 +51,10 @@ namespace krabs {
         uint64_t  keyword;
 
     private:
-        // See note on 'name', this is only set when internalized and
-        // provides memory ownership for the string_view.
+        /**
+         * See note on 'name', this is only set when internalized and
+         * provides memory ownership for the string_view.
+         */
         std::unique_ptr<std::string> backing_name;
 
     public:
@@ -185,7 +189,8 @@ namespace krabs {
 
     inline std::string_view get_trace_logger_event_name(const EVENT_RECORD & record)
     {
-        /* This implements part of the parsing that TDH would normally do so that
+        /**
+         * This implements part of the parsing that TDH would normally do so that
          * a schema_key can be built without calling TDH (which is expensive).
          * Here's pseudo code from the TraceLogger header describing the layout.
          *
