@@ -282,6 +282,20 @@ namespace krabs {
          */
         void set_default_event_callback(c_provider_callback callback);
 
+        /**
+         * <summary>
+         * Ignore Classic/MOF events that require calling TDH to get the provider which case be slow.
+         * Default behavior will leave MOF events enabled.
+         * </summary>
+         *
+         * <param name="ignore_mof_events">true to ignore MOF events</param>
+         * <example>
+         *    krabs::trace trace;
+         *    trace.set_ignore_mof_events(true);
+         * </example>
+         */
+        void set_ignore_mof_events(bool ignore_mof_events);
+
     private:
 
         /**
@@ -307,6 +321,8 @@ namespace krabs {
         const trace_context context_;
 
         provider_callback default_callback_ = nullptr;
+
+        bool ignore_mof_events_ = false;
 
     private:
         template <typename T>
@@ -443,4 +459,9 @@ namespace krabs {
         default_callback_ = callback;
     }
 
+    template <typename T>
+    void trace<T>::set_ignore_mof_events(bool ignore_mof_events)
+    {
+        ignore_mof_events_  = ignore_mof_events;
+    }
 }
