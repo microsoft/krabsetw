@@ -164,7 +164,7 @@ namespace krabs { namespace details {
             std::vector<BYTE> filterEventIdBuffer;
             auto filterEventIdCount = settings.provider_filter_event_ids_.size();
 
-            if (filterEventIdCount > 0) {
+            if (filterEventIdCount > 0 && filterEventIdCount <= MAX_EVENT_FILTER_EVENT_ID_COUNT) {
                 //event filters existing, set native filters using API
                 parameters.FilterDescCount = 1;
                 filterDesc.Type = EVENT_FILTER_TYPE_EVENT_ID;
@@ -237,15 +237,18 @@ namespace krabs { namespace details {
 
         // for MOF providers, EventHeader.Provider is the *Message* GUID
         // we need to ask TDH for event information in order to determine the
-        // correct provider to pass this event to
-        auto schema = get_event_schema_from_tdh(record);
-        auto eventInfo = reinterpret_cast<PTRACE_EVENT_INFO>(schema.get());
-        for (auto& provider : trace.providers_) {
-            if (eventInfo->ProviderGuid == provider.get().guid_) {
-                provider.get().on_event(record, trace.context_);
-                return;
+        // correct provider to pass this event to. Don't throw in callback.
+        try
+        {
+            auto eventInfo = trace.context_.schema_locator.get_event_schema(record);
+            for (auto& provider : trace.providers_) {
+                if (eventInfo->ProviderGuid == provider.get().guid_) {
+                    provider.get().on_event(record, trace.context_);
+                    return;
+                }
             }
         }
+        catch (krabs::could_not_find_schema&) {}
 
         if (trace.default_callback_ != nullptr)
             trace.default_callback_(record, trace.context_);
