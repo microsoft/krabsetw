@@ -122,6 +122,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         NativePtr<krabs::provider<>> provider_;
         GCHandle delegateHookHandle_;
         GCHandle delegateHandle_;
+        EventRecordMetadata^ data_;
         void SetUpProvider();
     };
 
@@ -148,6 +149,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         delegateHookHandle_ = GCHandle::Alloc(bridged);
 
         provider_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+
+        data_ = gcnew EventRecordMetadata();
     }
 
     inline RawProvider::~RawProvider()
@@ -165,6 +168,9 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void RawProvider::EventNotification(const EVENT_RECORD &record)
     {
-        OnEvent(gcnew EventRecordMetadata(record));
+        data_->record_ = &record;
+        data_->header_ = &record.EventHeader;
+
+        OnEvent(data_);
     }
 } } } }

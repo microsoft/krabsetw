@@ -17,14 +17,15 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// </summary>
     public ref class EventRecordMetadata : public IEventRecordMetadata
     {
-    protected:
-        const EVENT_RECORD* record_;
-        const EVENT_HEADER* header_;
-
     internal:
         EventRecordMetadata(const EVENT_RECORD& record)
             : record_(&record)
             , header_(&record.EventHeader) { }
+
+        EventRecordMetadata() { }
+
+        const EVENT_RECORD* record_;
+        const EVENT_HEADER* header_;
 
     public:
         // For container ID's, we are expecting format "00000000-0000-0000-0000-0000000000000", 
