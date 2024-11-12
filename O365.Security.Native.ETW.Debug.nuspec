@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Native.ETW.Debug</id>
-        <version>4.4.2</version>
+        <version>4.4.3</version>
         <title>Microsoft.O365.Security.Native.ETW Debug - managed wrappers for krabsetw</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -12,8 +12,8 @@
         <description>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</description>
         <summary>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</summary>
         <releaseNotes>
-            Version 4.4.2:
-              - Support reading TraceLogging events.
+            Version 4.4.3:
+              - RawProvider only allocates EventRecordMetadata once per instance.
         </releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
