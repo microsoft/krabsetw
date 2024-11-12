@@ -28,6 +28,9 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
         EventRecordMetadata() { }
 
+        /// <summary>
+        /// Update the underlying pointers to the event data to the given record.
+        /// </summary>
         virtual void Update(const EVENT_RECORD& record)
         {
             record_ = &record;
