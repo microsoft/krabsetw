@@ -26,6 +26,17 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             : record_(&record)
             , header_(&record.EventHeader) { }
 
+        EventRecordMetadata() { }
+
+        /// <summary>
+        /// Updates this instance to point to the specified event record.
+        /// </summary>
+        virtual void Update(const EVENT_RECORD& record)
+        {
+            record_ = &record;
+            header_ = &record.EventHeader;
+        }
+
     public:
         // For container ID's, we are expecting format "00000000-0000-0000-0000-0000000000000", 
         // 32 hex digits with 4 hyphens, no braces.
