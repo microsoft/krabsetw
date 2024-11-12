@@ -168,8 +168,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void RawProvider::EventNotification(const EVENT_RECORD &record)
     {
-        data_->record_ = &record;
-        data_->header_ = &record.EventHeader;
+        data_->Update(record);
 
         OnEvent(data_);
     }
