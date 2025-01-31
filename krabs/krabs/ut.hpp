@@ -235,8 +235,7 @@ namespace krabs { namespace details {
             }
         }
 
-        if (!trace.ignore_mof_events_)
-        {
+        if (trace.mof_events_enabled_) {
             // for MOF providers, EventHeader.Provider is the *Message* GUID
             // we need to ask TDH for event information in order to determine the
             // correct provider to pass this event to
