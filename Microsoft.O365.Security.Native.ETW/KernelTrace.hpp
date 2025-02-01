@@ -150,18 +150,41 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         ///     KernelTrace trace = new KernelTrace();
         ///     trace.SetDefaultEventCallback((record) => { ... });
         /// </example>
-        virtual void SetDefaultEventCallback(IEventRecordDelegate^ callback);
+        [Obsolete("This method is deprecated. Use the DefaultMetadata/DefaultEvent/DefaultError event instead.")]
+        virtual void SetDefaultEventCallback(IEventRecordDelegate^ callback) { DefaultEvent = callback; }
+
+        /// <summary>
+        /// An event is fired which has no corresponding provider.
+        /// provider.
+        /// </summary>
+        property IEventRecordMetadataDelegate^ DefaultMetadata {
+            IEventRecordMetadataDelegate^ get() { return bridge_->OnMetadata; }
+            void set(IEventRecordMetadataDelegate^ value) { bridge_->OnMetadata = value; }
+        }
+
+        /// <summary>
+        /// An event is fired which has no corresponding provider.
+        /// provider.
+        /// </summary>
+        property IEventRecordDelegate^ DefaultEvent {
+            IEventRecordDelegate^ get() { return bridge_->OnEvent; }
+            void set(IEventRecordDelegate^ value) { bridge_->OnEvent = value; }
+        }
+
+        /// <summary>
+        /// An event is fired when failed to fire <see cref="DefaultEvent"/>.
+        /// </summary>
+        property EventRecordErrorDelegate^ DefaultError {
+            EventRecordErrorDelegate^ get() { return bridge_->OnError; }
+            void set(EventRecordErrorDelegate^ value) { bridge_->OnError = value; }
+        }
 
     internal:
         bool disposed_ = false;
         O365::Security::ETW::NativePtr<krabs::kernel_trace> trace_;
+        CallbackBridge^ bridge_ = gcnew CallbackBridge();
 
-        IEventRecordDelegate^ callback_;
-        void EventNotification(const EVENT_RECORD&, const krabs::trace_context&);
-        delegate void NativeHookDelegate(const EVENT_RECORD&, const krabs::trace_context&);
-        NativeHookDelegate^ del_;
-        GCHandle delegateHandle_;
-        GCHandle delegateHookHandle_;
+        void RegisterCallbacks();
     };
 
     // Implementation
@@ -169,7 +192,9 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline KernelTrace::KernelTrace()
         : trace_(new krabs::kernel_trace())
-    { }
+    {
+        RegisterCallbacks();
+    }
 
     inline KernelTrace::~KernelTrace()
     {
@@ -179,16 +204,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
         Stop();
         disposed_ = true;
-
-        if (delegateHandle_.IsAllocated)
-        {
-            delegateHandle_.Free();
-        }
-
-        if (delegateHookHandle_.IsAllocated)
-        {
-            delegateHookHandle_.Free();
-        }
     }
 
     inline KernelTrace::KernelTrace(String ^name)
@@ -196,6 +211,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     {
         std::wstring nativeName = msclr::interop::marshal_as<std::wstring>(name);
         trace_.Swap(O365::Security::ETW::NativePtr<krabs::kernel_trace>(nativeName));
+        RegisterCallbacks();
     }
 
     inline void KernelTrace::Enable(O365::Security::ETW::KernelProvider ^provider)
@@ -234,24 +250,9 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         ExecuteAndConvertExceptions(return TraceStats(trace_->query_stats()));
     }
 
-    inline void KernelTrace::SetDefaultEventCallback(IEventRecordDelegate^ callback)
+    inline void KernelTrace::RegisterCallbacks()
     {
-        callback_ = callback;
-
-        if (!delegateHandle_.IsAllocated) {
-            del_ = gcnew NativeHookDelegate(this, &KernelTrace::EventNotification);
-            delegateHandle_ = GCHandle::Alloc(del_);
-            auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
-            delegateHookHandle_ = GCHandle::Alloc(bridged);
-            ExecuteAndConvertExceptions((void)trace_->set_default_event_callback((krabs::c_provider_callback)bridged.ToPointer()));
-        }
-    }
-
-    inline void KernelTrace::EventNotification(const EVENT_RECORD& record, const krabs::trace_context& trace_context)
-    {
-            krabs::schema schema(record, trace_context.schema_locator);
-            krabs::parser parser(schema);
-            callback_(gcnew EventRecord(record, schema, parser));
+        trace_->set_default_event_callback(bridge_->GetOnEventBridge());
     }
 
 } } } }

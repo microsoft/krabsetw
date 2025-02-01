@@ -5,8 +5,7 @@
 
 #include <krabs.hpp>
 
-#include "EventRecord.hpp"
-#include "EventRecordMetadata.hpp"
+#include "Callbacks.hpp"
 #include "Guid.hpp"
 #include "NativePtr.hpp"
 #include "Filtering/EventFilter.hpp"
@@ -74,6 +73,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// </remarks>
     public ref class Provider {
     public:
+
         /// <summary>
         /// Specifies a reasonable default to catch all the events with a
         /// bitmask with all bits set.
@@ -97,11 +97,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// var provider = new Provider("Microsoft-Windows-PowerShell");
         /// </example>
         Provider(String^ providerName);
-
-        /// <summary>
-        /// Destructs a Provider.
-        /// </summary>
-        ~Provider();
 
         /// <summary>
         /// Represents the "any" value on the provider's options, where
@@ -176,29 +171,33 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// An event that is invoked when an ETW event is fired in this
         /// provider.
         /// </summary>
-        event IEventRecordDelegate^ OnEvent;
+        event IEventRecordMetadataDelegate^ OnMetadata {
+            void add(IEventRecordMetadataDelegate^ value) { CombineDelegate(IEventRecordMetadataDelegate, bridge_->OnMetadata, value); }
+            void remove(IEventRecordMetadataDelegate^ value) { RemoveDelegate(IEventRecordMetadataDelegate, bridge_->OnMetadata, value); }
+        }
+
+        /// <summary>
+        /// An event that is invoked when an ETW event is fired in this
+        /// provider.
+        /// </summary>
+        event IEventRecordDelegate^ OnEvent {
+            void add(IEventRecordDelegate^ value) { CombineDelegate(IEventRecordDelegate, bridge_->OnEvent, value); }
+            void remove(IEventRecordDelegate^ value) { RemoveDelegate(IEventRecordDelegate, bridge_->OnEvent, value); }
+        }
 
         /// <summary>
         /// An event that is invoked when an ETW event is received
         /// but an error occurs handling the record.
         /// </summary>
-        event EventRecordErrorDelegate^ OnError;
+        event EventRecordErrorDelegate^ OnError {
+            void add(EventRecordErrorDelegate^ value) { CombineDelegate(EventRecordErrorDelegate, bridge_->OnError, value); }
+            void remove(EventRecordErrorDelegate^ value) { RemoveDelegate(EventRecordErrorDelegate, bridge_->OnError, value); }
+        }
 
     internal:
-        void EventNotification(const EVENT_RECORD &, const krabs::trace_context &);
-        void ErrorNotification(const EVENT_RECORD&, const std::string&);
-
-    internal:
-        delegate void EventReceivedNativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
-        delegate void ErrorReceivedNativeHookDelegate(const EVENT_RECORD &, const std::string &);
-
         NativePtr<krabs::provider<>> provider_;
-        EventReceivedNativeHookDelegate^ eventReceivedDelegate_;
-        ErrorReceivedNativeHookDelegate^ errorReceivedDelegate_;
-        GCHandle eventReceivedDelegateHookHandle_;
-        GCHandle errorReceivedDelegateHookHandle_;
-        GCHandle eventReceivedDelegateHandle_;
-        GCHandle errorReceivedDelegateHandle_;
+        CallbackBridge^ bridge_ = gcnew CallbackBridge();
+
         void RegisterCallbacks();
     };
 
@@ -217,67 +216,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         RegisterCallbacks();
     }
 
-    inline Provider::~Provider()
-    {
-        if (eventReceivedDelegateHandle_.IsAllocated)
-        {
-            eventReceivedDelegateHandle_.Free();
-        }
-
-        if (eventReceivedDelegateHookHandle_.IsAllocated)
-        {
-            eventReceivedDelegateHookHandle_.Free();
-        }
-
-        if (errorReceivedDelegateHandle_.IsAllocated)
-        {
-            errorReceivedDelegateHandle_.Free();
-        }
-
-        if (errorReceivedDelegateHookHandle_.IsAllocated)
-        {
-            errorReceivedDelegateHookHandle_.Free();
-        }
-    }
-
     inline void Provider::RegisterCallbacks() 
     {
-        eventReceivedDelegate_ = gcnew EventReceivedNativeHookDelegate(this, &Provider::EventNotification);
-        eventReceivedDelegateHandle_ = GCHandle::Alloc(eventReceivedDelegate_);
-        auto bridgedEventDelegate = Marshal::GetFunctionPointerForDelegate(eventReceivedDelegate_);
-        eventReceivedDelegateHookHandle_ = GCHandle::Alloc(bridgedEventDelegate);
-
-        provider_->add_on_event_callback((krabs::c_provider_callback)bridgedEventDelegate.ToPointer());
-
-        errorReceivedDelegate_ = gcnew ErrorReceivedNativeHookDelegate(this, &Provider::ErrorNotification);
-        errorReceivedDelegateHandle_ = GCHandle::Alloc(errorReceivedDelegate_);
-        auto bridgedErrorDelegate = Marshal::GetFunctionPointerForDelegate(errorReceivedDelegate_);
-        errorReceivedDelegateHookHandle_ = GCHandle::Alloc(bridgedErrorDelegate);
-
-        provider_->add_on_error_callback((krabs::c_provider_error_callback)bridgedErrorDelegate.ToPointer());
-    }
-
-    inline void Provider::EventNotification(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
-    {
-        try
-        {
-            krabs::schema schema(record, trace_context.schema_locator);
-            krabs::parser parser(schema);
-
-            OnEvent(gcnew EventRecord(record, schema, parser));
-        }
-        catch (const krabs::could_not_find_schema& ex)
-        {
-            ErrorNotification(record, ex.what());
-        }
-    }
-
-    inline void Provider::ErrorNotification(const EVENT_RECORD& record, const std::string& error_message)
-    {
-        auto msg = gcnew String(error_message.c_str());
-        auto metadata = gcnew EventRecordMetadata(record);
-
-        OnError(gcnew EventRecordError(msg, metadata));
+        provider_->add_on_event_callback(bridge_->GetOnEventBridge());
+        provider_->add_on_error_callback(bridge_->GetOnErrorBridge());
     }
 
 } } } }

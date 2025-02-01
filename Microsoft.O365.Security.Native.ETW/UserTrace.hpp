@@ -61,6 +61,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </example>
         virtual void Enable(O365::Security::ETW::Provider ^provider);
 
+#pragma warning(push)
+#pragma warning(disable: 4947) // Deprecated warning
         /// <summary>
         /// Enables a raw provider for the given user trace.
         /// </summary>
@@ -71,7 +73,9 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         ///     Provider provider = new RawProvider(powershell);
         ///     trace.Enable(provider);
         /// </example>
+        [Obsolete("The RawProvider is deprecated. Use the Provider.OnMetadata event instead.")]
         virtual void Enable(O365::Security::ETW::RawProvider ^provider);
+#pragma warning(pop)
 
         /// <summary>
         /// Sets the trace properties for a session.
@@ -150,9 +154,38 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the <see cref="O365::Security::ETW::TraceStats"/> for the current trace object</returns>
         virtual TraceStats QueryStats();
 
+        /// <summary>
+        /// An event is fired which has no corresponding provider.
+        /// provider.
+        /// </summary>
+        property IEventRecordMetadataDelegate^ DefaultMetadata {
+            IEventRecordMetadataDelegate^ get() { return bridge_->OnMetadata; }
+            void set(IEventRecordMetadataDelegate^ value) { bridge_->OnMetadata = value; }
+        }
+
+        /// <summary>
+        /// An event is fired which has no corresponding provider.
+        /// provider.
+        /// </summary>
+        property IEventRecordDelegate^ DefaultEvent {
+            IEventRecordDelegate^ get() { return bridge_->OnEvent; }
+            void set(IEventRecordDelegate^ value) { bridge_->OnEvent = value; }
+        }
+
+        /// <summary>
+        /// An event is fired when failed to fire <see cref="DefaultEvent"/>.
+        /// </summary>
+        property EventRecordErrorDelegate^ DefaultError {
+            EventRecordErrorDelegate^ get() { return bridge_->OnError; }
+            void set(EventRecordErrorDelegate^ value) { bridge_->OnError = value; }
+        }
+
     internal:
         bool disposed_ = false;
         O365::Security::ETW::NativePtr<krabs::user_trace> trace_;
+        CallbackBridge^ bridge_ = gcnew CallbackBridge();
+
+        void RegisterCallbacks();
     };
 
     // Implementation
@@ -161,6 +194,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline UserTrace::UserTrace()
         : trace_(new krabs::user_trace())
     {
+        RegisterCallbacks();
     }
 
     inline UserTrace::~UserTrace()
@@ -178,6 +212,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     {
         std::wstring nativeName = msclr::interop::marshal_as<std::wstring>(name);
         trace_.Swap(O365::Security::ETW::NativePtr<krabs::user_trace>(nativeName));
+        RegisterCallbacks();
     }
 
     inline void UserTrace::Enable(O365::Security::ETW::Provider ^provider)
@@ -185,10 +220,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         return trace_->enable(*provider->provider_);
     }
 
+#pragma warning(push)
+#pragma warning(disable: 4947) // Deprecated warning
     inline void UserTrace::Enable(O365::Security::ETW::RawProvider ^provider)
     {
         return trace_->enable(*provider->provider_);
     }
+#pragma warning(pop)
 
     inline void UserTrace::SetTraceProperties(EventTraceProperties ^properties)
     {
@@ -219,6 +257,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline TraceStats UserTrace::QueryStats()
     {
         ExecuteAndConvertExceptions(return TraceStats(trace_->query_stats()));
+    }
+
+    inline void UserTrace::RegisterCallbacks()
+    {
+        trace_->set_default_event_callback(bridge_->GetOnEventBridge());
     }
 
 } } } }
