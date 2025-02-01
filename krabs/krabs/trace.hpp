@@ -23,6 +23,17 @@ namespace krabs { namespace testing {
 
 namespace krabs {
 
+    /**
+     * <summary>
+     * Returns the type of the event record.
+     * DecodingSourceXMLFile - The event was emitted by a manifest-based provider.
+     * DecodingSourceWbem - The event was emitted by a MOF-based provider.
+     * DecodingSourceWPP - The event was emitted by a WPP software tracing provider.
+     * DecodingSourceTlg - The event was emitted by a TraceLogging provider.
+     * </summary>
+     */
+    DECODING_SOURCE get_event_type(const EVENT_RECORD &record);
+
     template <typename T>
     class provider;
 
@@ -296,6 +307,20 @@ namespace krabs {
          */
         void set_mof_event_processing_enabled(bool mof_events_enabled);
 
+        /**
+         * <summary>
+         * Sets whether to enable getting schema information for WPP events.
+         * Default behavior is to get schema information for WPP events.
+         * </summary>
+         *
+         * <param name="wpp_events_enabled">false to disable WPP events</param>
+         * <example>
+         *    krabs::trace trace;
+         *    trace.set_wpp_event_processing_enabled(false);
+         * </example>
+         */
+        void set_wpp_event_processing_enabled(bool wpp_events_enabled);
+
     private:
 
         /**
@@ -323,6 +348,7 @@ namespace krabs {
         provider_callback default_callback_ = nullptr;
 
         bool mof_events_enabled_ = true;
+        bool wpp_events_enabled_ = true;
 
     private:
         template <typename T>
@@ -336,6 +362,28 @@ namespace krabs {
 
     // Implementation
     // ------------------------------------------------------------------------
+
+    inline DECODING_SOURCE get_event_type(const EVENT_RECORD& record)
+    {
+        // The logic is reverse-engineered from tdh!TdhGetEventInformation
+        auto has_ext_event_schema_tl = [](const EVENT_RECORD& record) {
+            if (record.ExtendedDataCount) {
+                for (USHORT i = 0; i < record.ExtendedDataCount; i++) {
+                    if (record.ExtendedData[i].ExtType == EVENT_HEADER_EXT_TYPE_EVENT_SCHEMA_TL)
+                        return true;
+                }
+            }
+            return false;
+        };
+        if (record.EventHeader.Flags & EVENT_HEADER_FLAG_TRACE_MESSAGE)
+            return DecodingSourceWPP;
+        else if (record.EventHeader.EventDescriptor.Channel == 11 || has_ext_event_schema_tl(record))
+            return DecodingSourceTlg;
+        else if (record.EventHeader.Flags & EVENT_HEADER_FLAG_CLASSIC_HEADER)
+            return DecodingSourceWbem;
+        else
+            return DecodingSourceXMLFile;
+    }
 
     template <typename T>
     trace<T>::trace(const std::wstring &name)
@@ -463,5 +511,11 @@ namespace krabs {
     void trace<T>::set_mof_event_processing_enabled(bool mof_events_enabled)
     {
         mof_events_enabled_ = mof_events_enabled;
+    }
+
+    template <typename T>
+    void trace<T>::set_wpp_event_processing_enabled(bool wpp_events_enabled)
+    {
+        wpp_events_enabled_ = wpp_events_enabled;
     }
 }
