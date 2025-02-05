@@ -41,6 +41,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         property String^ ProviderName { String^ get(); }
 
+        /// <summary>
+        /// Returns the decoding source of the event.
+        /// </summary>
+        property ETW::DecodingSource DecodingSource { ETW::DecodingSource get(); }
+
         // Parser Methods
 
         /// <summary>

@@ -26,6 +26,8 @@
 #pragma warning(disable: 4634) // DocXml comment warnings in native C++
 #pragma warning(disable: 4635) // DocXml comment warnings in native C++
 
+#pragma managed(push, off)
+
 #include "krabs/compiler_check.hpp"
 #include "krabs/ut.hpp"
 #include "krabs/kt.hpp"
@@ -57,5 +59,7 @@
 #include "krabs/filtering/comparers.hpp"
 #include "krabs/filtering/predicates.hpp"
 #include "krabs/filtering/event_filter.hpp"
+
+#pragma managed(pop)
 
 #pragma warning(pop)

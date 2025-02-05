@@ -16,8 +16,6 @@
 
 #include <evntcons.h>
 #include <guiddef.h>
-#include <pla.h>
-#include <comutil.h>
 
 #ifdef _DEBUG
 #pragma comment(lib, "comsuppwd.lib")
@@ -294,6 +292,8 @@ namespace krabs {
         T trace_flags_;
         bool rundown_enabled_;
 
+        GUID provider_name_to_guid(const std::wstring& name);
+
     private:
         template <typename T>
         friend class details::trace_manager;
@@ -517,97 +517,10 @@ namespace krabs {
     , rundown_enabled_(false)
     {}
 
-
-    inline void check_com_hr(HRESULT hr) {
-        if (FAILED(hr)) {
-            std::stringstream stream;
-            stream << "Error in creating instance of trace providers";
-            stream << ", hr = 0x";
-            stream << std::hex << hr;
-            throw std::runtime_error(stream.str());
-        }
-    }
-
-    inline void check_provider_hr(HRESULT hr, const std::wstring &providerName) {
-        if (FAILED(hr)) {
-            std::stringstream stream;
-            stream << "Error in constructing guid from provider name (";
-            stream << from_wstring(providerName);
-            stream << "), hr = 0x";
-            stream << std::hex << hr;
-            throw std::runtime_error(stream.str());
-        }
-    }
-
     template <typename T>
     provider<T>::provider(const std::wstring &providerName)
-    {
-        ITraceDataProviderCollection *allProviders;
-
-        HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-        check_com_hr(hr);
-        {
-            hr = CoCreateInstance(
-                CLSID_TraceDataProviderCollection,
-                NULL,
-                CLSCTX_SERVER,
-                IID_ITraceDataProviderCollection,
-                (void**)&allProviders);
-            check_com_hr(hr);
-
-            auto release_ptr = [](IUnknown* ptr) { ptr->Release(); };
-            std::unique_ptr<ITraceDataProviderCollection, decltype(release_ptr)> allProvidersPtr(allProviders, release_ptr);
-
-            hr = allProviders->GetTraceDataProviders(NULL);
-            check_provider_hr(hr, providerName);
-
-            ULONG count;
-            hr = allProviders->get_Count((long*)&count);
-            check_provider_hr(hr, providerName);
-
-            VARIANT index;
-            index.vt = VT_UI4;
-
-            GUID providerGuid = { 0 };
-
-            for (index.ulVal = 0; index.ulVal < count; index.ulVal++){
-                ITraceDataProvider *provider;
-                hr = allProviders->get_Item(index, &provider);
-                check_provider_hr(hr, providerName);
-
-                std::unique_ptr<ITraceDataProvider, decltype(release_ptr)> providerPtr(provider, release_ptr);
-
-                _bstr_t name;
-                hr = provider->get_DisplayName(name.GetAddress());
-                check_provider_hr(hr, providerName);
-
-                if (wcscmp(name, providerName.c_str()) == 0){
-                    hr = provider->get_Guid(&providerGuid);
-                    check_provider_hr(hr, providerName);
-                    break;
-                }
-            }
-
-            if (memcmp((void*)&providerGuid, (void*)&emptyGuid, sizeof(emptyGuid)) == 0)
-            {
-                std::stringstream stream;
-                stream << "Provider name does not exist. (";
-                stream << from_wstring(providerName);
-                stream << "), hr = 0x";
-                stream << std::hex << hr;
-                throw std::runtime_error(stream.str());
-            }
-
-            guid_ = providerGuid;
-            any_ = 0;
-            all_ = 0;
-            level_ = 5;
-            trace_flags_ = 0;
-            rundown_enabled_ = false;
-        }
-
-        CoUninitialize();
-    }
+    : provider(provider_name_to_guid(providerName))
+    {}
 
     template <typename T>
     void provider<T>::any(T any)
@@ -656,6 +569,36 @@ namespace krabs {
         tmp.callbacks_      = this->callbacks_;
 
         return tmp;
+    }
+
+    template <typename T>
+    inline GUID provider<T>::provider_name_to_guid(const std::wstring& name)
+    {
+        ULONG bufferSize = 0;
+        TDHSTATUS status = TdhEnumerateProviders(NULL, &bufferSize);
+        if (status != ERROR_INSUFFICIENT_BUFFER) {
+            error_check_common_conditions(status);
+            return {};
+        }
+
+        auto buffer = std::unique_ptr<char[]>(new char[bufferSize]);
+        status = TdhEnumerateProviders((PPROVIDER_ENUMERATION_INFO)buffer.get(), &bufferSize);
+        error_check_common_conditions(status);
+
+        auto providers = (PPROVIDER_ENUMERATION_INFO)buffer.get();
+        for (ULONG i = 0; i < providers->NumberOfProviders; i++)
+        {
+            auto provider = providers->TraceProviderInfoArray[i];
+            std::wstring_view provider_name((wchar_t*)((char*)providers + provider.ProviderNameOffset));
+            if (provider_name == name)
+                return provider.ProviderGuid;
+        }
+
+        std::stringstream stream;
+        stream << "Provider name does not exist. (";
+        stream << from_wstring(name);
+        stream << ")";
+        throw std::runtime_error(stream.str());
     }
 
     inline const krabs::guid &kernel_provider::id() const
