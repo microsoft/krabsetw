@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Native.ETW.Debug</id>
-        <version>4.4.3</version>
+        <version>4.4.4</version>
         <title>Microsoft.O365.Security.Native.ETW Debug - managed wrappers for krabsetw</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
