@@ -12,8 +12,10 @@
         <description>Microsoft.O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library.</description>
         <summary>Microsoft.O365.Security.Native.ETW is a managed wrapper around the krabsetw ETW library.</summary>
         <releaseNotes>
-            Version 4.4.3:
-              - RawProvider only allocates EventRecordMetadata once per instance.
+            Version 4.4.4:
+              - Revamped callback infrastructure.
+              - Faster provider enumeration.
+              - Support disabling WPP and MOF handling.
         </releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
