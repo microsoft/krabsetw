@@ -99,7 +99,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>a predicate that matches events of the specified UInt32 property</returns>
         static Predicate ^IsUInt32(String ^propertyName, UInt32 value)
         {
-            return gcnew Predicate(krabs::predicates::property_is<UInt32>(
+            return gcnew Predicate(krabs::predicates::property_is<uint32_t>(
                 msclr::interop::marshal_as<std::wstring>(propertyName),
                 value));
         }
