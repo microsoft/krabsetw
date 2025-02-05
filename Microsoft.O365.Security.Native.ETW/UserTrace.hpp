@@ -150,6 +150,45 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the <see cref="O365::Security::ETW::TraceStats"/> for the current trace object</returns>
         virtual TraceStats QueryStats();
 
+        /// <summary>
+        /// Get the number of buffers processed by this trace
+        /// </summary>
+        /// <example>
+        ///     UserTrace trace = new UserTrace();
+        ///     // ...
+        ///     trace.Start();
+        ///     trace.Stop();
+        ///     Console.WriteLine("Buffers processed: " + trace.BuffersProcessed);
+        /// </example>
+        virtual property uint64_t BuffersProcessed
+        {
+            uint64_t get();
+        }
+
+        /// <summary>
+        /// Sets whether to enable getting schema information for MOF events.
+        /// </summary>
+        /// <example>
+        ///     UserTrace trace = new UserTrace();
+        ///     trace.MOFEventProcessingEnabled = false;
+        /// </example>
+        virtual property bool MOFEventProcessingEnabled
+        {
+            void set(bool value);
+        }
+
+        /// <summary>
+        /// Sets whether to enable getting schema information for WPP events.
+        /// </summary>
+        /// <example>
+        ///     UserTrace trace = new UserTrace();
+        ///     trace.WPPEventProcessingEnabled = false;
+        /// </example>
+        virtual property bool WPPEventProcessingEnabled
+        {
+            void set(bool value);
+        }
+
     internal:
         bool disposed_ = false;
         O365::Security::ETW::NativePtr<krabs::user_trace> trace_;
@@ -198,7 +237,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         _properties.MaximumBuffers = properties->MaximumBuffers;
         _properties.LogFileMode = properties->LogFileMode;
         _properties.FlushTimer = properties->FlushTimer;
-        ExecuteAndConvertExceptions(return trace_->set_trace_properties(&_properties));
+        trace_->set_trace_properties(&_properties);
     }
 
     inline void UserTrace::Open()
@@ -219,6 +258,21 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline TraceStats UserTrace::QueryStats()
     {
         ExecuteAndConvertExceptions(return TraceStats(trace_->query_stats()));
+    }
+
+    inline uint64_t UserTrace::BuffersProcessed::get()
+    {
+        return trace_->buffers_processed();
+    }
+
+    inline void UserTrace::MOFEventProcessingEnabled::set(bool value)
+    {
+        trace_->set_mof_event_processing_enabled(value);
+    }
+
+    inline void UserTrace::WPPEventProcessingEnabled::set(bool value)
+    {
+        trace_->set_wpp_event_processing_enabled(value);
     }
 
 } } } }
