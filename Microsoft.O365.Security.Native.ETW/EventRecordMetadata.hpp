@@ -142,6 +142,19 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             Guid get() { return ConvertGuid(header_->ActivityId); }
         }
 
+        /// <summary>
+        /// Returns the type of the event record.
+        /// DecodingSourceXMLFile - The event was emitted by a manifest-based provider.
+        /// DecodingSourceWbem - The event was emitted by a MOF-based provider.
+        /// DecodingSourceWPP - The event was emitted by a WPP software tracing provider.
+        /// DecodingSourceTlg - The event was emitted by a TraceLogging provider.
+        /// </summary>
+        /// <returns>the type of the event record</returns>
+        virtual DecodingSource GetEventType()
+        {
+            return (DecodingSource)krabs::get_event_type(*record_);
+        }
+
 #pragma endregion
 
 #pragma region EventRecord
