@@ -61,8 +61,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// provider.
         /// </summary>
         event IEventRecordMetadataDelegate^ OnMetadata {
-            void add(IEventRecordMetadataDelegate^ value) { CombineDelegate(IEventRecordMetadataDelegate, bridge_->OnMetadata, value); }
-            void remove(IEventRecordMetadataDelegate^ value) { RemoveDelegate(IEventRecordMetadataDelegate, bridge_->OnMetadata, value); }
+            void add(IEventRecordMetadataDelegate^ value) { CombineDelegate(bridge_->OnMetadata, value); }
+            void remove(IEventRecordMetadataDelegate^ value) { RemoveDelegate(bridge_->OnMetadata, value); }
         }
 
         /// <summary>
@@ -70,8 +70,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// provider.
         /// </summary>
         event IEventRecordDelegate^ OnEvent {
-            void add(IEventRecordDelegate^ value) { CombineDelegate(IEventRecordDelegate, bridge_->OnEvent, value); }
-            void remove(IEventRecordDelegate^ value) { RemoveDelegate(IEventRecordDelegate, bridge_->OnEvent, value); }
+            void add(IEventRecordDelegate^ value) { CombineDelegate(bridge_->OnEvent, value); }
+            void remove(IEventRecordDelegate^ value) { RemoveDelegate(bridge_->OnEvent, value); }
         }
 
         /// <summary>
@@ -79,8 +79,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// but an error occurs handling the record.
         /// </summary>
         event EventRecordErrorDelegate^ OnError {
-            void add(EventRecordErrorDelegate^ value) { CombineDelegate(EventRecordErrorDelegate, bridge_->OnError, value); }
-            void remove(EventRecordErrorDelegate^ value) { RemoveDelegate(EventRecordErrorDelegate, bridge_->OnError, value); }
+            void add(EventRecordErrorDelegate^ value) { CombineDelegate(bridge_->OnError, value); }
+            void remove(EventRecordErrorDelegate^ value) { RemoveDelegate(bridge_->OnError, value); }
         }
 
         /// <summary>

@@ -60,8 +60,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// filter and the event meets the given predicate.
         /// </summary>
         event IEventRecordDelegate^ OnEvent {
-            void add(IEventRecordDelegate^ value) { CombineDelegate(IEventRecordDelegate, bridge_->OnEvent, value); }
-            void remove(IEventRecordDelegate^ value) { RemoveDelegate(IEventRecordDelegate, bridge_->OnEvent, value); }
+            void add(IEventRecordDelegate^ value) { CombineDelegate(bridge_->OnEvent, value); }
+            void remove(IEventRecordDelegate^ value) { RemoveDelegate(bridge_->OnEvent, value); }
         }
 
         /// <summary>
@@ -69,8 +69,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// but an error occurs handling the record.
         /// </summary>
         event EventRecordErrorDelegate^ OnError {
-            void add(EventRecordErrorDelegate^ value) { CombineDelegate(EventRecordErrorDelegate, bridge_->OnError, value); }
-            void remove(EventRecordErrorDelegate^ value) { RemoveDelegate(EventRecordErrorDelegate, bridge_->OnError, value); }
+            void add(EventRecordErrorDelegate^ value) { CombineDelegate(bridge_->OnError, value); }
+            void remove(EventRecordErrorDelegate^ value) { RemoveDelegate(bridge_->OnError, value); }
         }
 
     internal:

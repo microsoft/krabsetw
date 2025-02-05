@@ -41,9 +41,9 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         EventRecord^ record_;
         EventRecordError^ error_;
 
-        EventRecordMetadata^ CreateMetadata(const EVENT_RECORD& record);
-        EventRecord^ CreateRecord(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser);
-        EventRecordError^ CreateError(const std::string& error_message, const EVENT_RECORD& record);
+        EventRecordMetadata^ WrapMetadata(const EVENT_RECORD& record);
+        EventRecord^ WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser);
+        EventRecordError^ WrapError(const std::string& error_message, const EVENT_RECORD& record);
 
         void EventNotification(const EVENT_RECORD& record, const krabs::trace_context& trace_context);
         void ErrorNotification(const EVENT_RECORD& record, const std::string& error_message);
@@ -68,7 +68,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
     };
 
-    EventRecordMetadata^ CallbackBridge::CreateMetadata(const EVENT_RECORD& record)
+    EventRecordMetadata^ CallbackBridge::WrapMetadata(const EVENT_RECORD& record)
     {
         auto value = metadata_;
         if (!value)
@@ -78,7 +78,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         return value;
     }
 
-    EventRecord^ CallbackBridge::CreateRecord(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser)
+    EventRecord^ CallbackBridge::WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser)
     {
         auto value = record_;
         if (!value) 
@@ -88,7 +88,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         return value;
     }
 
-    EventRecordError^ CallbackBridge::CreateError(const std::string& error_message, const EVENT_RECORD& record)
+    EventRecordError^ CallbackBridge::WrapError(const std::string& error_message, const EVENT_RECORD& record)
     {
         auto msg = gcnew String(error_message.c_str());
         auto value = error_;
@@ -103,7 +103,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     {
         auto onMetadata = OnMetadata;
         if (onMetadata) {
-            auto metadata = CreateMetadata(record);
+            auto metadata = WrapMetadata(record);
 
             onMetadata(metadata);
         }
@@ -116,7 +116,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             if (status == ERROR_SUCCESS) {
                 krabs::schema schema(record, trace_context.schema_locator);
                 krabs::parser parser(schema);
-                auto evt = CreateRecord(record, schema, parser);
+                auto evt = WrapRecord(record, schema, parser);
 
                 onEvent(evt);
             }
@@ -131,24 +131,35 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     {
         auto onError = OnError;
         if (onError) {
-            auto error = CreateError(error_message, record);
+            auto error = WrapError(error_message, record);
 
             onError(error);
         }
     }
 
-#define CombineOrRemoveDelegate(type, target, value, operation) \
-    { \
-        type^ original = target; \
-        type^ comparand; \
-        do \
-        { \
-            comparand = original; \
-            original = (type^)System::Threading::Interlocked::CompareExchange(target, (type^)System::Delegate::operation(comparand, value), comparand); \
-        } while (original != comparand); \
-    } \
+    template<typename T>
+    inline void CombineOrRemoveDelegate(T% target, T value, bool remove)
+    {
+        T original = target;
+        T comparand;
+        do
+        {
+            comparand = original;
+            T newValue = remove ? (T)System::Delegate::Remove(original, value) : (T)System::Delegate::Combine(original, value);
+            original = (T)System::Threading::Interlocked::CompareExchange(target, newValue, comparand);
+        } while (original != comparand);
+    }
 
-#define CombineDelegate(type, target, value) CombineOrRemoveDelegate(type, target, value, Combine)
-#define RemoveDelegate(type, target, value) CombineOrRemoveDelegate(type, target, value, Remove)
+    template<typename T>
+    inline void CombineDelegate(T% target, T value)
+    {
+        CombineOrRemoveDelegate(target, value, false);
+    }
+
+    template<typename T>
+    inline void RemoveDelegate(T% target, T value)
+    {
+        CombineOrRemoveDelegate(target, value, true);
+    }
 
 } } } }

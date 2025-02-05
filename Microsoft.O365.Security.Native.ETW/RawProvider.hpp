@@ -103,8 +103,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// provider.
         /// </summary>
         event IEventRecordMetadataDelegate^ OnEvent {
-            void add(IEventRecordMetadataDelegate^ value) { CombineDelegate(IEventRecordMetadataDelegate, bridge_->OnMetadata, value); }
-            void remove(IEventRecordMetadataDelegate^ value) { RemoveDelegate(IEventRecordMetadataDelegate, bridge_->OnMetadata, value); }
+            void add(IEventRecordMetadataDelegate^ value) { CombineDelegate(bridge_->OnMetadata, value); }
+            void remove(IEventRecordMetadataDelegate^ value) { RemoveDelegate(bridge_->OnMetadata, value); }
         }
 
     internal:
