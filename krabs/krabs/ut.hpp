@@ -238,7 +238,8 @@ namespace krabs { namespace details {
                 }
             }
         }
-        else if (((type == DecodingSourceWbem) && trace.mof_events_enabled_) || ((type == DecodingSourceWPP) && trace.wpp_events_enabled_)) {
+        else if ((type == DecodingSourceWbem && trace.mof_events_enabled_) ||
+            (type == DecodingSourceWPP && trace.wpp_events_enabled_)) {
             // for MOF/WPP providers, EventHeader.Provider is the *Message* GUID
             // we need to ask TDH for event information in order to determine the
             // correct provider to pass this event to

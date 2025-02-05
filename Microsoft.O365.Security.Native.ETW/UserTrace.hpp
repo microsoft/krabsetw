@@ -166,7 +166,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 
         /// <summary>
-        /// Gets or sets whether to enable getting schema information for MOF events.
+        /// Sets whether to enable getting schema information for MOF events.
         /// </summary>
         /// <example>
         ///     UserTrace trace = new UserTrace();
@@ -178,7 +178,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 
         /// <summary>
-        /// Gets or sets whether to enable getting schema information for WPP events.
+        /// Sets whether to enable getting schema information for WPP events.
         /// </summary>
         /// <example>
         ///     UserTrace trace = new UserTrace();
