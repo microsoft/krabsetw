@@ -75,6 +75,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             String^ get() { return gcnew String(schema_->provider_name()); }
         }
 
+        /// <summary>
+        /// Returns the decoding source of the event.
+        /// </summary>
+        virtual property ETW::DecodingSource DecodingSource
+        {
+            ETW::DecodingSource get() { return (ETW::DecodingSource)schema_->decoding_source(); }
+        }
+
 #pragma endregion
 
 #pragma region Parser

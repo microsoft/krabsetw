@@ -8,7 +8,6 @@ using namespace System::Runtime::InteropServices;
 
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
-
     /// <summary>
     /// From the EVENT_HEADER.EventProperty defines:
     /// https://msdn.microsoft.com/en-us/library/windows/desktop/aa363759(v=vs.85).aspx
@@ -18,6 +17,19 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         XML             = 0x0001,
         FORWARDED_XML   = 0x0002,
         LEGACY_EVENTLOG = 0x0004
+    };
+
+    /// <summary>
+    /// From the TRACE_EVENT_INFO.DecodingSource defines:
+    /// https://learn.microsoft.com/en-us/windows/win32/api/tdh/ne-tdh-decoding_source
+    /// </summary>
+    public enum class DecodingSource
+    {
+        XMLFile,
+        Wbem,
+        WPP,
+        Tlg,
+        Max
     };
 
     /// <summary>
@@ -87,6 +99,16 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// Returns the Activity ID associated with this event.
         /// </summary>
         property Guid ActivityId { Guid get(); }
+
+        /// <summary>
+        /// Returns the type of the event record.
+        /// DecodingSourceXMLFile - The event was emitted by a manifest-based provider.
+        /// DecodingSourceWbem - The event was emitted by a MOF-based provider.
+        /// DecodingSourceWPP - The event was emitted by a WPP software tracing provider.
+        /// DecodingSourceTlg - The event was emitted by a TraceLogging provider.
+        /// </summary>
+        /// <returns>the type of the event record</returns>
+        DecodingSource GetEventType();
 
 #pragma endregion
 
