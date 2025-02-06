@@ -149,22 +149,22 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
     inline void RecordBuilder::AddValue(System::String^ name, T value)
     {
         if (T::typeid == Int16::typeid)
-            AddValueInternal(name, (Int16)value);
+            AddValueInternal(name, (int16_t)value);
 
         else if (T::typeid == UInt16::typeid)
-            AddValueInternal(name, (UInt16)value);
+            AddValueInternal(name, (uint16_t)value);
 
         else if (T::typeid == Int32::typeid)
-            AddValueInternal(name, (Int32)value);
+            AddValueInternal(name, (int32_t)value);
 
         else if (T::typeid == UInt32::typeid)
-            AddValueInternal(name, (UInt32)value);
+            AddValueInternal(name, (uint32_t)value);
 
         else if (T::typeid == Int64::typeid)
-            AddValueInternal(name, (Int64)value);
+            AddValueInternal(name, (int64_t)value);
 
         else if (T::typeid == UInt64::typeid)
-            AddValueInternal(name, (UInt64)value);
+            AddValueInternal(name, (uint64_t)value);
 
         else
         {

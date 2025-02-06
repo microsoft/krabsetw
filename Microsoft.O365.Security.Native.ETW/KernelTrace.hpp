@@ -143,6 +143,21 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         virtual TraceStats QueryStats();
 
         /// <summary>
+        /// Get the number of buffers processed by this trace
+        /// </summary>
+        /// <example>
+        ///     KernelTrace trace = new KernelTrace();
+        ///     // ...
+        ///     trace.Start();
+        ///     trace.Stop();
+        ///     Console.WriteLine("Buffers processed: " + trace.BuffersProcessed);
+        /// </example>
+        virtual property uint64_t BuffersProcessed
+        {
+            uint64_t get();
+        }
+
+        /// <summary>
         /// Adds a function to call when an event is fired which has no corresponding provider.
         /// </summary>
         /// <param name="callback">the function to call into</param>
@@ -227,7 +242,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         _properties.MaximumBuffers = properties->MaximumBuffers;
         _properties.LogFileMode = properties->LogFileMode;
         _properties.FlushTimer = properties->FlushTimer;
-        ExecuteAndConvertExceptions(return trace_->set_trace_properties(&_properties));
+        trace_->set_trace_properties(&_properties);
     }
 
     inline void KernelTrace::Open()
@@ -248,6 +263,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline TraceStats KernelTrace::QueryStats()
     {
         ExecuteAndConvertExceptions(return TraceStats(trace_->query_stats()));
+    }
+
+    inline uint64_t KernelTrace::BuffersProcessed::get()
+    {
+        return trace_->buffers_processed();
     }
 
     inline void KernelTrace::RegisterCallbacks()

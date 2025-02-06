@@ -227,24 +227,30 @@ namespace krabs { namespace details {
         const EVENT_RECORD &record,
         const krabs::trace<krabs::details::ut> &trace)
     {
-        // for manifest providers, EventHeader.ProviderId is the Provider GUID
-        for (auto& provider : trace.providers_) {
-            if (record.EventHeader.ProviderId == provider.get().guid_) {
-                provider.get().on_event(record, trace.context_);
-                return;
-            }
-        }
+        auto type = get_event_type(record);
 
-        // for MOF providers, EventHeader.Provider is the *Message* GUID
-        // we need to ask TDH for event information in order to determine the
-        // correct provider to pass this event to
-        TDHSTATUS status = ERROR_SUCCESS;
-        auto schema = trace.context_.schema_locator.get_event_schema_no_throw(record, status);
-        if (status == ERROR_SUCCESS) {
+        if (type == DecodingSourceXMLFile || type == DecodingSourceTlg) {
+            // for manifest/TraceLogging providers, EventHeader.ProviderId is the Provider GUID
             for (auto& provider : trace.providers_) {
-                if (schema->ProviderGuid == provider.get().guid_) {
+                if (record.EventHeader.ProviderId == provider.get().guid_) {
                     provider.get().on_event(record, trace.context_);
                     return;
+                }
+            }
+        }
+        else if ((type == DecodingSourceWbem && trace.mof_events_enabled_) ||
+            (type == DecodingSourceWPP && trace.wpp_events_enabled_)) {
+            // for MOF/WPP providers, EventHeader.Provider is the *Message* GUID
+            // we need to ask TDH for event information in order to determine the
+            // correct provider to pass this event to
+            TDHSTATUS status = ERROR_SUCCESS;
+            auto schema = trace.context_.schema_locator.get_event_schema_no_throw(record, status);
+            if (status == ERROR_SUCCESS) {
+                for (auto& provider : trace.providers_) {
+                    if (schema->ProviderGuid == provider.get().guid_) {
+                        provider.get().on_event(record, trace.context_);
+                        return;
+                    }
                 }
             }
         }
