@@ -15,8 +15,25 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     public ref struct EventRecordError : public IEventRecordError
     {
     private:
-        initonly System::String^ msg_;
-        initonly IEventRecordMetadata^ record_;
+        System::String^ msg_;
+        EventRecordMetadata^ record_;
+
+    internal:
+        EventRecordError(
+            System::String^ message,
+            EventRecordMetadata^ record)
+            : msg_(message)
+            , record_(record)
+        { }
+
+        /// <summary>
+        /// Updates this instance to point to the specified event record.
+        /// </summary>
+        void Update(System::String^ msg, const EVENT_RECORD& record)
+        {
+            msg_ = msg;
+            record_->Update(record);
+        }
 
     public:
         /// <summary>
@@ -39,14 +56,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
                 return record_;
             }
         }
-
-    internal:
-        EventRecordError(
-            System::String^ message,
-            IEventRecordMetadata^ record)
-            : msg_(message)
-            , record_(record)
-        { }
     };
 
 } } } }

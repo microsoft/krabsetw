@@ -33,7 +33,54 @@ namespace EtwTestsCS
         }
 
         [TestMethod]
-        public void it_should_raise_OnEvent_for_raw_provider_on_user_trace()
+        public void it_should_raise_OnMetadata_for_user_trace()
+        {
+            var called = false;
+
+            var trace = new UserTrace();
+            var proxy = new Proxy(trace);
+
+            var provider = new Provider(PowerShellEvent.ProviderId);
+            provider.OnMetadata += e => { called = true; };
+
+            trace.Enable(provider);
+            proxy.PushEvent(PowerShellEvent.CreateRecord("user data", "context info", "payload"));
+
+            Assert.IsTrue(called, "proxy call raised on event");
+        }
+
+        [TestMethod]
+        public void it_should_raise_DefaultEvent_for_user_trace()
+        {
+            var called = false;
+
+            var trace = new UserTrace();
+            var proxy = new Proxy(trace);
+
+            trace.DefaultEvent += e => { called = true; };
+
+            proxy.PushEvent(PowerShellEvent.CreateRecord("user data", "context info", "payload"));
+
+            Assert.IsTrue(called, "proxy call raised on event");
+        }
+
+        [TestMethod]
+        public void it_should_raise_DefaultMetadata_for_user_trace()
+        {
+            var called = false;
+
+            var trace = new UserTrace();
+            var proxy = new Proxy(trace);
+
+            trace.DefaultMetadata += e => { called = true; };
+
+            proxy.PushEvent(PowerShellEvent.CreateRecord("user data", "context info", "payload"));
+
+            Assert.IsTrue(called, "proxy call raised on event");
+        }
+
+        [TestMethod, Obsolete]
+        public void it_should_raise_OnMetadata_for_provider_on_user_trace()
         {
             var called = false;
 
@@ -61,6 +108,53 @@ namespace EtwTestsCS
             provider.OnEvent += e => { called = true; };
 
             trace.Enable(provider);
+            proxy.PushEvent(ImageLoadEvent.CreateRecord(123, "file.exe"));
+
+            Assert.IsTrue(called, "proxy call raised on event");
+        }
+
+        [TestMethod]
+        public void it_should_raise_OnMetadata_for_kernel_trace()
+        {
+            var called = false;
+
+            var trace = new KernelTrace();
+            var proxy = new Proxy(trace);
+
+            var provider = new ImageLoadProvider();
+            provider.OnMetadata += e => { called = true; };
+
+            trace.Enable(provider);
+            proxy.PushEvent(ImageLoadEvent.CreateRecord(123, "file.exe"));
+
+            Assert.IsTrue(called, "proxy call raised on event");
+        }
+
+        [TestMethod]
+        public void it_should_raise_DefaultEvent_for_kernel_trace()
+        {
+            var called = false;
+
+            var trace = new KernelTrace();
+            var proxy = new Proxy(trace);
+
+            trace.DefaultEvent += e => { called = true; };
+
+            proxy.PushEvent(ImageLoadEvent.CreateRecord(123, "file.exe"));
+
+            Assert.IsTrue(called, "proxy call raised on event");
+        }
+
+        [TestMethod]
+        public void it_should_raise_DefaultMetadata_for_kernel_trace()
+        {
+            var called = false;
+
+            var trace = new KernelTrace();
+            var proxy = new Proxy(trace);
+
+            trace.DefaultMetadata += e => { called = true; };
+
             proxy.PushEvent(ImageLoadEvent.CreateRecord(123, "file.exe"));
 
             Assert.IsTrue(called, "proxy call raised on event");

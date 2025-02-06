@@ -122,6 +122,9 @@
     <ClInclude Include="IEventRecordError.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Callbacks.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".nuget\NuGet.Config">

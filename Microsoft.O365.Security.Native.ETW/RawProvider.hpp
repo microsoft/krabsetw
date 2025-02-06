@@ -5,22 +5,18 @@
 
 #include <krabs.hpp>
 
-#include "EventRecord.hpp"
-#include "EventRecordMetadata.hpp"
+#include "Callbacks.hpp"
 #include "Guid.hpp"
 #include "NativePtr.hpp"
 #include "Filtering/EventFilter.hpp"
+
+#pragma warning(push)
+#pragma warning(disable: 4947) // Deprecated warning
 
 using namespace System;
 using namespace System::Runtime::InteropServices;
 
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
-
-    /// <summary>
-    /// Delegate called when a new ETW <see cref="O365::Security::ETW::EventRecordMetadata"/> is received.
-    /// </summary>
-    public delegate void IEventRecordMetadataDelegate(
-        O365::Security::ETW::IEventRecordMetadata^ record);
 
     ref class UserTrace;
 
@@ -30,6 +26,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// so it can be used to access events without a registered schema.
     /// </summary>
     /// <seealso cref="O365::Security::ETW::Provider"/>
+    [Obsolete("This class is deprecated. Use the Provider.OnMetadata event instead.")]
     public ref class RawProvider {
     public:
         /// <summary>
@@ -51,11 +48,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <param name="providerName">the friendly name of the provider to enable</param>
         /// <seealso cref="O365::Security::ETW::Provider"/>
         RawProvider(String^ providerName);
-
-        /// <summary>
-        /// Destructs a RawProvider.
-        /// </summary>
-        ~RawProvider();
 
         /// <summary>
         /// Represents the "any" value on the provider's options, where
@@ -110,20 +102,16 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// An event that is invoked when an ETW event is fired in this
         /// provider.
         /// </summary>
-        event IEventRecordMetadataDelegate^ OnEvent;
+        event IEventRecordMetadataDelegate^ OnEvent {
+            void add(IEventRecordMetadataDelegate^ value) { CombineDelegate(bridge_->OnMetadata, value); }
+            void remove(IEventRecordMetadataDelegate^ value) { RemoveDelegate(bridge_->OnMetadata, value); }
+        }
 
     internal:
-        void EventNotification(const EVENT_RECORD &);
-
-    internal:
-        delegate void NativeHookDelegate(const EVENT_RECORD &);
-
-        NativeHookDelegate ^del_;
         NativePtr<krabs::provider<>> provider_;
-        GCHandle delegateHookHandle_;
-        GCHandle delegateHandle_;
-        EventRecordMetadata^ data_;
-        void SetUpProvider();
+        CallbackBridge^ bridge_ = gcnew CallbackBridge();
+
+        void RegisterCallbacks();
     };
 
     // Implementation
@@ -132,44 +120,20 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline RawProvider::RawProvider(System::Guid id)
         : provider_(ConvertGuid(id))
     {
-        SetUpProvider();
+        RegisterCallbacks();
     }
 
     inline RawProvider::RawProvider(String^ providerName)
         : provider_(msclr::interop::marshal_as<std::wstring>(providerName))
     {
-        SetUpProvider();
+        RegisterCallbacks();
     }
 
-    inline void RawProvider::SetUpProvider()
+    inline void RawProvider::RegisterCallbacks()
     {
-        del_ = gcnew NativeHookDelegate(this, &RawProvider::EventNotification);
-        delegateHandle_ = GCHandle::Alloc(del_);
-        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
-        delegateHookHandle_ = GCHandle::Alloc(bridged);
-
-        provider_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
-
-        data_ = gcnew EventRecordMetadata();
+        provider_->add_on_event_callback(bridge_->GetOnEventBridge());
     }
 
-    inline RawProvider::~RawProvider()
-    {
-        if (delegateHandle_.IsAllocated)
-        {
-            delegateHandle_.Free();
-        }
-
-        if (delegateHookHandle_.IsAllocated)
-        {
-            delegateHookHandle_.Free();
-        }
-    }
-
-    inline void RawProvider::EventNotification(const EVENT_RECORD &record)
-    {
-        data_->Update(record);
-
-        OnEvent(data_);
-    }
 } } } }
+
+#pragma warning(pop)

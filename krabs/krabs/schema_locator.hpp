@@ -15,6 +15,8 @@
 
 #include <memory>
 #include <unordered_map>
+#include <variant>
+#include <cassert>
 
 #include "compiler_check.hpp"
 #include "errors.hpp"
@@ -156,6 +158,14 @@ namespace krabs {
 
     /**
      * <summary>
+     * Get event schema from TDH without throwing exceptions.
+     * If the schema is not found, the function returns an empty unique_ptr and sets the status.
+     * </summary>
+     */
+    std::unique_ptr<char[]> get_event_schema_from_tdh_no_throw(const EVENT_RECORD&, TDHSTATUS&);
+
+    /**
+     * <summary>
      * Returns a string_view to the event name if the specified event was logged
      * with the TraceLogger API otherwise returns an empty string_view.
      * </summary>
@@ -180,8 +190,24 @@ namespace krabs {
          */
         const PTRACE_EVENT_INFO get_event_schema(const EVENT_RECORD &record) const;
 
+        /**
+        * <summary>
+        * Retrieves the event schema from the cache or falls back to
+        * TDH to load the schema without throwing exceptions.
+        * If the schema is not found, the function returns nullptr and sets the status.
+        * </summary>
+        */
+        const PTRACE_EVENT_INFO get_event_schema_no_throw(const EVENT_RECORD& record, TDHSTATUS& status) const;
+
+        /**
+         * <summary>
+         * Returns true if the event schema can be found in the cache or TDH.
+         * </summary>
+         */
+        bool has_event_schema(const EVENT_RECORD& record) const;
+
     private:
-        mutable std::unordered_map<schema_key, std::unique_ptr<char[]>> cache_;
+        mutable std::unordered_map<schema_key, std::variant<std::unique_ptr<char[]>, TDHSTATUS>> cache_;
     };
 
     // Implementation
@@ -254,31 +280,64 @@ namespace krabs {
 
     inline const PTRACE_EVENT_INFO schema_locator::get_event_schema(const EVENT_RECORD &record) const
     {
+        TDHSTATUS status = ERROR_SUCCESS;
+        auto buffer = get_event_schema_no_throw(record, status);
+        error_check_common_conditions(status, record);
+        return buffer;
+    }
+
+    inline const PTRACE_EVENT_INFO schema_locator::get_event_schema_no_throw(const EVENT_RECORD& record, TDHSTATUS& status) const
+    {
+        status = ERROR_SUCCESS;
+
         auto eventName = get_trace_logger_event_name(record);
         auto key = schema_key(record, eventName);
 
         // Check the cache...
         auto it = cache_.find(key);
         if (it != cache_.end()) {
-            return (PTRACE_EVENT_INFO)it->second.get();
+            auto& value = it->second;
+            if (std::holds_alternative<TDHSTATUS>(value)) {
+                status = std::get<TDHSTATUS>(value);
+                return nullptr;
+            }
+            return (PTRACE_EVENT_INFO)std::get<std::unique_ptr<char[]>>(value).get();
         }
 
         // Cache miss. Fetch the schema...
-        auto buffer = get_event_schema_from_tdh(record);
+        auto buffer = get_event_schema_from_tdh_no_throw(record, status);
         auto returnVal = (PTRACE_EVENT_INFO)buffer.get();
 
         // Add the new instance to the cache.
         // NB: key's 'internalize_name' gets called by the cctor here.
-        cache_.emplace(key, std::move(buffer));
+        if (status == ERROR_SUCCESS)
+            cache_.emplace(key, std::move(buffer));
+        else
+            cache_.emplace(key, status);
 
         return returnVal;
     }
 
+    inline bool schema_locator::has_event_schema(const EVENT_RECORD& record) const
+    {
+        TDHSTATUS status = ERROR_SUCCESS;
+        get_event_schema_no_throw(record, status);
+        return status == ERROR_SUCCESS;
+    }
+
     inline std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD &record)
+    {
+        TDHSTATUS status = ERROR_SUCCESS;
+        auto buffer = get_event_schema_from_tdh_no_throw(record, status);
+        error_check_common_conditions(status, record);
+        return buffer;
+    }
+
+    inline std::unique_ptr<char[]> get_event_schema_from_tdh_no_throw(const EVENT_RECORD& record, TDHSTATUS& status)
     {
         // get required size
         ULONG bufferSize = 0;
-        ULONG status = TdhGetEventInformation(
+        status = TdhGetEventInformation(
             (PEVENT_RECORD)&record,
             0,
             NULL,
@@ -286,20 +345,22 @@ namespace krabs {
             &bufferSize);
 
         if (status != ERROR_INSUFFICIENT_BUFFER) {
-            error_check_common_conditions(status, record);
+            return {};
         }
 
         // allocate and fill the schema from TDH
         auto buffer = std::unique_ptr<char[]>(new char[bufferSize]);
 
-        error_check_common_conditions(
-            TdhGetEventInformation(
+        status = TdhGetEventInformation(
             (PEVENT_RECORD)&record,
             0,
             NULL,
             (PTRACE_EVENT_INFO)buffer.get(),
-            &bufferSize),
-            record);
+            &bufferSize);
+
+        if (status != ERROR_SUCCESS) {
+            return {};
+        }
 
         return buffer;
     }

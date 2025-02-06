@@ -26,12 +26,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             : record_(&record)
             , header_(&record.EventHeader) { }
 
-        EventRecordMetadata() { }
-
         /// <summary>
         /// Updates this instance to point to the specified event record.
         /// </summary>
-        virtual void Update(const EVENT_RECORD& record)
+        void Update(const EVENT_RECORD& record)
         {
             record_ = &record;
             header_ = &record.EventHeader;

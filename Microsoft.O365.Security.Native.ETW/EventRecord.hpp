@@ -40,6 +40,16 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             , schema_(&schema)
             , parser_(&parser) { }
 
+        /// <summary>
+        /// Updates this instance to point to the specified event record.
+        /// </summary>
+        void Update(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser)
+        {
+            Update(record);
+            schema_ = &schema;
+            parser_ = &parser;
+        }
+
     public:
 
 #pragma region Schema

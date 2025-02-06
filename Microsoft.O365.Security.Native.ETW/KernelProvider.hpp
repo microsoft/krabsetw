@@ -6,8 +6,7 @@
 #include <krabs.hpp>
 #include <krabs/perfinfo_groupmask.hpp>
 
-#include "EventRecord.hpp"
-#include "EventRecordMetadata.hpp"
+#include "Callbacks.hpp"
 #include "Guid.hpp"
 #include "NativePtr.hpp"
 #include "Filtering/EventFilter.hpp"
@@ -47,11 +46,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         KernelProvider(System::Guid id, PERFINFO_MASK mask);
 
         /// <summary>
-        /// Destructs a KernelProvider.
-        /// </summary>
-        ~KernelProvider();
-
-        /// <summary>
         /// Adds a new EventFilter to the provider.
         /// </summary>
         /// <param name="filter">
@@ -66,13 +60,28 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// An event that is invoked when an ETW event is fired in this
         /// provider.
         /// </summary>
-        event IEventRecordDelegate^ OnEvent;
+        event IEventRecordMetadataDelegate^ OnMetadata {
+            void add(IEventRecordMetadataDelegate^ value) { CombineDelegate(bridge_->OnMetadata, value); }
+            void remove(IEventRecordMetadataDelegate^ value) { RemoveDelegate(bridge_->OnMetadata, value); }
+        }
+
+        /// <summary>
+        /// An event that is invoked when an ETW event is fired in this
+        /// provider.
+        /// </summary>
+        event IEventRecordDelegate^ OnEvent {
+            void add(IEventRecordDelegate^ value) { CombineDelegate(bridge_->OnEvent, value); }
+            void remove(IEventRecordDelegate^ value) { RemoveDelegate(bridge_->OnEvent, value); }
+        }
 
         /// <summary>
         /// An event that is invoked when an ETW event is received
         /// but an error occurs handling the record.
         /// </summary>
-        event EventRecordErrorDelegate^ OnError;
+        event EventRecordErrorDelegate^ OnError {
+            void add(EventRecordErrorDelegate^ value) { CombineDelegate(bridge_->OnError, value); }
+            void remove(EventRecordErrorDelegate^ value) { RemoveDelegate(bridge_->OnError, value); }
+        }
 
         /// <summary>
         /// Retrieves the GUID associated with this provider
@@ -89,17 +98,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             }
         }
 
-
     internal:
-        void EventNotification(const EVENT_RECORD &, const krabs::trace_context &);
-
-    internal:
-        delegate void NativeHookDelegate(const EVENT_RECORD &, const krabs::trace_context &);
-
-        NativeHookDelegate ^del_;
         NativePtr<krabs::kernel_provider> provider_;
-        GCHandle delegateHookHandle_;
-        GCHandle delegateHandle_;
+        CallbackBridge^ bridge_ = gcnew CallbackBridge();
+
+        void RegisterCallbacks();
     };
 
     // Implementation
@@ -108,54 +111,19 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     inline KernelProvider::KernelProvider(unsigned int flags, System::Guid id)
     : provider_(flags, ConvertGuid(id))
     {
-        del_ = gcnew NativeHookDelegate(this, &KernelProvider::EventNotification);
-        delegateHandle_ = GCHandle::Alloc(del_);
-        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
-        delegateHookHandle_ = GCHandle::Alloc(bridged);
-
-        provider_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+        RegisterCallbacks();
     }
 
     inline KernelProvider::KernelProvider(System::Guid id, PERFINFO_MASK mask)
         : provider_(ConvertGuid(id), mask)
     {
-        del_ = gcnew NativeHookDelegate(this, &KernelProvider::EventNotification);
-        delegateHandle_ = GCHandle::Alloc(del_);
-        auto bridged = Marshal::GetFunctionPointerForDelegate(del_);
-        delegateHookHandle_ = GCHandle::Alloc(bridged);
-
-        provider_->add_on_event_callback((krabs::c_provider_callback)bridged.ToPointer());
+        RegisterCallbacks();
     }
 
-    inline KernelProvider::~KernelProvider()
+    inline void KernelProvider::RegisterCallbacks()
     {
-        if (delegateHandle_.IsAllocated)
-        {
-            delegateHandle_.Free();
-        }
-
-        if (delegateHookHandle_.IsAllocated)
-        {
-            delegateHookHandle_.Free();
-        }
-    }
-
-    inline void KernelProvider::EventNotification(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
-    {
-        try
-        {
-            krabs::schema schema(record, trace_context.schema_locator);
-            krabs::parser parser(schema);
-
-            OnEvent(gcnew EventRecord(record, schema, parser));
-        }
-        catch (const krabs::could_not_find_schema& ex)
-        {
-            auto msg = gcnew String(ex.what());
-            auto metadata = gcnew EventRecordMetadata(record);
-
-            OnError(gcnew EventRecordError(msg, metadata));
-        }
+        provider_->add_on_event_callback(bridge_->GetOnEventBridge());
+        provider_->add_on_error_callback(bridge_->GetOnErrorBridge());
     }
 
 } } } }

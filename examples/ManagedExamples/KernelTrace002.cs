@@ -47,10 +47,10 @@ namespace ManagedExamples
             // You'll also likely receive the EventTrace_Header and any HWConfig events here.
             //  * https://docs.microsoft.com/en-us/windows/win32/etw/eventtrace-header
             //  * https://docs.microsoft.com/en-us/windows/win32/etw/hwconfig
-            trace.SetDefaultEventCallback((record) =>
+            trace.DefaultEvent += (record) =>
             {
                 Console.WriteLine($"{record.ProviderId} provider={record.ProviderName} task_name={record.TaskName} opcode={record.Opcode} opcode_name={record.OpcodeName}");
-            });
+            };
             trace.Enable(hiveProvider);
 
             trace.Start();

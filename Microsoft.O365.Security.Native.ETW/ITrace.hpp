@@ -52,11 +52,15 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <param name="provider">The <see cref="O365::Security::ETW::Provider"/> to enable.</param>
         void Enable(Provider^ provider);
 
+#pragma warning(push)
+#pragma warning(disable: 4947) // Deprecated warning
         /// <summary>
         /// Enables a raw provider for the given user trace.
         /// </summary>
         /// <param name="provider">The <see cref="O365::Security::ETW::RawProvider"/> to enable.</param>
+        [Obsolete("The RawProvider is deprecated. Use the Provider.OnMetadata event instead.")]
         void Enable(RawProvider^ provider);
+#pragma warning(pop)
     };
 
     /// <summary>
