@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Native.ETW.Debug</id>
-        <version>4.4.4</version>
+        <version>4.4.5</version>
         <title>Microsoft.O365.Security.Native.ETW Debug - managed wrappers for krabsetw</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -12,10 +12,8 @@
         <description>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</description>
         <summary>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</summary>
         <releaseNotes>
-            Version 4.4.4:
-              - Revamped callback infrastructure.
-              - Faster provider enumeration.
-              - Support disabling WPP and MOF handling.
+            Version 4.4.5:
+              - Fixes error with Refasmer when generating reference assemblies
         </releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
