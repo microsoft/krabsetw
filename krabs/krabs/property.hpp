@@ -193,7 +193,7 @@ namespace krabs {
         const auto &curr_prop = schema_.pSchema_->EventPropertyInfoArray[index];
 
         const wchar_t *pName = reinterpret_cast<const wchar_t*>(
-            reinterpret_cast<BYTE*>(schema_.pSchema_) +
+            reinterpret_cast<const BYTE*>(schema_.pSchema_) +
             curr_prop.NameOffset);
 
         auto tdh_type = (_TDH_IN_TYPE)curr_prop.nonStructType.InType;
