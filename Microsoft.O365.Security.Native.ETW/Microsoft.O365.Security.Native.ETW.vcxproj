@@ -134,9 +134,6 @@
     <ClCompile>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
-    <Link>
-      <AssemblyDebug>true</AssemblyDebug>
-    </Link>
   </ItemDefinitionGroup>
 
   <ItemGroup>
