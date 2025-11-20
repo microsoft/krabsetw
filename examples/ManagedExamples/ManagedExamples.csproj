@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>ManagedExamples</RootNamespace>
     <AssemblyName>ManagedExamples</AssemblyName>
-    <TargetFrameworks>net462;net6.0-windows</TargetFrameworks>
+    <TargetFrameworks>net462;net8.0-windows</TargetFrameworks>
     <Company>Microsoft Corporation</Company>
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
     <Configurations>Debug;DebugSigning;Release;ReleaseSigning</Configurations>
@@ -39,7 +39,7 @@
     <ProjectReference Include="..\..\Microsoft.O365.Security.Native.ETW\Microsoft.O365.Security.Native.ETW.vcxproj" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net6.0-windows' ">
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net8.0-windows' ">
     <ProjectReference Include="..\..\Microsoft.O365.Security.Native.ETW.NetCore\Microsoft.O365.Security.Native.ETW.NetCore.vcxproj" />
   </ItemGroup>
 
