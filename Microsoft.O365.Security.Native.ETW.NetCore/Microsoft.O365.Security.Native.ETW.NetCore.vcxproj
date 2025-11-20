@@ -137,7 +137,6 @@
   <ItemDefinitionGroup Condition="'$(BaseConfig)'=='Release'">
     <ClCompile>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <AssemblyDebug>true</AssemblyDebug>
