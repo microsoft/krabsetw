@@ -13,7 +13,7 @@ if (Test-Path ".\ref") {
 
 $platforms = @("x64", "ARM64")
 $configurations = @("Debug", "DebugSigning", "Release", "ReleaseSigning")
-$targetFrameworks = @("net6.0", "net462")
+$targetFrameworks = @("net8.0", "net462")
 $targetAssemblyName = "Microsoft.O365.Security.Native.ETW.dll"
 
 $generated = @()
