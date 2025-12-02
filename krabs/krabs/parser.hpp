@@ -164,7 +164,7 @@ namespace krabs {
 
             auto &currentPropInfo = schema_.pSchema_->EventPropertyInfoArray[i];
             const wchar_t *pName = reinterpret_cast<const wchar_t*>(
-                                        reinterpret_cast<BYTE*>(schema_.pSchema_) +
+                                        reinterpret_cast<const BYTE*>(schema_.pSchema_) +
                                         currentPropInfo.NameOffset);
 
             ULONG propertyLength = size_provider::get_property_size(

@@ -56,6 +56,26 @@ namespace krabs {
         schema(const EVENT_RECORD &, const krabs::schema_locator &);
 
         /**
+         * <summary>
+         * Constructs a schema from an event record instance
+         * using the provided TRACE_EVENT_INFO pointer.
+         * </summary>
+         *
+         * <example>
+         *   void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+         *   {
+         *       TDHSTATUS status = ERROR_SUCCESS;
+         *       const PTRACE_EVENT_INFO info = trace_context.schema_locator.get_event_schema_no_throw(record, status);
+         *       if (status != ERROR_SUCCESS) {
+         *           // fallback logic here...
+         *       }
+         *       krabs::schema schema(record, info);
+         *   }
+         * </example>
+         */
+        schema(const EVENT_RECORD &, const PTRACE_EVENT_INFO);
+
+        /**
          * <summary>Compares two schemas for equality.<summary>
          *
          * <example>
@@ -264,7 +284,7 @@ namespace krabs {
 
     private:
         const EVENT_RECORD &record_;
-        TRACE_EVENT_INFO *pSchema_;
+        const TRACE_EVENT_INFO *pSchema_;
 
     private:
         friend std::wstring event_name(const schema &);
@@ -292,6 +312,11 @@ namespace krabs {
     inline schema::schema(const EVENT_RECORD &record, const krabs::schema_locator &schema_locator)
         : record_(record)
         , pSchema_(schema_locator.get_event_schema(record))
+    { }
+
+    inline schema::schema(const EVENT_RECORD &record, const PTRACE_EVENT_INFO pSchema)
+        : record_(record)
+        , pSchema_(pSchema)
     { }
 
     inline bool schema::operator==(const schema &other) const
