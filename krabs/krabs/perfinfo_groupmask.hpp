@@ -186,6 +186,7 @@ typedef struct _EVENT_TRACE_GROUPMASK_INFORMATION {
 #ifndef _WINTERNL_
 
 typedef enum _SYSTEM_INFORMATION_CLASS {
+    SystemPerformanceTraceInformation = 0x1f,
 } SYSTEM_INFORMATION_CLASS;
 
 typedef LONG NTSTATUS;
@@ -204,7 +205,5 @@ extern "C" NTSTATUS NTAPI NtSetSystemInformation(
     _In_reads_bytes_opt_(SystemInformationLength) PVOID SystemInformation,
     _In_ ULONG SystemInformationLength
 );
-
-constexpr auto SystemPerformanceTraceInformation{ static_cast<SYSTEM_INFORMATION_CLASS>(0x1f) };
 
 #endif // PERFINFO_GROUPMASK_HPP
