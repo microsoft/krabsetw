@@ -7,6 +7,7 @@
 
 #include <tdh.h>
 #include <string>
+#include <string_view>
 #include <stdexcept>
 
 #include "compiler_check.hpp"
@@ -74,7 +75,7 @@ namespace krabs {
         // type that does not have any assignment validation. This compiles
         // to a no-op in release.
         template <typename T>
-        inline void assert_valid_assignment(const std::wstring&, const property_info&)
+        inline void assert_valid_assignment(std::wstring_view, const property_info&)
         {
 #ifndef NDEBUG
 
@@ -93,7 +94,7 @@ namespace krabs {
         // will fall back to the unspecialized version which is a no-op in release.
 
         inline void throw_if_invalid(
-            const std::wstring& name,
+            std::wstring_view name,
             const property_info& info,
             _TDH_IN_TYPE requested)
         {
@@ -120,7 +121,7 @@ namespace krabs {
 #define BUILD_ASSERT(type, tdh_type) \
         template <> \
         inline void assert_valid_assignment<type>(               \
-            const std::wstring& name, const property_info& info) \
+            std::wstring_view name, const property_info& info) \
         {                                                        \
             throw_if_invalid(name, info, tdh_type);              \
         }
@@ -159,7 +160,7 @@ namespace krabs {
 
         template <>
         inline void assert_valid_assignment<ip_address>(
-            const std::wstring&, const property_info& info)
+            std::wstring_view, const property_info& info)
         {
             auto outType = info.pEventPropertyInfo_->nonStructType.OutType;
 
@@ -172,7 +173,7 @@ namespace krabs {
 
         template <>
         inline void assert_valid_assignment<socket_address>(
-            const std::wstring&, const property_info& info)
+            std::wstring_view, const property_info& info)
         {
             auto outType = info.pEventPropertyInfo_->nonStructType.OutType;
 
@@ -184,7 +185,7 @@ namespace krabs {
 
         template <>
         inline void assert_valid_assignment<sid>(
-            const std::wstring&, const property_info& info)
+            std::wstring_view, const property_info& info)
         {
             auto inType = info.pEventPropertyInfo_->nonStructType.InType;
 
@@ -196,7 +197,7 @@ namespace krabs {
 
         template <>
         inline void assert_valid_assignment<pointer>(
-            const std::wstring&, const property_info& info)
+            std::wstring_view, const property_info& info)
         {
             auto inType = info.pEventPropertyInfo_->nonStructType.InType;
 
@@ -208,7 +209,7 @@ namespace krabs {
 
         template <>
         inline void assert_valid_assignment<bool>(
-            const std::wstring&, const property_info& info)
+            std::wstring_view, const property_info& info)
         {
             auto inType = info.pEventPropertyInfo_->nonStructType.InType;
 
