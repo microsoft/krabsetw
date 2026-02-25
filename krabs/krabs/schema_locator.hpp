@@ -14,6 +14,7 @@
 #include <evntrace.h>
 
 #include <memory>
+#include <string_view>
 #include <unordered_map>
 #include <variant>
 #include <cassert>
@@ -174,6 +175,14 @@ namespace krabs {
 
     /**
      * <summary>
+     * Maps property names to their index in the schema.
+     * Keys are wstring_views pointing into stable TRACE_EVENT_INFO memory.
+     * </summary>
+     */
+    using property_name_map = std::unordered_map<std::wstring_view, ULONG>;
+
+    /**
+     * <summary>
      * Fetches and caches schemas from TDH.
      * NOTE: this cache also reduces the number of managed to native transitions
      * when krabs is compiled into a managed assembly.
@@ -206,8 +215,21 @@ namespace krabs {
          */
         bool has_event_schema(const EVENT_RECORD& record) const;
 
+        /**
+         * <summary>
+         * Returns the persistent property name to index map for a schema.
+         * The map is built when the schema is first cached.
+         * Returns nullptr if pSchema is null or not in the cache.
+         * </summary>
+         */
+        const property_name_map* get_property_names(const TRACE_EVENT_INFO* pSchema) const;
+
     private:
+        void build_property_names(const TRACE_EVENT_INFO* pSchema) const;
+
         mutable std::unordered_map<schema_key, std::variant<std::unique_ptr<char[]>, TDHSTATUS>> cache_;
+        // Persistent property name to index maps, keyed by schema pointer.
+        mutable std::unordered_map<const TRACE_EVENT_INFO*, property_name_map> property_name_cache_;
     };
 
     // Implementation
@@ -310,9 +332,10 @@ namespace krabs {
 
         // Add the new instance to the cache.
         // NB: key's 'internalize_name' gets called by the cctor here.
-        if (status == ERROR_SUCCESS)
+        if (status == ERROR_SUCCESS) {
             cache_.emplace(key, std::move(buffer));
-        else
+            build_property_names(returnVal);
+        } else
             cache_.emplace(key, status);
 
         return returnVal;
@@ -323,6 +346,29 @@ namespace krabs {
         TDHSTATUS status = ERROR_SUCCESS;
         get_event_schema_no_throw(record, status);
         return status == ERROR_SUCCESS;
+    }
+
+    inline void schema_locator::build_property_names(const TRACE_EVENT_INFO* pSchema) const
+    {
+        property_name_map names;
+        for (ULONG i = 0; i < pSchema->PropertyCount; ++i) {
+            const wchar_t* pName = reinterpret_cast<const wchar_t*>(
+                reinterpret_cast<const BYTE*>(pSchema) +
+                pSchema->EventPropertyInfoArray[i].NameOffset);
+            names.emplace(std::wstring_view(pName), i);
+        }
+        property_name_cache_.emplace(pSchema, std::move(names));
+    }
+
+    inline const property_name_map* schema_locator::get_property_names(const TRACE_EVENT_INFO* pSchema) const
+    {
+        if (!pSchema) return nullptr;
+
+        auto it = property_name_cache_.find(pSchema);
+        if (it != property_name_cache_.end()) {
+            return &it->second;
+        }
+        return nullptr;
     }
 
     inline std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD &record)
