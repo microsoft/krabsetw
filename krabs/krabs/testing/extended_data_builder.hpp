@@ -70,7 +70,7 @@ namespace krabs { namespace testing {
         void add_container_id(const GUID& container_id);
 
         // Mocks a process start key type extended data item.
-        void add_process_start_key(ULONG64 process_start_key);
+        void add_process_start_key(const ULONG64& process_start_key);
 
         // This generates a contiguous buffer holding all of the data for
         // the extended data items. Non-trivial because the actual structs
@@ -114,11 +114,11 @@ namespace krabs { namespace testing {
         items_.emplace_back(static_cast<USHORT>(EVENT_HEADER_EXT_TYPE_CONTAINER_ID), guid_data, GUID_STRING_LENGTH_NO_BRACES);
     }
 
-    inline void extended_data_builder::add_process_start_key(ULONG64 process_start_key)
+    inline void extended_data_builder::add_process_start_key(const ULONG64& process_start_key)
     {
         items_.emplace_back(
             static_cast<USHORT>(EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY),
-            reinterpret_cast<BYTE*>(&process_start_key),
+            const_cast<BYTE*>(reinterpret_cast<const BYTE*>(&process_start_key)),
             sizeof(ULONG64));
     }
 

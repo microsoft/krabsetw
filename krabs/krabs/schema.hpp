@@ -494,7 +494,8 @@ namespace krabs {
             auto& item = record_.ExtendedData[i];
             if (item.ExtType == EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY)
             {
-                return *reinterpret_cast<const ULONG64*>(item.DataPtr);
+                if (item.DataPtr != 0)
+                    return *reinterpret_cast<const ULONG64*>(item.DataPtr);
             }
         }
         return 0;

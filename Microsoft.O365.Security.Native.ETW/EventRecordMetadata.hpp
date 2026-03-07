@@ -250,8 +250,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
                 if (extended_data.ExtType == EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY)
                 {
-                    result = *reinterpret_cast<const ULONG64*>(extended_data.DataPtr);
-                    return true;
+                    if (extended_data.DataPtr != 0)
+                    {
+                        result = *reinterpret_cast<const ULONG64*>(extended_data.DataPtr);
+                        return true;
+                    }
                 }
             }
 
