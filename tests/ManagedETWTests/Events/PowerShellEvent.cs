@@ -48,5 +48,23 @@ namespace EtwTestsCS.Events
                 return rb.Pack();
             }
         }
+
+        public static SynthRecord CreateRecordWithProcessStartKey(
+            string userData,
+            string contextInfo,
+            string payload,
+            ulong processStartKey)
+        {
+            using (var rb = new RecordBuilder(ProviderId, EventId, Version))
+            {
+                rb.AddUnicodeString(UserData, userData);
+                rb.AddUnicodeString(ContextInfo, contextInfo);
+                rb.AddUnicodeString(Payload, payload);
+
+                rb.AddProcessStartKey(processStartKey);
+
+                return rb.Pack();
+            }
+        }
     }
 }

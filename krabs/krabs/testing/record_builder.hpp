@@ -144,6 +144,13 @@ namespace krabs { namespace testing {
          */
          void add_container_id_extended_data(const GUID& container_id);
 
+         /**
+         * <summary>
+         * Adds extended data representing a process start key
+         * </summary>
+         */
+         void add_process_start_key_extended_data(const ULONG64& process_start_key);
+
         /**
          * <summary>
          * Gives direct access to the EVENT_HEADER that will be packed into
@@ -306,6 +313,11 @@ namespace krabs { namespace testing {
     inline void record_builder::add_container_id_extended_data(const GUID& container_id)
     {
         extended_data_.add_container_id(container_id);
+    }
+
+    inline void record_builder::add_process_start_key_extended_data(const ULONG64& process_start_key)
+    {
+        extended_data_.add_process_start_key(process_start_key);
     }
 
     inline std::pair<std::vector<BYTE>, std::vector<std::wstring>>

@@ -67,6 +67,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
         /// </summary>
         void AddContainerId(System::Guid container_id);
 
+        /// <summary>
+        /// Adds a process start key extended data item
+        /// </summary>
+        void AddProcessStartKey(System::UInt64 process_start_key);
+
     internal:
         NativePtr<krabs::testing::record_builder> builder_;
 
@@ -183,6 +188,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
     inline void RecordBuilder::AddContainerId(System::Guid container_id)
     {
         builder_->add_container_id_extended_data(ConvertGuid(container_id));
+    }
+
+    inline void RecordBuilder::AddProcessStartKey(System::UInt64 process_start_key)
+    {
+        ULONG64 key = process_start_key;
+        builder_->add_process_start_key_extended_data(key);
     }
 
 } /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */ } /* namespace Microsoft */

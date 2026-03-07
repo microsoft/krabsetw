@@ -226,6 +226,39 @@ namespace EtwTestsCS
                 proxy.PushEvent(PowerShellEvent.CreateRecordWithContainerId(
                     "Test data", String.Empty, String.Empty, guid));
             }
+
+            [TestMethod]
+            public void it_should_read_process_start_key()
+            {
+                ulong expectedKey = 0x123456789ABCDEF0;
+                var provider = new Provider(PowerShellEvent.ProviderId);
+                provider.OnEvent += e =>
+                {
+                    ulong processStartKey;
+                    Assert.IsTrue(e.TryGetProcessStartKey(out processStartKey));
+                    Assert.AreEqual(expectedKey, processStartKey);
+                };
+
+                trace.Enable(provider);
+                proxy.PushEvent(PowerShellEvent.CreateRecordWithProcessStartKey(
+                    "Test data", String.Empty, String.Empty, expectedKey));
+            }
+
+            [TestMethod]
+            public void it_should_return_false_when_process_start_key_not_present()
+            {
+                var provider = new Provider(PowerShellEvent.ProviderId);
+                provider.OnEvent += e =>
+                {
+                    ulong processStartKey;
+                    Assert.IsFalse(e.TryGetProcessStartKey(out processStartKey));
+                    Assert.AreEqual(0UL, processStartKey);
+                };
+
+                trace.Enable(provider);
+                proxy.PushEvent(PowerShellEvent.CreateRecord(
+                    "Test data", String.Empty, String.Empty));
+            }
         }
 
         [TestClass]
