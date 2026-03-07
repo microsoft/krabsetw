@@ -13,6 +13,9 @@ jobs:
     
     steps:
     - uses: actions/checkout@v2
+    - uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
     - uses: microsoft/setup-msbuild@v1
     - uses: NuGet/setup-nuget@v1.0.5
     - uses: darenm/Setup-VSTest@v1
