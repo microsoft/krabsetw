@@ -17,6 +17,10 @@
     #define EVENT_HEADER_EXT_TYPE_CONTAINER_ID 16
 #endif
 
+#ifndef EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY
+    #define EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY 0x000B
+#endif
+
 namespace krabs { namespace testing {
     class extended_data_builder;
 
@@ -65,6 +69,9 @@ namespace krabs { namespace testing {
         // Mocks a container ID type extended data item.
         void add_container_id(const GUID& container_id);
 
+        // Mocks a process start key type extended data item.
+        void add_process_start_key(ULONG64 process_start_key);
+
         // This generates a contiguous buffer holding all of the data for
         // the extended data items. Non-trivial because the actual structs
         // have to be a contiguous array, and they each contain pointers,
@@ -105,6 +112,14 @@ namespace krabs { namespace testing {
         }
 
         items_.emplace_back(static_cast<USHORT>(EVENT_HEADER_EXT_TYPE_CONTAINER_ID), guid_data, GUID_STRING_LENGTH_NO_BRACES);
+    }
+
+    inline void extended_data_builder::add_process_start_key(ULONG64 process_start_key)
+    {
+        items_.emplace_back(
+            static_cast<USHORT>(EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY),
+            reinterpret_cast<BYTE*>(&process_start_key),
+            sizeof(ULONG64));
     }
 
     inline std::pair<std::shared_ptr<BYTE[]>, size_t> extended_data_builder::pack() const

@@ -18,6 +18,11 @@
 #include "compiler_check.hpp"
 #include "schema_locator.hpp"
 
+// Windows SDK may not define this constant on older SDK versions.
+#ifndef EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY
+#define EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY 0x000B
+#endif
+
 #pragma comment(lib, "tdh.lib")
 
 
@@ -282,6 +287,24 @@ namespace krabs {
         */
         std::vector<ULONG64> stack_trace() const;
 
+        /**
+        * <summary>
+        * Retrieves the process start key from the extended data, if enabled.
+        * The process start key is a ULONG64 that uniquely identifies a process
+        * instance across the lifetime of a boot session (unlike PID which can
+        * be recycled). Requires EVENT_ENABLE_PROPERTY_PROCESS_START_KEY.
+        * Returns 0 if the extended data item is not present.
+        * </summary>
+        * <example>
+        *    void on_event(const EVENT_RECORD &record, const krabs::trace_context &trace_context)
+        *    {
+        *        krabs::schema schema(record, trace_context.schema_locator);
+        *        ULONG64 psk = schema.process_start_key();
+        *    }
+        * </example>
+        */
+        ULONG64 process_start_key() const;
+
     private:
         const EVENT_RECORD &record_;
         const TRACE_EVENT_INFO *pSchema_;
@@ -299,6 +322,8 @@ namespace krabs {
         friend int event_id(const schema &);
         friend std::vector<ULONG64> stack_trace(const schema&);
         friend std::vector<ULONG64> stack_trace(const EVENT_RECORD&);
+        friend ULONG64 process_start_key(const schema&);
+        friend ULONG64 process_start_key(const EVENT_RECORD&);
 
         friend class parser;
         friend class property_iterator;
@@ -460,5 +485,18 @@ namespace krabs {
         }
 
         return call_stack;
+    }
+
+    inline ULONG64 schema::process_start_key() const
+    {
+        for (USHORT i = 0; i < record_.ExtendedDataCount; i++)
+        {
+            auto& item = record_.ExtendedData[i];
+            if (item.ExtType == EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY)
+            {
+                return *reinterpret_cast<const ULONG64*>(item.DataPtr);
+            }
+        }
+        return 0;
     }
 }
