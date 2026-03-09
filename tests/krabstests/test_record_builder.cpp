@@ -223,6 +223,70 @@ namespace krabstests
             Assert::IsTrue(CONTAINER_GUID == krabs::guid(parsed_guid));
         }
 
+        TEST_METHOD(pack_should_include_process_start_key_extended_data)
+        {
+            krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+            krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
+            ULONG64 key = 0x123456789ABCDEF0;
+            builder.add_process_start_key_extended_data(key);
+
+            auto synth_record = builder.pack_incomplete();
+            const EVENT_RECORD& record = synth_record;
+
+            Assert::AreEqual((unsigned int)record.ExtendedDataCount, 1u);
+            Assert::IsNotNull(record.ExtendedData);
+            Assert::AreEqual((unsigned int)record.ExtendedData[0].ExtType, (unsigned int)EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY);
+        }
+
+        TEST_METHOD(process_start_key_should_be_read_correctly_after_packing)
+        {
+            const ULONG64 EXPECTED_KEY = 0x123456789ABCDEF0;
+
+            krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+            krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
+            ULONG64 key = EXPECTED_KEY;
+            builder.add_process_start_key_extended_data(key);
+
+            auto synth_record = builder.pack_incomplete();
+            const EVENT_RECORD& record = synth_record;
+
+            Assert::AreEqual((unsigned int)record.ExtendedDataCount, 1u);
+            Assert::IsNotNull(record.ExtendedData);
+
+            auto& extended_data = record.ExtendedData[0];
+            Assert::AreEqual((unsigned int)extended_data.ExtType, (unsigned int)EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY);
+            Assert::AreEqual((size_t)extended_data.DataSize, sizeof(ULONG64));
+
+            auto parsed_key = *reinterpret_cast<const ULONG64*>(extended_data.DataPtr);
+            Assert::AreEqual(EXPECTED_KEY, parsed_key);
+        }
+
+        TEST_METHOD(process_start_key_should_be_read_via_schema)
+        {
+            const ULONG64 EXPECTED_KEY = 0xDEADBEEFCAFEBABE;
+
+            krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+            krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
+            ULONG64 key = EXPECTED_KEY;
+            builder.add_process_start_key_extended_data(key);
+
+            auto synth_record = builder.pack_incomplete();
+            krabs::schema schema(synth_record, schema_locator_);
+
+            Assert::AreEqual(EXPECTED_KEY, schema.process_start_key());
+        }
+
+        TEST_METHOD(process_start_key_should_return_zero_when_not_present)
+        {
+            krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+            krabs::testing::record_builder builder(powershell, krabs::id(7942), krabs::version(1));
+
+            auto synth_record = builder.pack_incomplete();
+            krabs::schema schema(synth_record, schema_locator_);
+
+            Assert::AreEqual((ULONG64)0, schema.process_start_key());
+        }
+
         private:
             krabs::schema_locator schema_locator_;
     };

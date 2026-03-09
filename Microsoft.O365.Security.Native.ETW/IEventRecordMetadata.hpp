@@ -149,6 +149,17 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </returns>
         bool TryGetContainerId([Out] System::Guid% result);
 
+        /// <summary>
+        /// If the event's extended data contains a process start key
+        /// (enabled via EVENT_ENABLE_PROPERTY_PROCESS_START_KEY), retrieve it.
+        /// The process start key uniquely identifies a process instance across
+        /// the lifetime of a boot session, unlike PID which can be recycled.
+        /// </summary>
+        /// <returns>
+        /// True if a process start key was present. False if not.
+        /// </returns>
+        bool TryGetProcessStartKey([Out] uint64_t% result);
+
 #pragma endregion
     };
 

@@ -7,6 +7,11 @@
 #include "IEventRecordMetadata.hpp"
 #include "Guid.hpp"
 
+// Windows SDK may not define this constant on older SDK versions.
+#ifndef EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY
+#define EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY 0x000B
+#endif
+
 using namespace System;
 using namespace System::Runtime::InteropServices;
 
@@ -229,6 +234,31 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
             // Not found.
             result = System::Guid::Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// If the event's extended data contains a process start key
+        /// (enabled via EVENT_ENABLE_PROPERTY_PROCESS_START_KEY), retrieve it.
+        /// </summary>
+        virtual bool TryGetProcessStartKey([Out] uint64_t% result)
+        {
+            auto extended_data_count = record_->ExtendedDataCount;
+            for (USHORT i = 0; i < extended_data_count; i++)
+            {
+                auto& extended_data = record_->ExtendedData[i];
+
+                if (extended_data.ExtType == EVENT_HEADER_EXT_TYPE_PROCESS_START_KEY)
+                {
+                    if (extended_data.DataPtr != 0)
+                    {
+                        result = *reinterpret_cast<const ULONG64*>(extended_data.DataPtr);
+                        return true;
+                    }
+                }
+            }
+
+            result = 0;
             return false;
         }
 
