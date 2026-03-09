@@ -12,9 +12,8 @@
         <description>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</description>
         <summary>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</summary>
         <releaseNotes>
-            Version 4.4.6:
-              - Add constructor for schema from EVENT_RECORD and PTRACE_EVENT_INFO
-              - Update for .NET Core 8
+            Version 4.4.7:
+              - Add process_start_key() to read ProcessStartKey from extended data
         </releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
