@@ -127,39 +127,16 @@ namespace krabs {
         // A schema contains a collection of properties that are keyed by name.
         // These properties are stored in a blob of bytes that needs to be
         // interpreted according to information that is packaged up in the
-        // schema and that can be retrieved using the Tdh* APIs. This format
-        // requires a linear traversal over the blob, incrementing according to
-        // the contents within it. This is janky, so our strategy is to
-        // minimize this as much as possible via caching.
+        // schema and that can be retrieved using the Tdh* APIs.
+        // We have pre-calculated and cached a name to index map.
 
-        const ULONG totalPropCount = schema_.pSchema_->PropertyCount;
-
-        // Resolve property name to index.
-        ULONG index = totalPropCount; // sentinel = not found
-        if (pPropertyNames_) {
-            // Fast path: use the persistent name to index map shared across
-            // all events of the same type.
-            auto it = pPropertyNames_->find(name);
-            if (it != pPropertyNames_->end()) {
-                index = it->second;
-            }
-        } else {
-            // Fallback: linear scan of property names in the schema.
-            for (ULONG i = 0; i < totalPropCount; ++i) {
-                auto &propInfo = schema_.pSchema_->EventPropertyInfoArray[i];
-                const wchar_t *pName = reinterpret_cast<const wchar_t*>(
-                    reinterpret_cast<const BYTE*>(schema_.pSchema_) +
-                    propInfo.NameOffset);
-                if (name == pName) {
-                    index = i;
-                    break;
-                }
-            }
-        }
-
-        if (index >= totalPropCount) {
+        // Resolve property name to index via map.
+        const auto it = pPropertyNames_->find(name);
+        if (it == pPropertyNames_->end()) { // not found
             return property_info();
         }
+
+        const ULONG index = it->second;
 
         // The first step is to use our cache for the property to see if we've
         // discovered it already.
@@ -172,6 +149,7 @@ namespace krabs {
 
         // accept that last property can be omitted from buffer. this happens if last property
         // is string but empty and the provider strips the null terminator
+        const ULONG totalPropCount = schema_.pSchema_->PropertyCount;
         assert((pBufferIndex_ == pEndBuffer_ ? ((totalPropCount - lastPropertyIndex_) <= 1)
                                              : true)
                && "invariant: if we've exhausted our buffer, then we must've"

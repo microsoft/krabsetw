@@ -306,6 +306,8 @@ namespace krabs {
         ULONG64 process_start_key() const;
 
     private:
+        schema(const EVENT_RECORD &, std::pair<const PTRACE_EVENT_INFO, const property_name_map *>);
+
         const EVENT_RECORD &record_;
         const TRACE_EVENT_INFO *pSchema_;
         // Persistent name to index map, owned by schema_locator. May be nullptr.
@@ -337,9 +339,13 @@ namespace krabs {
     // ------------------------------------------------------------------------
 
     inline schema::schema(const EVENT_RECORD &record, const krabs::schema_locator &schema_locator)
+        : schema(record, schema_locator.get_schema_and_names(record))
+    { }
+
+    inline schema::schema(const EVENT_RECORD &record, std::pair<const PTRACE_EVENT_INFO, const property_name_map *> p)
         : record_(record)
-        , pSchema_(schema_locator.get_event_schema(record))
-        , pPropertyNames_(schema_locator.get_property_names(pSchema_))
+        , pSchema_(p.first)
+        , pPropertyNames_(p.second)
     { }
 
     inline schema::schema(const EVENT_RECORD &record, const PTRACE_EVENT_INFO pSchema)
