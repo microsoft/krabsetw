@@ -126,12 +126,9 @@ namespace krabs {
             throw_if_invalid(name, info, tdh_type);              \
         }
 
-        // NOTE: don't just blindly add assertions here, some types
-        // that seem trivial (e.g. bool) are not because of differences
-        // between the representation in C++ and the representation in ETW.
-        // Ensure that type sizes match and that the ETW form isn't
-        // a variant or variable length. A type that requires a specialized
-        // assertion will also require a specialized parser.
+        // Types that check a single InType can use the BUILD_ASSERT macro.
+        // Types that check OutType or accept multiple InTypes need manual
+        // specializations below.
 
         // strings
         BUILD_ASSERT(std::wstring, TDH_INTYPE_UNICODESTRING);
@@ -155,6 +152,12 @@ namespace krabs {
         // FILETIME
         BUILD_ASSERT(::FILETIME, TDH_INTYPE_FILETIME);
         BUILD_ASSERT(::SYSTEMTIME, TDH_INTYPE_SYSTEMTIME);
+
+        BUILD_ASSERT(pointer, TDH_INTYPE_POINTER);
+        BUILD_ASSERT(bool, TDH_INTYPE_BOOLEAN);
+
+        // NOTE: No assert for krabs::binary which can be used to read
+        // any property as raw bytes and so it is valid with any type.
 
 #undef BUILD_ASSERT
 
@@ -192,30 +195,6 @@ namespace krabs {
             if (inType != TDH_INTYPE_WBEMSID && inType != TDH_INTYPE_SID) {
                 throw std::runtime_error(
                     "Requested a SID but was neither a SID nor WBEMSID");
-            }
-        }
-
-        template <>
-        inline void assert_valid_assignment<pointer>(
-            std::wstring_view, const property_info& info)
-        {
-            auto inType = info.pEventPropertyInfo_->nonStructType.InType;
-
-            if (inType != TDH_INTYPE_POINTER) {
-                throw std::runtime_error(
-                    "Requested a POINTER from property that is not one");
-            }
-        }
-
-        template <>
-        inline void assert_valid_assignment<bool>(
-            std::wstring_view, const property_info& info)
-        {
-            auto inType = info.pEventPropertyInfo_->nonStructType.InType;
-
-            if (inType != TDH_INTYPE_BOOLEAN) {
-                throw std::runtime_error(
-                    "Requested a BOOLEAN from property that is not one");
             }
         }
 

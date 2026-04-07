@@ -308,8 +308,6 @@ namespace krabs {
     private:
         const EVENT_RECORD &record_;
         const TRACE_EVENT_INFO *pSchema_;
-        // Persistent name to index map, owned by schema_locator. May be nullptr.
-        const property_name_map *pPropertyNames_;
 
     private:
         friend std::wstring event_name(const schema &);
@@ -339,13 +337,11 @@ namespace krabs {
     inline schema::schema(const EVENT_RECORD &record, const krabs::schema_locator &schema_locator)
         : record_(record)
         , pSchema_(schema_locator.get_event_schema(record))
-        , pPropertyNames_(schema_locator.get_property_names(pSchema_))
     { }
 
     inline schema::schema(const EVENT_RECORD &record, const PTRACE_EVENT_INFO pSchema)
         : record_(record)
         , pSchema_(pSchema)
-        , pPropertyNames_(nullptr)
     { }
 
     inline bool schema::operator==(const schema &other) const
