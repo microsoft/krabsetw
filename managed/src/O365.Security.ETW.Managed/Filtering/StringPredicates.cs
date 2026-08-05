@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Microsoft.O365.Security.ETW.Interop;
 
 namespace Microsoft.O365.Security.ETW
 {
@@ -123,10 +124,10 @@ namespace Microsoft.O365.Security.ETW
 
             _name = name ?? throw new ArgumentNullException(nameof(name));
 
-            // UTF-8 rather than the ANSI code page. The two agree for every ASCII value,
-            // which covers the strings ETW providers actually emit; choosing UTF-8 keeps
-            // behaviour identical on .NET Framework and .NET, where Encoding.Default differs.
-            _value = Encoding.UTF8.GetBytes(value);
+            // The ANSI code page, matching how these properties are decoded and how the
+            // C++/CLI wrapper marshals the value it compares against
+            // (msclr::interop::marshal_as<std::string>, which is also CP_ACP).
+            _value = AnsiEncoding.Current.GetBytes(value);
             _match = match;
             _ignoreCase = ignoreCase;
         }
