@@ -178,6 +178,23 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <summary>
+        /// Delivers a record to this trace's providers as though ETW had produced it.
+        /// Drives <see cref="Testing.Proxy"/>; not part of the consumer API.
+        /// </summary>
+        internal unsafe void PushEvent(Interop.EVENT_RECORD* record)
+        {
+            lock (_gate)
+            {
+                if (!_opened)
+                {
+                    _context.SetProviders(_providers);
+                }
+            }
+
+            _context.OnEvent(record);
+        }
+
+        /// <summary>
         /// Creates the session and opens it for consumption, without beginning to process
         /// events. Lets a caller enable providers and know the session exists before
         /// <see cref="Start"/> blocks.
