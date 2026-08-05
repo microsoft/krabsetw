@@ -149,7 +149,10 @@ namespace Microsoft.O365.Security.ETW.Interop
         WbemSid = 310
     }
 
-    /// <summary>TDH_OUT_TYPE values (subset that affects decoding).</summary>
+    /// <summary>
+    /// TDH_OUT_TYPE values, as ordered in tdh.h (SDK 10.0.26100.0). The enum there is
+    /// implicitly numbered, so the values are spelled out here and must stay contiguous.
+    /// </summary>
     internal enum TdhOutType : ushort
     {
         Null = 0,
@@ -178,17 +181,18 @@ namespace Microsoft.O365.Security.ETW.Interop
         Ipv4 = 23,
         Ipv6 = 24,
         SocketAddress = 25,
-        Etwtime = 30,
-        Xml = 31,
-        ErrorCode = 32,
-        Win32Error = 33,
-        Ntstatus = 34,
-        Hresult = 35,
-        CultureInsensitiveDatetime = 36,
-        Json = 37,
-        Utf8 = 38,
-        Pkcs7WithTypeInfo = 39,
-        CodePointer = 40,
-        DatetimeUtc = 41
+        CimDateTime = 26,
+        Etwtime = 27,
+        Xml = 28,
+        ErrorCode = 29,
+        Win32Error = 30,
+        Ntstatus = 31,
+        Hresult = 32,
+        CultureInsensitiveDatetime = 33,
+        Json = 34,
+        Utf8 = 35,
+        Pkcs7WithTypeInfo = 36,
+        CodePointer = 37,
+        DatetimeUtc = 38
     }
 }
