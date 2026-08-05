@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using Microsoft.O365.Security.ETW.Interop;
 using Microsoft.O365.Security.ETW.Schema;
 using Xunit;
@@ -16,93 +15,31 @@ namespace Microsoft.O365.Security.ETW.Tests
     /// for a property that fails to decode to take working ones down with it: krabs resolves
     /// every offset from scratch on each access and so cannot have that problem, and the port
     /// has to behave the same.
+    ///
+    /// <see cref="OffsetResolverDifferentialTests"/> makes the same guarantee generally, over
+    /// generated schemas. These cases pin the specific shape that regressed.
     /// </remarks>
     public unsafe class OffsetResolverTests : IDisposable
     {
-        private const int HeaderSize = 112;
-        private const int PropertyInfoSize = 24;
-        private const int PointerSize = 8;
-
         /// <summary>first (UInt32), middle (a struct, which this implementation will not size), last (UInt32).</summary>
-        private readonly IntPtr _blob;
-        private readonly SchemaEntry _schema;
-        private readonly IntPtr _payload;
-        private readonly IntPtr _record;
+        private readonly SchemaBlob _schema;
+        private readonly SyntheticRecord _record;
 
         public OffsetResolverTests()
         {
-            const int PropertyCount = 3;
-            string[] names = { "first", "middle", "last" };
+            _schema = new SchemaBlobBuilder()
+                .Fixed("first", TdhInType.UInt32, 4)
+                .Struct("middle")
+                .Fixed("last", TdhInType.UInt32, 4)
+                .Build();
 
-            int nameArea = 0;
-            foreach (string name in names)
-            {
-                nameArea += (name.Length + 1) * sizeof(char);
-            }
-
-            int propertiesOffset = HeaderSize;
-            int namesOffset = propertiesOffset + (PropertyCount * PropertyInfoSize);
-            int blobSize = namesOffset + nameArea;
-
-            _blob = Marshal.AllocHGlobal(blobSize);
-            byte* blob = (byte*)_blob;
-
-            for (int i = 0; i < blobSize; i++)
-            {
-                blob[i] = 0;
-            }
-
-            var info = (TRACE_EVENT_INFO*)blob;
-            info->PropertyCount = PropertyCount;
-            info->TopLevelPropertyCount = PropertyCount;
-
-            var properties = (EVENT_PROPERTY_INFO*)(blob + propertiesOffset);
-
-            int nameCursor = namesOffset;
-            for (int i = 0; i < PropertyCount; i++)
-            {
-                properties[i].NameOffset = (uint)nameCursor;
-
-                var target = (char*)(blob + nameCursor);
-                for (int c = 0; c < names[i].Length; c++)
-                {
-                    target[c] = names[i][c];
-                }
-
-                target[names[i].Length] = '\0';
-                nameCursor += (names[i].Length + 1) * sizeof(char);
-
-                properties[i].CountOrCountPropertyIndex = 1;
-            }
-
-            properties[0].InTypeOrStructStartIndex = (ushort)TdhInType.UInt32;
-            properties[0].LengthOrLengthPropertyIndex = 4;
-
-            // A struct. PropertySizer deliberately refuses these rather than reading
-            // misaligned data, so the walk stops here.
-            properties[1].Flags = NativeConstants.PropertyStruct;
-
-            properties[2].InTypeOrStructStartIndex = (ushort)TdhInType.UInt32;
-            properties[2].LengthOrLengthPropertyIndex = 4;
-
-            var table = new PropertyTable(info, PointerSize);
-            _schema = new SchemaEntry(_blob, blobSize, table, null);
-
-            _payload = Marshal.AllocHGlobal(12);
-            _record = Marshal.AllocHGlobal(sizeof(EVENT_RECORD));
-
-            var record = (EVENT_RECORD*)_record;
-            *record = default;
-            record->UserData = _payload;
-            record->UserDataLength = 12;
-            record->EventHeader.Flags = NativeConstants.EVENT_HEADER_FLAG_64_BIT_HEADER;
+            _record = new SyntheticRecord(new byte[12]);
         }
 
         [Fact]
         public void ResolvesOffsetsBeforeTheUndecodableProperty()
         {
-            var offsets = new OffsetResolver();
-            offsets.Begin((EVENT_RECORD*)_record, _schema);
+            OffsetResolver offsets = Resolver();
 
             Assert.Equal(0, offsets.GetOffset(0));
             Assert.Equal(4, offsets.GetOffset(1));
@@ -111,8 +48,7 @@ namespace Microsoft.O365.Security.ETW.Tests
         [Fact]
         public void DoesNotResolveOffsetsAfterTheUndecodableProperty()
         {
-            var offsets = new OffsetResolver();
-            offsets.Begin((EVENT_RECORD*)_record, _schema);
+            OffsetResolver offsets = Resolver();
 
             Assert.Equal(-1, offsets.GetOffset(2));
         }
@@ -124,8 +60,7 @@ namespace Microsoft.O365.Security.ETW.Tests
         [Fact]
         public void ReadingPastAnUndecodablePropertyLeavesEarlierOnesReadable()
         {
-            var offsets = new OffsetResolver();
-            offsets.Begin((EVENT_RECORD*)_record, _schema);
+            OffsetResolver offsets = Resolver();
 
             Assert.Equal(-1, offsets.GetOffset(2));
 
@@ -133,11 +68,17 @@ namespace Microsoft.O365.Security.ETW.Tests
             Assert.Equal(4, offsets.GetOffset(1));
         }
 
+        private OffsetResolver Resolver()
+        {
+            var offsets = new OffsetResolver();
+            offsets.Begin(_record.Record, _schema.Entry);
+            return offsets;
+        }
+
         public void Dispose()
         {
-            Marshal.FreeHGlobal(_blob);
-            Marshal.FreeHGlobal(_payload);
-            Marshal.FreeHGlobal(_record);
+            _schema.Dispose();
+            _record.Dispose();
         }
     }
 }
