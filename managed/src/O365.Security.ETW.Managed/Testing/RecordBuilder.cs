@@ -98,7 +98,7 @@ namespace Microsoft.O365.Security.ETW.Testing
         /// <summary>Adds a property with an ANSI string to the record.</summary>
         public void AddAnsiString(string name, string value)
         {
-            byte[] text = Encoding.Default.GetBytes(value ?? string.Empty);
+            byte[] text = AnsiEncoding.Current.GetBytes(value ?? string.Empty);
             var bytes = new byte[text.Length + 1];
             text.CopyTo(bytes, 0);
 

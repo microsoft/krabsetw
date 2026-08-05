@@ -207,11 +207,15 @@ namespace Microsoft.O365.Security.ETW
             return false;
         }
 
+        /// <summary>
+        /// ANSI string properties carry the provider's ANSI code page, not UTF-8 -- see
+        /// <see cref="Interop.AnsiEncoding"/> for the citation and the provider survey.
+        /// </summary>
         private static string Decode(ReadOnlySpan<byte> value)
         {
             fixed (byte* p = value)
             {
-                return Encoding.UTF8.GetString(p, value.Length);
+                return Interop.AnsiEncoding.Current.GetString(p, value.Length);
             }
         }
 
