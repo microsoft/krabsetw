@@ -38,6 +38,7 @@ namespace Microsoft.O365.Security.ETW
         private ulong _traceHandle;
         private IntPtr _loggerName;
         private bool _opened;
+        private volatile bool _providersPublished;
         private bool _disposed;
 
         private EventTraceProperties _properties = new EventTraceProperties
@@ -119,6 +120,7 @@ namespace Microsoft.O365.Security.ETW
                 }
 
                 _providers.Add(provider);
+                _providersPublished = false;
             }
         }
 
@@ -133,11 +135,17 @@ namespace Microsoft.O365.Security.ETW
         /// </summary>
         internal void PushEvent(EVENT_RECORD* record)
         {
-            lock (_gate)
+            // Republishing on every push would allocate two arrays per event. Only the
+            // first push after an Enable has to do it.
+            if (!_providersPublished)
             {
-                if (!_opened)
+                lock (_gate)
                 {
-                    _context.SetKernelProviders(_providers);
+                    if (!_providersPublished)
+                    {
+                        _context.SetKernelProviders(_providers);
+                        _providersPublished = true;
+                    }
                 }
             }
 
@@ -157,6 +165,7 @@ namespace Microsoft.O365.Security.ETW
                 EnableGroupMasks();
 
                 _context.SetKernelProviders(_providers);
+                _providersPublished = true;
                 _contextIndex = TraceRegistry.Register(_context);
                 OpenConsumer();
 
