@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
     /// From the EVENT_HEADER.EventProperty defines.
@@ -52,6 +52,11 @@ namespace O365.Security.ETW
         ushort UserDataLength { get; }
 
         IntPtr UserData { get; }
+
+        /// <summary>
+        /// Classifies the event from its header alone, without resolving a schema.
+        /// </summary>
+        DecodingSource GetEventType();
 
         /// <summary>Copies the raw payload onto the heap.</summary>
         byte[] CopyUserData();
@@ -125,7 +130,15 @@ namespace O365.Security.ETW
 
         bool TryGetCountedString(string name, out string result);
 
+        IPAddress GetIPAddress(string name);
+
+        IPAddress GetIPAddress(string name, IPAddress defaultValue);
+
         bool TryGetIPAddress(string name, out IPAddress result);
+
+        SocketAddress GetSocketAddress(string name);
+
+        SocketAddress GetSocketAddress(string name, SocketAddress defaultValue);
 
         bool TryGetSocketAddress(string name, out SocketAddress result);
 
@@ -186,5 +199,11 @@ namespace O365.Security.ETW
         byte[] GetBinary(string name);
 
         bool TryGetBinary(string name, out byte[] result);
+
+        /// <summary>
+        /// Returns the call stack captured with the event, or an empty list when the session
+        /// was not enabled with <see cref="TraceFlags.IncludeStackTrace"/>.
+        /// </summary>
+        List<ulong> GetStackTrace();
     }
 }

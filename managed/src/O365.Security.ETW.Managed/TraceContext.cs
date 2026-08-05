@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using O365.Security.ETW.Interop;
-using O365.Security.ETW.Schema;
+using System.Threading;
+using Microsoft.O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Schema;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
     /// Per-trace state and the entry point ETW calls for each event.
@@ -25,6 +26,13 @@ namespace O365.Security.ETW
 
         public ulong EventsTotal;
         public ulong EventsHandled;
+        public ulong BuffersProcessed;
+
+        /// <summary>Whether MOF (WBEM) events are routed to providers by schema provider GUID.</summary>
+        public bool MofEventsEnabled;
+
+        /// <summary>Whether WPP events are routed to providers by schema provider GUID.</summary>
+        public bool WppEventsEnabled;
 
         public EventRecordDelegate DefaultEventSpan;
         public IEventRecordDelegate DefaultEvent;
@@ -52,21 +60,8 @@ namespace O365.Security.ETW
             try
             {
                 var view = new EventRecordRef(record, _scratch);
-                Guid providerId = record->EventHeader.ProviderId;
 
-                bool matched = false;
-                for (int i = 0; i < _providerIds.Length; i++)
-                {
-                    if (_providerIds[i] != providerId)
-                    {
-                        continue;
-                    }
-
-                    matched = true;
-                    _providers[i].Dispatch(view, _adapter);
-                }
-
-                if (matched)
+                if (Route(view, record))
                 {
                     EventsHandled++;
                 }
@@ -81,39 +76,92 @@ namespace O365.Security.ETW
             }
         }
 
+        /// <summary>
+        /// Delivers the event to the first provider that claims it, mirroring
+        /// krabs::details::ut::forward_events.
+        /// </summary>
+        /// <remarks>
+        /// For manifest and TraceLogging events the header carries the provider GUID. For MOF
+        /// and WPP events it carries the *message* GUID instead, so the only way to find the
+        /// owning provider is to resolve the schema and read TRACE_EVENT_INFO.ProviderGuid.
+        /// That lookup is gated on the trace opting in, because it forces a TDH call for
+        /// every classic event whether or not anyone wants them.
+        /// </remarks>
+        private bool Route(in EventRecordRef view, EVENT_RECORD* record)
+        {
+            DecodingSource type = EventRecordRef.GetEventType(record);
+
+            if (type == DecodingSource.XMLFile || type == DecodingSource.Tlg)
+            {
+                Guid providerId = record->EventHeader.ProviderId;
+
+                for (int i = 0; i < _providerIds.Length; i++)
+                {
+                    if (_providerIds[i] == providerId)
+                    {
+                        _providers[i].Dispatch(view, _adapter);
+                        return true;
+                    }
+                }
+            }
+            else if ((type == DecodingSource.Wbem && MofEventsEnabled)
+                || (type == DecodingSource.WPP && WppEventsEnabled))
+            {
+                SchemaEntry schema = view.SchemaEntry;
+
+                if (schema.Status == NativeConstants.ERROR_SUCCESS)
+                {
+                    Guid providerId = schema.Info->ProviderGuid;
+
+                    for (int i = 0; i < _providerIds.Length; i++)
+                    {
+                        if (_providerIds[i] == providerId)
+                        {
+                            _providers[i].Dispatch(view, _adapter);
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
         private void DispatchDefault(in EventRecordRef view)
         {
+            // Same shape as Provider.Dispatch: the native default callback is the very same
+            // CallbackBridge, so metadata fires unconditionally and first.
+            DefaultMetadata?.Invoke(_adapter);
+
             var span = DefaultEventSpan;
             var compat = DefaultEvent;
-            var metadata = DefaultMetadata;
 
-            if (span == null && compat == null && metadata == null)
+            if (span == null && compat == null)
             {
                 return;
             }
 
-            try
+            // The span surface reads the record header without a schema, so it is not gated
+            // on one. The compat IEventRecord surface mirrors C++/CLI.
+            span?.Invoke(view);
+
+            if (compat == null)
             {
-                if (span != null || compat != null)
-                {
-                    span?.Invoke(view);
-                    compat?.Invoke(_adapter);
-                }
-                else
-                {
-                    metadata(_adapter);
-                }
+                return;
             }
-            catch (Exception ex)
+
+            SchemaEntry schema = view.SchemaEntry;
+
+            if (schema.Status != NativeConstants.ERROR_SUCCESS)
             {
                 var handler = DefaultError;
-                if (handler == null)
-                {
-                    throw;
-                }
-
-                handler(new EventRecordError(ex.Message, _adapter));
+                handler?.Invoke(new EventRecordError(
+                    ErrorMessages.StatusAndRecordContext(schema.Status, view.ProviderId, view.Id),
+                    _adapter));
+                return;
             }
+
+            compat(_adapter);
         }
 
         public void Dispose()
@@ -144,14 +192,21 @@ namespace O365.Security.ETW
                 {
                     if (_contexts[i] == null)
                     {
-                        _contexts[i] = context;
+                        Volatile.Write(ref _contexts[i], context);
                         return i;
                     }
                 }
 
                 int index = _contexts.Length;
-                Array.Resize(ref _contexts, _contexts.Length * 2);
-                _contexts[index] = context;
+
+                // Grow into a fresh array and publish it only once fully populated, so a
+                // callback thread reading the field concurrently sees either the old array
+                // or a complete new one.
+                var grown = new TraceContext[_contexts.Length * 2];
+                Array.Copy(_contexts, grown, _contexts.Length);
+                grown[index] = context;
+                Volatile.Write(ref _contexts, grown);
+
                 return index;
             }
         }
@@ -160,22 +215,23 @@ namespace O365.Security.ETW
         {
             lock (Gate)
             {
-                if (index >= 0 && index < _contexts.Length)
+                TraceContext[] contexts = _contexts;
+
+                if (index >= 0 && index < contexts.Length)
                 {
-                    _contexts[index] = null;
+                    Volatile.Write(ref contexts[index], null);
                 }
             }
         }
 
         /// <summary>
-        /// Resolves a context without locking. Safe because the array reference is only ever
-        /// replaced by a fully populated copy, and a trace is unregistered only after
-        /// ProcessTrace has returned.
+        /// Resolves a context without locking. The array reference is only ever replaced by a
+        /// fully populated copy, so a torn read is not possible.
         /// </summary>
         public static TraceContext Get(int index)
         {
-            TraceContext[] contexts = _contexts;
-            return (uint)index < (uint)contexts.Length ? contexts[index] : null;
+            TraceContext[] contexts = Volatile.Read(ref _contexts);
+            return (uint)index < (uint)contexts.Length ? Volatile.Read(ref contexts[index]) : null;
         }
     }
 
@@ -193,7 +249,7 @@ namespace O365.Security.ETW
 
         public static IntPtr BufferCallback
         {
-            get { return (IntPtr)(delegate* unmanaged<EVENT_TRACE_LOGFILE*, uint>)&OnBuffer; }
+            get { return (IntPtr)(delegate* unmanaged<IntPtr, uint>)&OnBuffer; }
         }
 
         [UnmanagedCallersOnly]
@@ -203,8 +259,9 @@ namespace O365.Security.ETW
         }
 
         [UnmanagedCallersOnly]
-        private static uint OnBuffer(EVENT_TRACE_LOGFILE* logfile)
+        private static uint OnBuffer(IntPtr logfile)
         {
+            CountBuffer(logfile);
             return 1;
         }
 #else
@@ -222,7 +279,12 @@ namespace O365.Security.ETW
         private static readonly EventRecordCallbackDelegate EventRecordThunk =
             record => Dispatch((EVENT_RECORD*)record);
 
-        private static readonly BufferCallbackDelegate BufferThunk = _ => 1;
+        private static readonly BufferCallbackDelegate BufferThunk =
+            logfile =>
+            {
+                CountBuffer(logfile);
+                return 1;
+            };
 
         private static readonly IntPtr EventRecordThunkPointer =
             Marshal.GetFunctionPointerForDelegate(EventRecordThunk);
@@ -242,6 +304,35 @@ namespace O365.Security.ETW
 #endif
 
         internal static Exception LastException;
+
+        // EVENT_TRACE_LOGFILE is not blittable, so the buffer callback receives it as an
+        // opaque pointer. Only the trailing Context field is needed, and its offset is taken
+        // from the declared layout rather than hard coded.
+        private static readonly int ContextOffset =
+            (int)Marshal.OffsetOf(typeof(EVENT_TRACE_LOGFILE), nameof(EVENT_TRACE_LOGFILE.Context));
+
+        private static void CountBuffer(IntPtr logfile)
+        {
+            try
+            {
+                if (logfile == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                var index = (int)*(IntPtr*)((byte*)logfile + ContextOffset);
+                TraceContext context = TraceRegistry.Get(index);
+
+                if (context != null)
+                {
+                    context.BuffersProcessed++;
+                }
+            }
+            catch (Exception ex)
+            {
+                LastException = ex;
+            }
+        }
 
         private static void Dispatch(EVENT_RECORD* record)
         {

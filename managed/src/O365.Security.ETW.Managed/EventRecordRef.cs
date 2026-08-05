@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.CompilerServices;
-using O365.Security.ETW.Interop;
-using O365.Security.ETW.Schema;
+using Microsoft.O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Schema;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
     /// A zero-copy view over a single ETW event.
@@ -61,6 +61,12 @@ namespace O365.Security.ETW
         internal int SchemaStatus
         {
             get { return Schema?.Status ?? -1; }
+        }
+
+        /// <summary>Resolves and returns the schema entry, including a cached failure.</summary>
+        internal SchemaEntry SchemaEntry
+        {
+            get { return Schema; }
         }
 
         #region Header
@@ -171,6 +177,62 @@ namespace O365.Security.ETW
                     ? (DecodingSource)schema.Info->DecodingSource
                     : DecodingSource.Max;
             }
+        }
+
+        /// <summary>
+        /// Classifies the event from its header alone, without consulting TDH.
+        /// </summary>
+        /// <remarks>
+        /// Port of krabs::get_event_type, whose logic is reverse engineered from
+        /// tdh!TdhGetEventInformation. Unlike <see cref="DecodingSource"/> this costs nothing
+        /// and works for events that have no schema at all, which is what makes it usable for
+        /// routing MOF and WPP events to the right provider.
+        /// </remarks>
+        public DecodingSource GetEventType()
+        {
+            return GetEventType(_record);
+        }
+
+        internal static DecodingSource GetEventType(EVENT_RECORD* record)
+        {
+            ushort flags = record->EventHeader.Flags;
+
+            if ((flags & NativeConstants.EVENT_HEADER_FLAG_TRACE_MESSAGE) != 0)
+            {
+                return DecodingSource.WPP;
+            }
+
+            if (record->EventHeader.EventDescriptor.Channel == 11 || HasTraceLoggingSchema(record))
+            {
+                return DecodingSource.Tlg;
+            }
+
+            if ((flags & NativeConstants.EVENT_HEADER_FLAG_CLASSIC_HEADER) != 0)
+            {
+                return DecodingSource.Wbem;
+            }
+
+            return DecodingSource.XMLFile;
+        }
+
+        private static bool HasTraceLoggingSchema(EVENT_RECORD* record)
+        {
+            if (record->ExtendedDataCount == 0 || record->ExtendedData == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            var items = (EVENT_HEADER_EXTENDED_DATA_ITEM*)record->ExtendedData;
+
+            for (int i = 0; i < record->ExtendedDataCount; i++)
+            {
+                if (items[i].ExtType == NativeConstants.EVENT_HEADER_EXT_TYPE_EVENT_SCHEMA_TL)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         #endregion

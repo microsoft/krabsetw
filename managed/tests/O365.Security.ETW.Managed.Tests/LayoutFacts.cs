@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
 using Xunit;
 
-namespace O365.Security.ETW.Tests
+namespace Microsoft.O365.Security.ETW.Tests
 {
     /// <summary>
     /// Pins the interop struct layouts to values taken from the real Windows headers.
@@ -96,7 +96,7 @@ namespace O365.Security.ETW.Tests
             // ANYSIZE_ARRAY of EVENT_PROPERTY_INFO. The managed declaration stops before that
             // array and indexes into it manually, so it stops at the array's offset.
             Assert.Equal(112, Marshal.SizeOf<TRACE_EVENT_INFO>());
-            Assert.Equal(112, O365.Security.ETW.Schema.TraceEventInfoLayout.PropertyArrayOffset);
+            Assert.Equal(112, Microsoft.O365.Security.ETW.Schema.TraceEventInfoLayout.PropertyArrayOffset);
             Assert.Equal(136, Marshal.SizeOf<TRACE_EVENT_INFO>() + Marshal.SizeOf<EVENT_PROPERTY_INFO>());
         }
 

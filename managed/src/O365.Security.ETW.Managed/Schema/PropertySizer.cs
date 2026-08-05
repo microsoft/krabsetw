@@ -1,20 +1,37 @@
 using System;
 using System.Runtime.CompilerServices;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
 
-namespace O365.Security.ETW.Schema
+namespace Microsoft.O365.Security.ETW.Schema
 {
     /// <summary>
     /// Computes property sizes from schema metadata and, where the schema is not enough,
     /// from the event payload itself.
     /// </summary>
+    /// <remarks>
+    /// The rules implemented here are the ones documented against each TDH_IN_TYPE in tdh.h.
+    /// Two of them differ from what native krabs does, deliberately:
+    ///
+    /// - For TDH_INTYPE_UNICODESTRING the length is a count of WCHARs, not bytes. Native
+    ///   krabs::size_provider returns epi.length unscaled, which halves every fixed-width
+    ///   unicode string.
+    /// - For TDH_INTYPE_WBEMSID the SE_TOKEN_USER prefix is sized from the *producing*
+    ///   process's pointer width, taken from EVENT_HEADER.Flags, not from our own.
+    ///
+    /// A length of -1 throughout means "the schema did not specify one". That is distinct
+    /// from a specified length of 0, which is a legitimately empty field; conflating the two
+    /// makes an empty string swallow the rest of the payload.
+    /// </remarks>
     internal static unsafe class PropertySizer
     {
+        /// <summary>Passed as a length to mean "the schema did not specify one".</summary>
+        public const int LengthUnspecified = -1;
+
         /// <summary>
         /// Returns the size of a property when it can be determined from the schema alone,
         /// or -1 when the size depends on the payload.
         /// </summary>
-        public static int TryGetFixedSize(uint flags, ushort inType, ushort length, ushort count, int pointerSize)
+        public static int TryGetFixedSize(uint flags, ushort inType, ushort outType, ushort length, ushort count, int pointerSize)
         {
             // Structs and payload-derived lengths/counts can't be resolved statically.
             if ((flags & NativeConstants.PropertyStruct) != 0 ||
@@ -25,7 +42,12 @@ namespace O365.Security.ETW.Schema
                 return -1;
             }
 
-            int elementSize = TryGetFixedElementSize(inType, length, pointerSize);
+            int elementSize = TryGetFixedElementSize(
+                inType,
+                outType,
+                length == 0 ? LengthUnspecified : length,
+                pointerSize);
+
             if (elementSize < 0)
             {
                 return -1;
@@ -36,9 +58,14 @@ namespace O365.Security.ETW.Schema
         }
 
         /// <summary>
-        /// Returns the size of a single element when determinable from the schema, else -1.
+        /// Returns the size of a single element when determinable without reading the
+        /// payload, else -1.
         /// </summary>
-        public static int TryGetFixedElementSize(ushort inType, ushort length, int pointerSize)
+        /// <param name="length">
+        /// Element length from the schema, in the unit the in-type documents, or
+        /// <see cref="LengthUnspecified"/>.
+        /// </param>
+        public static int TryGetFixedElementSize(ushort inType, ushort outType, int length, int pointerSize)
         {
             switch ((TdhInType)inType)
             {
@@ -75,20 +102,24 @@ namespace O365.Security.ETW.Schema
                     return pointerSize;
 
                 case TdhInType.UnicodeString:
-                case TdhInType.NonNullTerminatedString:
-                    // A non-zero length in the schema means a fixed-width character field.
-                    return length > 0 ? length * 2 : -1;
+                    // epi.length is a count of WCHARs for this in-type.
+                    return length >= 0 ? length * 2 : -1;
 
                 case TdhInType.AnsiString:
-                case TdhInType.NonNullTerminatedAnsiString:
-                    return length > 0 ? length : -1;
+                    return length >= 0 ? length : -1;
 
                 case TdhInType.Binary:
-                case TdhInType.HexDump:
-                    return length > 0 ? length : -1;
+                    if (length >= 0)
+                    {
+                        return length;
+                    }
+
+                    // A length-less BINARY is only well formed when it is an IPv6 address.
+                    return (TdhOutType)outType == TdhOutType.Ipv6 ? 16 : -1;
 
                 default:
-                    // Counted strings, SIDs and anything unrecognised need the payload.
+                    // Counted strings, SIDs, hex dumps and anything unrecognised need the
+                    // payload.
                     return -1;
             }
         }
@@ -99,18 +130,24 @@ namespace O365.Security.ETW.Schema
         /// </summary>
         public static int GetRuntimeSize(
             ushort inType,
-            ushort length,
+            ushort outType,
+            int length,
             int count,
             int pointerSize,
             byte* data,
             int remaining)
         {
+            if (count < 0 || remaining < 0)
+            {
+                return -1;
+            }
+
             int elements = count == 0 ? 1 : count;
             int total = 0;
 
             for (int e = 0; e < elements; e++)
             {
-                int size = GetSingleRuntimeSize(inType, length, pointerSize, data + total, remaining - total);
+                int size = GetSingleRuntimeSize(inType, outType, length, pointerSize, data + total, remaining - total);
                 if (size < 0)
                 {
                     return -1;
@@ -121,12 +158,19 @@ namespace O365.Security.ETW.Schema
                 {
                     return -1;
                 }
+
+                // A zero-width element repeated N times can never make progress, and for a
+                // payload-derived count N may be very large. Stop rather than spin.
+                if (size == 0)
+                {
+                    return total;
+                }
             }
 
             return total;
         }
 
-        private static int GetSingleRuntimeSize(ushort inType, ushort length, int pointerSize, byte* data, int remaining)
+        private static int GetSingleRuntimeSize(ushort inType, ushort outType, int length, int pointerSize, byte* data, int remaining)
         {
             if (remaining < 0)
             {
@@ -136,7 +180,8 @@ namespace O365.Security.ETW.Schema
             switch ((TdhInType)inType)
             {
                 case TdhInType.UnicodeString:
-                    if (length > 0)
+                    // Specified in WCHARs. A specified length of zero is an empty field.
+                    if (length >= 0)
                     {
                         return length * 2;
                     }
@@ -144,44 +189,80 @@ namespace O365.Security.ETW.Schema
                     return NullTerminatedUtf16Size(data, remaining);
 
                 case TdhInType.AnsiString:
-                    if (length > 0)
+                    if (length >= 0)
                     {
                         return length;
                     }
 
                     return NullTerminatedAnsiSize(data, remaining);
 
+                case TdhInType.NonNullTerminatedString:
+                case TdhInType.NonNullTerminatedAnsiString:
+                    // Documented as running to the end of the event.
+                    return length >= 0
+                        ? ((TdhInType)inType == TdhInType.NonNullTerminatedString ? length * 2 : length)
+                        : remaining;
+
                 case TdhInType.CountedString:
-                case TdhInType.NonNullTerminatedString when length == 0:
-                    if (remaining < 2)
-                    {
-                        return -1;
-                    }
-
-                    return 2 + ReadUInt16(data);
-
                 case TdhInType.CountedAnsiString:
+                case TdhInType.ManifestCountedString:
+                case TdhInType.ManifestCountedAnsiString:
+                case TdhInType.ManifestCountedBinary:
                     if (remaining < 2)
                     {
                         return -1;
                     }
 
-                    return 2 + ReadUInt16(data);
+                    return Bounded(2 + ReadUInt16LE(data), remaining);
+
+                case TdhInType.ReversedCountedString:
+                case TdhInType.ReversedCountedAnsiString:
+                    if (remaining < 2)
+                    {
+                        return -1;
+                    }
+
+                    return Bounded(2 + ReadUInt16BE(data), remaining);
+
+                case TdhInType.HexDump:
+                    if (remaining < 4)
+                    {
+                        return -1;
+                    }
+
+                    return Bounded(4L + ReadUInt32LE(data), remaining);
 
                 case TdhInType.Sid:
                 case TdhInType.WbemSid:
-                    return SidSize(inType, data, remaining);
+                    return SidSize(inType, pointerSize, data, remaining);
 
                 default:
-                    int fixedSize = TryGetFixedElementSize(inType, length, pointerSize);
-                    return fixedSize;
+                    return TryGetFixedElementSize(inType, outType, length, pointerSize);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ushort ReadUInt16(byte* p)
+        private static int Bounded(long size, int remaining)
+        {
+            return size >= 0 && size <= remaining ? (int)size : -1;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ushort ReadUInt16LE(byte* p)
         {
             return (ushort)(p[0] | (p[1] << 8));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ushort ReadUInt16BE(byte* p)
+        {
+            return (ushort)((p[0] << 8) | p[1]);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint ReadUInt32LE(byte* p)
+        {
+            return (uint)(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
         }
 
         private static int NullTerminatedUtf16Size(byte* data, int remaining)
@@ -197,7 +278,8 @@ namespace O365.Security.ETW.Schema
                 i += 2;
             }
 
-            // Unterminated: the string runs to the end of the payload.
+            // Unterminated: the string runs to the end of the payload. Providers get this
+            // wrong often enough that TDH tolerates it, so we do too.
             return remaining;
         }
 
@@ -219,15 +301,19 @@ namespace O365.Security.ETW.Schema
 
         /// <summary>
         /// SID layout: Revision(1) SubAuthorityCount(1) IdentifierAuthority(6) SubAuthority[n](4n).
-        /// A WBEM SID is preceded by two pointer-sized values (TOKEN_USER).
         /// </summary>
-        private static int SidSize(ushort inType, byte* data, int remaining)
+        /// <remarks>
+        /// A WBEM SID is an SE_TOKEN_USER, which begins with a TOKEN_USER (a pointer plus a
+        /// DWORD, pointer aligned) and then a SID_AND_ATTRIBUTES with the same shape. The
+        /// pointer width is the *producing* process's, not ours: a 32-bit process logging on
+        /// a 64-bit machine emits a 8-byte prefix, and using IntPtr.Size here misreads it.
+        /// </remarks>
+        private static int SidSize(ushort inType, int pointerSize, byte* data, int remaining)
         {
             int prefix = 0;
             if ((TdhInType)inType == TdhInType.WbemSid)
             {
-                // TOKEN_USER contains a SID_AND_ATTRIBUTES: a pointer plus a DWORD, padded.
-                prefix = IntPtr.Size == 8 ? 16 : 8;
+                prefix = pointerSize == 8 ? 16 : 8;
             }
 
             if (remaining < prefix + 8)

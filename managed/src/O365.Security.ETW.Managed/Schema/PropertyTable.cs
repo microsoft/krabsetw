@@ -1,8 +1,8 @@
 using System;
 using System.Runtime.CompilerServices;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
 
-namespace O365.Security.ETW.Schema
+namespace Microsoft.O365.Security.ETW.Schema
 {
     /// <summary>
     /// Precomputed, per-schema description of an event's properties.
@@ -100,6 +100,7 @@ namespace O365.Security.ETW.Schema
                     int size = PropertySizer.TryGetFixedSize(
                         p.Flags,
                         p.InTypeOrStructStartIndex,
+                        p.OutTypeOrNumOfStructMembers,
                         p.LengthOrLengthPropertyIndex,
                         p.CountOrCountPropertyIndex,
                         pointerSize);

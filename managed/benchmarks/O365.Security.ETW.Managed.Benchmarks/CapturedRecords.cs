@@ -4,9 +4,9 @@ using System.Diagnostics.Tracing;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
 
-namespace O365.Security.ETW.Benchmarks
+namespace Microsoft.O365.Security.ETW.Benchmarks
 {
     /// <summary>
     /// A TraceLogging (self-describing) source. Self-describing events carry their schema

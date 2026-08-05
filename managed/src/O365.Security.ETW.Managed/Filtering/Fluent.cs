@@ -1,6 +1,6 @@
 using System;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
     /// Factory methods for event predicates. Mirrors the C++/CLI <c>Filter</c> class.
@@ -128,52 +128,54 @@ namespace O365.Security.ETW
     }
 
     /// <summary>
-    /// Predicates over counted string properties.
+    /// Predicates over counted string properties: a UINT16 byte count followed by UTF-16
+    /// character data.
     /// </summary>
     /// <remarks>
-    /// Decoding is driven by the property's TDH in-type, so these behave identically to
-    /// <see cref="UnicodeString"/>. The type is kept for source compatibility.
+    /// The counted layout is forced rather than inferred from the property's TDH in-type,
+    /// matching native krabs. Classic WBEM schemas frequently declare such a field as a plain
+    /// UNICODESTRING, and inferring would leave the count bytes inside the compared value.
     /// </remarks>
     public static class CountedString
     {
         public static Predicate Is(string name, string value)
         {
-            return UnicodeString.Is(name, value);
+            return new CountedStringPredicate(name, value, StringMatch.Equals, false);
         }
 
         public static Predicate IEquals(string name, string value)
         {
-            return UnicodeString.IEquals(name, value);
+            return new CountedStringPredicate(name, value, StringMatch.Equals, true);
         }
 
         public static Predicate Contains(string name, string value)
         {
-            return UnicodeString.Contains(name, value);
+            return new CountedStringPredicate(name, value, StringMatch.Contains, false);
         }
 
         public static Predicate IContains(string name, string value)
         {
-            return UnicodeString.IContains(name, value);
+            return new CountedStringPredicate(name, value, StringMatch.Contains, true);
         }
 
         public static Predicate StartsWith(string name, string value)
         {
-            return UnicodeString.StartsWith(name, value);
+            return new CountedStringPredicate(name, value, StringMatch.StartsWith, false);
         }
 
         public static Predicate IStartsWith(string name, string value)
         {
-            return UnicodeString.IStartsWith(name, value);
+            return new CountedStringPredicate(name, value, StringMatch.StartsWith, true);
         }
 
         public static Predicate EndsWith(string name, string value)
         {
-            return UnicodeString.EndsWith(name, value);
+            return new CountedStringPredicate(name, value, StringMatch.EndsWith, false);
         }
 
         public static Predicate IEndsWith(string name, string value)
         {
-            return UnicodeString.IEndsWith(name, value);
+            return new CountedStringPredicate(name, value, StringMatch.EndsWith, true);
         }
     }
 

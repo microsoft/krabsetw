@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using O365.Security.ETW.Interop;
-using O365.Security.ETW.Schema;
+using Microsoft.O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Schema;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
     /// Presents an event through <see cref="IEventRecord"/>.
@@ -76,6 +76,16 @@ namespace O365.Security.ETW
         public ushort UserDataLength => Ref.UserDataLength;
 
         public IntPtr UserData => Ref.UserData;
+
+        public DecodingSource GetEventType()
+        {
+            return Ref.GetEventType();
+        }
+
+        public List<ulong> GetStackTrace()
+        {
+            return ExtendedData.GetStackTrace(_record);
+        }
 
         public byte[] CopyUserData()
         {
@@ -155,17 +165,24 @@ namespace O365.Security.ETW
 
         public string GetCountedString(string name)
         {
-            return GetUnicodeString(name);
+            return TryGetCountedString(name, out string result) ? result : throw Missing(name);
         }
 
         public string GetCountedString(string name, string defaultValue)
         {
-            return GetUnicodeString(name, defaultValue);
+            return TryGetCountedString(name, out string result) ? result : defaultValue;
         }
 
         public bool TryGetCountedString(string name, out string result)
         {
-            return TryGetUnicodeString(name, out result);
+            if (Ref.TryGetCountedString(name.AsSpan(), out ReadOnlySpan<char> value))
+            {
+                result = value.ToString();
+                return true;
+            }
+
+            result = null;
+            return false;
         }
 
         public string GetAnsiString(string name)
@@ -308,6 +325,26 @@ namespace O365.Security.ETW
 
             result = address;
             return true;
+        }
+
+        public IPAddress GetIPAddress(string name)
+        {
+            return TryGetIPAddress(name, out IPAddress v) ? v : throw Missing(name);
+        }
+
+        public IPAddress GetIPAddress(string name, IPAddress defaultValue)
+        {
+            return TryGetIPAddress(name, out IPAddress v) ? v : defaultValue;
+        }
+
+        public SocketAddress GetSocketAddress(string name)
+        {
+            return TryGetSocketAddress(name, out SocketAddress v) ? v : throw Missing(name);
+        }
+
+        public SocketAddress GetSocketAddress(string name, SocketAddress defaultValue)
+        {
+            return TryGetSocketAddress(name, out SocketAddress v) ? v : defaultValue;
         }
 
         public DateTime GetDateTime(string name)

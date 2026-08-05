@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Schema;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
     /// Filters events before they reach a handler, and where possible before they reach the
@@ -12,30 +13,38 @@ namespace O365.Security.ETW
     /// Event ids supplied here, or derivable from the predicate, are pushed into ETW via
     /// EnableTraceEx2. Non-matching events are then never written to the session buffers,
     /// which is far cheaper than discarding them in the callback.
+    ///
+    /// Pushdown is only ever an optimisation: the ids are re-tested here on every event, so
+    /// a filter behaves identically whether or not ETW honoured the request. Native krabs
+    /// relies on the pushdown alone, which silently misbehaves for the providers and event
+    /// types that ETW does not apply id filtering to.
     /// </remarks>
-    public sealed class EventFilter
+    public sealed class EventFilter : IDisposable
     {
-        private readonly List<ushort> _eventIds;
+        private readonly ushort[] _eventIds;
+        private readonly List<ushort> _pushdownIds;
 
         public EventFilter(Predicate predicate)
         {
             Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
-            _eventIds = DeriveEventIds(predicate);
+            _eventIds = null;
+            _pushdownIds = DeriveEventIds(predicate);
         }
 
         public EventFilter(ushort eventId)
-            : this(eventId, AnyEventPredicate.Instance)
+            : this(eventId, null)
         {
         }
 
         public EventFilter(ushort eventId, Predicate predicate)
         {
-            Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
-            _eventIds = new List<ushort> { eventId };
+            Predicate = predicate;
+            _eventIds = new[] { eventId };
+            _pushdownIds = new List<ushort> { eventId };
         }
 
         public EventFilter(List<ushort> eventIds)
-            : this(eventIds, AnyEventPredicate.Instance)
+            : this(eventIds, null)
         {
         }
 
@@ -44,19 +53,20 @@ namespace O365.Security.ETW
             if (eventIds == null) throw new ArgumentNullException(nameof(eventIds));
             if (eventIds.Count == 0) throw new ArgumentException("At least one event id is required.", nameof(eventIds));
 
-            Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
-            _eventIds = new List<ushort>(eventIds);
+            Predicate = predicate;
+            _eventIds = eventIds.ToArray();
+            _pushdownIds = new List<ushort>(eventIds);
         }
 
         internal Predicate Predicate { get; }
 
-        /// <summary>Invoked for each event that satisfies the predicate. Zero-copy path.</summary>
+        /// <summary>Invoked for each event that satisfies the filter. Zero-copy path.</summary>
         public event EventRecordDelegate OnEventSpan;
 
-        /// <summary>Invoked for each event that satisfies the predicate.</summary>
+        /// <summary>Invoked for each event that satisfies the filter.</summary>
         public event IEventRecordDelegate OnEvent;
 
-        /// <summary>Invoked when a handler throws.</summary>
+        /// <summary>Invoked when an event's schema could not be resolved.</summary>
         public event EventRecordErrorDelegate OnError;
 
         internal bool HasHandlers
@@ -70,7 +80,7 @@ namespace O365.Security.ETW
         /// </summary>
         internal IReadOnlyList<ushort> EventIds
         {
-            get { return _eventIds; }
+            get { return _pushdownIds; }
         }
 
         private static List<ushort> DeriveEventIds(Predicate predicate)
@@ -87,31 +97,100 @@ namespace O365.Security.ETW
             return ids.Count > NativeConstants.MAX_EVENT_FILTER_EVENT_ID_COUNT ? null : ids;
         }
 
-        internal unsafe void Dispatch(in EventRecordRef record, EventRecordAdapter adapter)
+        private bool MatchesEventId(ushort id)
         {
-            if (!Predicate.Test(record))
+            ushort[] ids = _eventIds;
+            if (ids == null)
+            {
+                return true;
+            }
+
+            for (int i = 0; i < ids.Length; i++)
+            {
+                if (ids[i] == id)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal void Dispatch(in EventRecordRef record, EventRecordAdapter adapter)
+        {
+            // Native returns immediately when a filter has no event callbacks. OnError is
+            // included because the native filter still reports schema failures raised by its
+            // predicate when only an error handler is attached.
+            if (OnEventSpan == null && OnEvent == null && OnError == null)
             {
                 return;
+            }
+
+            if (!MatchesEventId(record.Id))
+            {
+                return;
+            }
+
+            Predicate predicate = Predicate;
+
+            if (predicate != null)
+            {
+                // A predicate that needs the payload cannot decide without a schema. Native
+                // discovers this by having the parser throw; deciding it from the predicate's
+                // static tier keeps the outcome independent of evaluation order.
+                if (predicate.Tier == PredicateTier.Payload && !EnsureSchema(record, adapter))
+                {
+                    return;
+                }
+
+                if (!predicate.Test(record))
+                {
+                    return;
+                }
             }
 
             var span = OnEventSpan;
             var compat = OnEvent;
 
-            try
+            if (span == null && compat == null)
             {
-                span?.Invoke(record);
-                compat?.Invoke(adapter);
+                return;
             }
-            catch (Exception ex)
-            {
-                var handler = OnError;
-                if (handler == null)
-                {
-                    throw;
-                }
 
-                handler(new EventRecordError(ex.Message, adapter));
+            // The span surface reads the record header without a schema, so it is not gated
+            // on one. The compat IEventRecord surface mirrors C++/CLI, whose EventRecord wraps
+            // a krabs::schema and therefore cannot be handed to a handler without one.
+            span?.Invoke(record);
+
+            if (compat != null && EnsureSchema(record, adapter))
+            {
+                compat(adapter);
             }
+        }
+
+        /// <summary>
+        /// Resolves the schema, reporting a failure to <see cref="OnError"/>.
+        /// </summary>
+        /// <returns>True when the schema is available.</returns>
+        private bool EnsureSchema(in EventRecordRef record, EventRecordAdapter adapter)
+        {
+            SchemaEntry schema = record.SchemaEntry;
+
+            if (schema.Status == NativeConstants.ERROR_SUCCESS)
+            {
+                return true;
+            }
+
+            var handler = OnError;
+            handler?.Invoke(new EventRecordError(
+                ErrorMessages.StatusAndRecordContext(schema.Status, record.ProviderId, record.Id),
+                adapter));
+
+            return false;
+        }
+
+        public void Dispose()
+        {
         }
     }
 }

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace O365.Security.ETW.Tests
+namespace Microsoft.O365.Security.ETW.Tests
 {
     /// <summary>
     /// Prints what the schema layer sees for a known event. Kept because a decoding failure
@@ -61,7 +61,7 @@ namespace O365.Security.ETW.Tests
                 signal.Set();
             };
 
-            var provider = new Provider(TestTraceLoggingSource.ProviderName) { Any = 0 };
+            var provider = new Provider(TestTraceLoggingSource.ProviderGuid) { Any = 0 };
             provider.AddFilter(filter);
 
             using (var trace = new UserTrace("Krabs-Managed-Diag-" + Guid.NewGuid().ToString("N")))
@@ -92,7 +92,7 @@ namespace O365.Security.ETW.Tests
                 _output.WriteLine(line);
             }
 
-            Assert.True(lines.Count > 0, "No event was captured. LastException=" + (O365.Security.ETW.TraceCallbacks.LastException?.ToString() ?? "none"));
+            Assert.True(lines.Count > 0, "No event was captured. LastException=" + (Microsoft.O365.Security.ETW.TraceCallbacks.LastException?.ToString() ?? "none"));
         }
     }
 }

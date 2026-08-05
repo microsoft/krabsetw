@@ -3,10 +3,10 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
-using O365.Security.ETW.Interop;
-using O365.Security.ETW.Schema;
+using Microsoft.O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Schema;
 
-namespace O365.Security.ETW.Benchmarks
+namespace Microsoft.O365.Security.ETW.Benchmarks
 {
     /// <summary>
     /// Measures the per-event cost of the dispatch path over captured records.

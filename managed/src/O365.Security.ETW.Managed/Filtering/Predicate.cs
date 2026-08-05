@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
     /// How much of an event a predicate needs before it can decide.

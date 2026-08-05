@@ -1,6 +1,6 @@
 using System;
 
-namespace O365.Security.ETW.Interop
+namespace Microsoft.O365.Security.ETW.Interop
 {
     internal static class NativeConstants
     {
@@ -124,6 +124,9 @@ namespace O365.Security.ETW.Interop
         Sid = 19,
         HexInt32 = 20,
         HexInt64 = 21,
+        ManifestCountedString = 22,
+        ManifestCountedAnsiString = 23,
+        ManifestCountedBinary = 25,
         CountedString = 300,
         CountedAnsiString = 301,
         ReversedCountedString = 302,

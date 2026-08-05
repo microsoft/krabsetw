@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace O365.Security.ETW.Interop
+namespace Microsoft.O365.Security.ETW.Interop
 {
     /// <summary>
     /// Raw P/Invoke surface. Signatures are deliberately pointer-only and blittable so the
@@ -56,5 +56,31 @@ namespace O365.Security.ETW.Interop
             IntPtr tdhContext,
             TRACE_EVENT_INFO* buffer,
             uint* bufferSize);
+
+        [DllImport(Tdh, EntryPoint = "TdhEnumerateProviders", SetLastError = false)]
+        public static extern int TdhEnumerateProviders(
+            byte* buffer,
+            uint* bufferSize);
+    }
+
+    /// <summary>
+    /// Header of the buffer returned by TdhEnumerateProviders, followed by
+    /// <see cref="NumberOfProviders"/> <see cref="TRACE_PROVIDER_INFO"/> entries.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct PROVIDER_ENUMERATION_INFO
+    {
+        public uint NumberOfProviders;
+        public uint Reserved;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct TRACE_PROVIDER_INFO
+    {
+        public Guid ProviderGuid;
+        public uint SchemaSource;
+
+        /// <summary>Byte offset of the provider name, relative to the start of the buffer.</summary>
+        public uint ProviderNameOffset;
     }
 }

@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace O365.Security.ETW.Tests
+namespace Microsoft.O365.Security.ETW.Tests
 {
     [EventSource(Name = ProviderName)]
     internal sealed class TestEventSource : EventSource
@@ -13,6 +13,8 @@ namespace O365.Security.ETW.Tests
         public const string ProviderName = "Krabs-Managed-Test-Provider";
 
         public static readonly TestEventSource Log = new TestEventSource();
+
+        public static Guid ProviderGuid => Log.Guid;
 
         [Event(1, Level = EventLevel.Informational)]
         public void Interesting(string message, int number)
@@ -41,6 +43,8 @@ namespace O365.Security.ETW.Tests
         public const string ProviderName = "Krabs-Managed-Test-Tlg";
 
         public static readonly TestTraceLoggingSource Log = new TestTraceLoggingSource();
+
+        public static Guid ProviderGuid => Log.Guid;
 
         private TestTraceLoggingSource()
             : base(ProviderName, EventSourceSettings.EtwSelfDescribingEventFormat)
@@ -85,12 +89,32 @@ namespace O365.Security.ETW.Tests
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
+        /// <summary>
+        /// Native krabs resolves provider names through TdhEnumerateProviders, so only
+        /// names registered with the system resolve. An EventSource that has never
+        /// registered a manifest with the machine is not one of them.
+        /// </summary>
         [Fact]
-        public void ProviderNameResolvesToTheSameGuidAsEventSource()
+        public void ProviderNameLookupRequiresASystemRegisteredProvider()
         {
             Assert.Equal(
-                EventSource.GetGuid(typeof(TestEventSource)),
-                Provider.GuidFromName(TestEventSource.ProviderName));
+                new Guid("22fb2cd6-0e7b-422b-a0c7-2fad1fd0e716"),
+                Provider.GuidFromName("Microsoft-Windows-Kernel-Process"));
+
+            var ex = Assert.Throws<ArgumentException>(
+                () => Provider.GuidFromName(TestEventSource.ProviderName));
+
+            Assert.Contains("Provider name does not exist.", ex.Message);
+        }
+
+        /// <summary>
+        /// Lookup is case sensitive, matching krabs::provider_name_to_guid.
+        /// </summary>
+        [Fact]
+        public void ProviderNameLookupIsCaseSensitive()
+        {
+            Assert.Throws<ArgumentException>(
+                () => Provider.GuidFromName("microsoft-windows-kernel-process"));
         }
 
         [Fact]
@@ -110,7 +134,7 @@ namespace O365.Security.ETW.Tests
                 }
             };
 
-            var provider = new Provider(TestTraceLoggingSource.ProviderName)
+            var provider = new Provider(TestTraceLoggingSource.ProviderGuid)
             {
                 Any = 0
             };
@@ -145,7 +169,7 @@ namespace O365.Security.ETW.Tests
                 Interlocked.Increment(ref rejected);
             };
 
-            var provider = new Provider(TestEventSource.ProviderName)
+            var provider = new Provider(TestEventSource.ProviderGuid)
             {
                 Any = 0
             };
@@ -177,7 +201,7 @@ namespace O365.Security.ETW.Tests
                 signal.Set();
             };
 
-            var provider = new Provider(TestTraceLoggingSource.ProviderName)
+            var provider = new Provider(TestTraceLoggingSource.ProviderGuid)
             {
                 Any = 0
             };
@@ -204,7 +228,7 @@ namespace O365.Security.ETW.Tests
                 signal.Set();
             };
 
-            var provider = new Provider(TestTraceLoggingSource.ProviderName)
+            var provider = new Provider(TestTraceLoggingSource.ProviderGuid)
             {
                 Any = 0
             };
@@ -225,23 +249,61 @@ namespace O365.Security.ETW.Tests
             IEventRecord escaped = null;
             var signal = new ManualResetEventSlim();
 
-            var filter = new EventFilter(Filter.EventIdIs(1));
+            var filter = new EventFilter(Filter.EventNameIs("Interesting"));
             filter.OnEvent += record =>
             {
                 escaped = record;
                 signal.Set();
             };
 
-            var provider = new Provider(TestEventSource.ProviderName)
+            var provider = new Provider(TestTraceLoggingSource.ProviderGuid)
             {
                 Any = 0
             };
             provider.AddFilter(filter);
 
-            RunTrace(provider, signal, () => TestEventSource.Log.Interesting("escape", 1));
+            RunTrace(provider, signal, () => TestTraceLoggingSource.Log.Interesting("escape", 1));
 
             Assert.NotNull(escaped);
             Assert.Throws<InvalidOperationException>(() => escaped.ProcessId);
+        }
+
+        /// <summary>
+        /// TDH cannot decode manifest-based EventSource payloads, because the manifest is
+        /// published in-band rather than registered with the machine. C++/CLI reports that
+        /// through OnError and never invokes OnEvent; the span surface does not need a schema
+        /// for header access, so it still fires.
+        /// </summary>
+        [Fact]
+        public void MissingSchemaRoutesCompatHandlersToOnErrorButNotSpanHandlers()
+        {
+            int spanHits = 0;
+            int compatHits = 0;
+            string error = null;
+            var signal = new ManualResetEventSlim();
+
+            var filter = new EventFilter(Filter.EventIdIs(1));
+            filter.OnEventSpan += (in EventRecordRef record) => Interlocked.Increment(ref spanHits);
+            filter.OnEvent += record => Interlocked.Increment(ref compatHits);
+            filter.OnError += e =>
+            {
+                error = e.Message;
+                signal.Set();
+            };
+
+            var provider = new Provider(TestEventSource.ProviderGuid)
+            {
+                Any = 0
+            };
+            provider.AddFilter(filter);
+
+            RunTrace(provider, signal, () => TestEventSource.Log.Interesting("no schema", 1));
+
+            Assert.True(spanHits > 0, "The span handler never fired.");
+            Assert.Equal(0, compatHits);
+            Assert.NotNull(error);
+            Assert.Contains("status_code=", error);
+            Assert.Contains("event_id=1", error);
         }
 
         private static void RunTrace(Provider provider, ManualResetEventSlim signal, Action emit)

@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     internal enum StringMatch
     {
@@ -37,6 +37,53 @@ namespace O365.Security.ETW
         public override bool Test(in EventRecordRef record)
         {
             if (!record.TryGetUnicodeString(_name.AsSpan(), out ReadOnlySpan<char> actual))
+            {
+                return false;
+            }
+
+            ReadOnlySpan<char> expected = _value.AsSpan();
+
+            switch (_match)
+            {
+                case StringMatch.Equals:
+                    return SpanCompare.Equals(actual, expected, _ignoreCase);
+                case StringMatch.Contains:
+                    return SpanCompare.Contains(actual, expected, _ignoreCase);
+                case StringMatch.StartsWith:
+                    return SpanCompare.StartsWith(actual, expected, _ignoreCase);
+                case StringMatch.EndsWith:
+                    return SpanCompare.EndsWith(actual, expected, _ignoreCase);
+                default:
+                    return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Compares a counted UTF-16 string property against a fixed value.
+    /// </summary>
+    /// <remarks>
+    /// Forces the counted interpretation regardless of the property's TDH in-type, which is
+    /// what krabs::predicates::adapters::counted_string does.
+    /// </remarks>
+    internal sealed class CountedStringPredicate : Predicate
+    {
+        private readonly string _name;
+        private readonly string _value;
+        private readonly StringMatch _match;
+        private readonly bool _ignoreCase;
+
+        public CountedStringPredicate(string name, string value, StringMatch match, bool ignoreCase)
+        {
+            _name = name ?? throw new ArgumentNullException(nameof(name));
+            _value = value ?? throw new ArgumentNullException(nameof(value));
+            _match = match;
+            _ignoreCase = ignoreCase;
+        }
+
+        public override bool Test(in EventRecordRef record)
+        {
+            if (!record.TryGetCountedString(_name.AsSpan(), out ReadOnlySpan<char> actual))
             {
                 return false;
             }
