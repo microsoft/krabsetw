@@ -111,6 +111,7 @@ namespace Microsoft.O365.Security.ETW
         private ulong _traceHandle;
         private IntPtr _loggerName;
         private bool _opened;
+        private volatile bool _providersPublished;
         private bool _disposed;
         private uint _processTraceMode;
 
@@ -200,11 +201,13 @@ namespace Microsoft.O365.Security.ETW
             lock (_gate)
             {
                 _providers.Add(provider);
+                _providersPublished = false;
 
                 if (_opened)
                 {
                     EnableProviders();
                     _context.SetProviders(_providers);
+                    _providersPublished = true;
                 }
             }
         }
@@ -224,11 +227,17 @@ namespace Microsoft.O365.Security.ETW
         /// </summary>
         internal unsafe void PushEvent(Interop.EVENT_RECORD* record)
         {
-            lock (_gate)
+            // Republishing on every push would allocate two arrays per event. Only the
+            // first push after an Enable has to do it.
+            if (!_providersPublished)
             {
-                if (!_opened)
+                lock (_gate)
                 {
-                    _context.SetProviders(_providers);
+                    if (!_providersPublished)
+                    {
+                        _context.SetProviders(_providers);
+                        _providersPublished = true;
+                    }
                 }
             }
 
@@ -253,6 +262,7 @@ namespace Microsoft.O365.Security.ETW
                 EnableProviders();
 
                 _context.SetProviders(_providers);
+                _providersPublished = true;
                 _contextIndex = TraceRegistry.Register(_context);
                 OpenConsumer();
 

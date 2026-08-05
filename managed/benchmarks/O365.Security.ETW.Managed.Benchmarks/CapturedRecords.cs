@@ -72,9 +72,11 @@ namespace Microsoft.O365.Security.ETW.Benchmarks
                 records.Add((IntPtr)captured.DeepCopy(record.Record));
             };
 
+            // Constructed from the GUID, not the name: an in-process EventSource is not
+            // registered with the system, so TdhEnumerateProviders cannot resolve its name.
             // Keyword 0 means "match all". A non-zero mask would collide with the keyword
             // bits EventSource reserves for its own per-session filtering.
-            var provider = new Provider(BenchmarkEventSource.ProviderName) { Any = 0 };
+            var provider = new Provider(BenchmarkEventSource.Log.Guid) { Any = 0 };
             provider.AddFilter(filter);
 
             using (var trace = new UserTrace("Krabs-Managed-Bench-" + Guid.NewGuid().ToString("N")))
