@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net462;net48;net10.0-windows</TargetFrameworks>
+    <AssemblyName>O365.Security.ETW.Managed</AssemblyName>
+    <RootNamespace>O365.Security.ETW</RootNamespace>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="O365.Security.ETW.Managed.Tests" />
+    <InternalsVisibleTo Include="O365.Security.ETW.Managed.Benchmarks" />
+  </ItemGroup>
+
+</Project>

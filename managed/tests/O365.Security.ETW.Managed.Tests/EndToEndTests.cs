@@ -1,0 +1,274 @@
+using System;
+using System.Collections.Concurrent;
+using System.Diagnostics.Tracing;
+using System.Threading;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace O365.Security.ETW.Tests
+{
+    [EventSource(Name = ProviderName)]
+    internal sealed class TestEventSource : EventSource
+    {
+        public const string ProviderName = "Krabs-Managed-Test-Provider";
+
+        public static readonly TestEventSource Log = new TestEventSource();
+
+        [Event(1, Level = EventLevel.Informational)]
+        public void Interesting(string message, int number)
+        {
+            WriteEvent(1, message, number);
+        }
+
+        [Event(2, Level = EventLevel.Informational)]
+        public void Boring(int value)
+        {
+            WriteEvent(2, value);
+        }
+    }
+
+    /// <summary>
+    /// A self-describing (TraceLogging) provider.
+    /// </summary>
+    /// <remarks>
+    /// Manifest-based EventSource providers publish their manifest in-band rather than
+    /// registering it with the system, so TDH cannot decode their payloads. That is equally
+    /// true of native krabs, which also relies on TDH. Payload decoding is therefore exercised
+    /// against TraceLogging events, whose schema travels with each event.
+    /// </remarks>
+    internal sealed class TestTraceLoggingSource : EventSource
+    {
+        public const string ProviderName = "Krabs-Managed-Test-Tlg";
+
+        public static readonly TestTraceLoggingSource Log = new TestTraceLoggingSource();
+
+        private TestTraceLoggingSource()
+            : base(ProviderName, EventSourceSettings.EtwSelfDescribingEventFormat)
+        {
+        }
+
+        public void Interesting(string message, int number)
+        {
+            Write("Interesting", new Payload { message = message, number = number });
+        }
+
+        public void Boring(int value)
+        {
+            Write("Boring", new BoringPayload { value = value });
+        }
+
+        [EventData]
+        public sealed class Payload
+        {
+            public string message { get; set; }
+
+            public int number { get; set; }
+        }
+
+        [EventData]
+        public sealed class BoringPayload
+        {
+            public int value { get; set; }
+        }
+    }
+
+    /// <summary>
+    /// Exercises a real ETW session against a real provider.
+    /// </summary>
+    /// <remarks>
+    /// These need an elevated process, because creating a session does. They are the only
+    /// tests that prove the interop layouts, the callback thunk, the schema cache and the
+    /// offset walker agree with what Windows actually delivers.
+    /// </remarks>
+    [Collection("etw")]
+    public class EndToEndTests
+    {
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
+        [Fact]
+        public void ProviderNameResolvesToTheSameGuidAsEventSource()
+        {
+            Assert.Equal(
+                EventSource.GetGuid(typeof(TestEventSource)),
+                Provider.GuidFromName(TestEventSource.ProviderName));
+        }
+
+        [Fact]
+        public void DeliversAndDecodesEvents()
+        {
+            var received = new ConcurrentQueue<Tuple<string, int>>();
+            var signal = new ManualResetEventSlim();
+
+            var filter = new EventFilter(Filter.EventNameIs("Interesting"));
+            filter.OnEventSpan += (in EventRecordRef record) =>
+            {
+                if (record.TryGetUnicodeString("message".AsSpan(), out ReadOnlySpan<char> message)
+                    && record.TryGetInt32("number".AsSpan(), out int number))
+                {
+                    received.Enqueue(Tuple.Create(message.ToString(), number));
+                    signal.Set();
+                }
+            };
+
+            var provider = new Provider(TestTraceLoggingSource.ProviderName)
+            {
+                Any = 0
+            };
+            provider.AddFilter(filter);
+
+            RunTrace(provider, signal, () => TestTraceLoggingSource.Log.Interesting("hello krabs", 42));
+
+            Assert.True(received.TryDequeue(out Tuple<string, int> first), "No matching event was delivered.");
+            Assert.Equal("hello krabs", first.Item1);
+            Assert.Equal(42, first.Item2);
+        }
+
+        [Fact]
+        public void PredicateRejectsNonMatchingEvents()
+        {
+            int matched = 0;
+            int rejected = 0;
+            var signal = new ManualResetEventSlim();
+
+            // Two filters on one provider, so event id pushdown keeps both ids but each
+            // filter still has to reject the other's events.
+            var interesting = new EventFilter(Filter.EventIdIs(1));
+            interesting.OnEventSpan += (in EventRecordRef record) =>
+            {
+                Interlocked.Increment(ref matched);
+                signal.Set();
+            };
+
+            var boring = new EventFilter(Filter.EventIdIs(2));
+            boring.OnEventSpan += (in EventRecordRef record) =>
+            {
+                Interlocked.Increment(ref rejected);
+            };
+
+            var provider = new Provider(TestEventSource.ProviderName)
+            {
+                Any = 0
+            };
+            provider.AddFilter(interesting);
+            provider.AddFilter(boring);
+
+            RunTrace(provider, signal, () =>
+            {
+                TestEventSource.Log.Interesting("a", 1);
+                TestEventSource.Log.Boring(7);
+            });
+
+            Assert.True(matched > 0, "The event id 1 filter never fired.");
+            Assert.True(rejected > 0, "The event id 2 filter never fired.");
+        }
+
+        [Fact]
+        public void CompatibilityInterfaceDecodesTheSameValues()
+        {
+            string message = null;
+            int number = 0;
+            var signal = new ManualResetEventSlim();
+
+            var filter = new EventFilter(Filter.EventNameIs("Interesting"));
+            filter.OnEvent += record =>
+            {
+                message = record.GetUnicodeString("message", null);
+                number = record.GetInt32("number", 0);
+                signal.Set();
+            };
+
+            var provider = new Provider(TestTraceLoggingSource.ProviderName)
+            {
+                Any = 0
+            };
+            provider.AddFilter(filter);
+
+            RunTrace(provider, signal, () => TestTraceLoggingSource.Log.Interesting("compat", 99));
+
+            Assert.Equal("compat", message);
+            Assert.Equal(99, number);
+        }
+
+        [Fact]
+        public void StringPredicateMatchesWithoutMaterialisingTheValue()
+        {
+            var signal = new ManualResetEventSlim();
+            int hits = 0;
+
+            var filter = new EventFilter(
+                Filter.EventNameIs("Interesting").And(UnicodeString.Is("message", "needle")));
+
+            filter.OnEventSpan += (in EventRecordRef record) =>
+            {
+                Interlocked.Increment(ref hits);
+                signal.Set();
+            };
+
+            var provider = new Provider(TestTraceLoggingSource.ProviderName)
+            {
+                Any = 0
+            };
+            provider.AddFilter(filter);
+
+            RunTrace(provider, signal, () =>
+            {
+                TestTraceLoggingSource.Log.Interesting("haystack", 1);
+                TestTraceLoggingSource.Log.Interesting("needle", 2);
+            });
+
+            Assert.True(hits > 0, "The string predicate never matched.");
+        }
+
+        [Fact]
+        public void RecordIsInvalidAfterTheCallbackReturns()
+        {
+            IEventRecord escaped = null;
+            var signal = new ManualResetEventSlim();
+
+            var filter = new EventFilter(Filter.EventIdIs(1));
+            filter.OnEvent += record =>
+            {
+                escaped = record;
+                signal.Set();
+            };
+
+            var provider = new Provider(TestEventSource.ProviderName)
+            {
+                Any = 0
+            };
+            provider.AddFilter(filter);
+
+            RunTrace(provider, signal, () => TestEventSource.Log.Interesting("escape", 1));
+
+            Assert.NotNull(escaped);
+            Assert.Throws<InvalidOperationException>(() => escaped.ProcessId);
+        }
+
+        private static void RunTrace(Provider provider, ManualResetEventSlim signal, Action emit)
+        {
+            using (var trace = new UserTrace("Krabs-Managed-Tests-" + Guid.NewGuid().ToString("N")))
+            {
+                trace.Enable(provider);
+                trace.Open();
+
+                Task processing = Task.Run(() => trace.Start());
+
+                try
+                {
+                    var deadline = DateTime.UtcNow + Timeout;
+
+                    while (DateTime.UtcNow < deadline && !signal.IsSet)
+                    {
+                        emit();
+                        signal.Wait(TimeSpan.FromMilliseconds(250));
+                    }
+                }
+                finally
+                {
+                    trace.Stop();
+                    processing.Wait(Timeout);
+                }
+            }
+        }
+    }
+}
