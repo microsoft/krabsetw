@@ -164,6 +164,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         /// <param name="filter">the <see cref="O365::Security::ETW::EventFilter"/> to add</param>
         void AddFilter(O365::Security::ETW::EventFilter ^filter) {
+            filters_->Add(filter);
             provider_->add_filter(filter);
         }
 
@@ -197,6 +198,17 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     internal:
         NativePtr<krabs::provider<>> provider_;
         CallbackBridge^ bridge_ = gcnew CallbackBridge();
+
+        /// <summary>
+        /// Roots the managed filters added to this provider.
+        /// </summary>
+        /// <remarks>
+        /// add_filter hands the native provider the filter's native representation only, so
+        /// without this the managed EventFilter that owns the delegates is collectable as
+        /// soon as the caller drops it.
+        /// </remarks>
+        System::Collections::Generic::List<O365::Security::ETW::EventFilter^>^ filters_ =
+            gcnew System::Collections::Generic::List<O365::Security::ETW::EventFilter^>();
 
         void RegisterCallbacks();
     };
