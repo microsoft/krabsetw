@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net48;net10.0-windows</TargetFrameworks>
+    <AssemblyName>O365.Security.ETW.Managed.Benchmarks</AssemblyName>
+    <RootNamespace>O365.Security.ETW.Benchmarks</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\O365.Security.ETW.Managed\O365.Security.ETW.Managed.csproj" />
+  </ItemGroup>
+
+</Project>

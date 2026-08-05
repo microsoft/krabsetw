@@ -76,6 +76,12 @@ namespace O365.Security.ETW.Schema
             }
         }
 
+        /// <summary>Number of TDH lookups performed across this trace's lifetime.</summary>
+        internal int SchemaMisses
+        {
+            get { return _cache.Misses; }
+        }
+
         public void Dispose()
         {
             _cache.Dispose();

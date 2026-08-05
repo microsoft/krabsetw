@@ -128,6 +128,9 @@ namespace O365.Security.ETW.Schema
         private readonly List<IntPtr> _blobs = new List<IntPtr>();
         private bool _disposed;
 
+        /// <summary>Number of TDH lookups performed. A well-behaved trace resolves each distinct schema once.</summary>
+        internal int Misses { get; private set; }
+
         /// <summary>
         /// Returns the cached schema for an event, consulting TDH on a miss. Failures are
         /// cached too, so an event without a schema is only looked up once.
@@ -154,6 +157,7 @@ namespace O365.Security.ETW.Schema
             }
 
             entry = Load(record, tlName);
+            Misses++;
             _cache[key] = entry;
             return entry;
         }
