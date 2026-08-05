@@ -82,6 +82,12 @@ namespace Microsoft.O365.Security.ETW.Schema
             get { return _cache.Misses; }
         }
 
+        /// <summary>Exposed for benchmarks that isolate the stages of a lookup.</summary>
+        internal SchemaCache Cache
+        {
+            get { return _cache; }
+        }
+
         public void Dispose()
         {
             _cache.Dispose();

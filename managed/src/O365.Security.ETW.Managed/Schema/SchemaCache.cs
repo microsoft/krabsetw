@@ -55,7 +55,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 return name.Length == 0;
             }
 
-            return name.SequenceEqual(new ReadOnlySpan<byte>(_traceLoggingName));
+            return ShortSpan.Equal(name, _traceLoggingName);
         }
     }
 
@@ -83,6 +83,21 @@ namespace Microsoft.O365.Security.ETW.Schema
             Version = version;
             Opcode = opcode;
             Level = level;
+        }
+
+        /// <summary>
+        /// Compares everything except the name hash, which exists only to spread dictionary
+        /// buckets. Callers that already hold the name confirm it separately.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool MatchesEvent(Guid provider, ulong keyword, ushort id, byte version, byte opcode, byte level)
+        {
+            return Id == id
+                && Version == version
+                && Opcode == opcode
+                && Level == level
+                && Keyword == keyword
+                && Provider == provider;
         }
 
         public bool Equals(SchemaKey other)
@@ -126,6 +141,8 @@ namespace Microsoft.O365.Security.ETW.Schema
     {
         private readonly Dictionary<SchemaKey, SchemaEntry> _cache = new Dictionary<SchemaKey, SchemaEntry>();
         private readonly List<IntPtr> _blobs = new List<IntPtr>();
+        private SchemaKey _lastKey;
+        private SchemaEntry _lastEntry;
         private bool _disposed;
 
         /// <summary>Number of TDH lookups performed. A well-behaved trace resolves each distinct schema once.</summary>
@@ -138,9 +155,26 @@ namespace Microsoft.O365.Security.ETW.Schema
         public SchemaEntry Get(EVENT_RECORD* record)
         {
             ReadOnlySpan<byte> tlName = TraceLoggingMetadata.GetEventName(record);
-            ulong nameHash = tlName.Length == 0 ? 0UL : Fnv1A(tlName);
 
             ref EVENT_DESCRIPTOR descriptor = ref record->EventHeader.EventDescriptor;
+
+            // Events arrive in bursts from the same provider, so the previous event's schema
+            // is overwhelmingly the right answer. Confirming it structurally is cheaper than
+            // hashing the name and probing the dictionary.
+            if (_lastEntry != null
+                && _lastKey.MatchesEvent(
+                    record->EventHeader.ProviderId,
+                    descriptor.Keyword,
+                    descriptor.Id,
+                    descriptor.Version,
+                    descriptor.Opcode,
+                    descriptor.Level)
+                && _lastEntry.NameMatches(tlName))
+            {
+                return _lastEntry;
+            }
+
+            ulong nameHash = tlName.Length == 0 ? 0UL : Fnv1A(tlName);
 
             var key = new SchemaKey(
                 record->EventHeader.ProviderId,
@@ -153,12 +187,16 @@ namespace Microsoft.O365.Security.ETW.Schema
 
             if (_cache.TryGetValue(key, out SchemaEntry entry) && entry.NameMatches(tlName))
             {
+                _lastKey = key;
+                _lastEntry = entry;
                 return entry;
             }
 
             entry = Load(record, tlName);
             Misses++;
             _cache[key] = entry;
+            _lastKey = key;
+            _lastEntry = entry;
             return entry;
         }
 
@@ -215,8 +253,13 @@ namespace Microsoft.O365.Security.ETW.Schema
             return IntPtr.Size;
         }
 
-        private static ulong Fnv1A(ReadOnlySpan<byte> value)
+        /// <summary>Exposed for benchmarks that isolate the stages of a lookup.</summary>
+        internal static ulong HashName(ReadOnlySpan<byte> name)
         {
+            return name.Length == 0 ? 0UL : Fnv1A(name);
+        }
+
+        private static ulong Fnv1A(ReadOnlySpan<byte> value)        {
             const ulong offsetBasis = 14695981039346656037UL;
             const ulong prime = 1099511628211UL;
 
@@ -238,6 +281,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             }
 
             _disposed = true;
+            _lastEntry = null;
 
             for (int i = 0; i < _blobs.Count; i++)
             {
@@ -318,13 +362,9 @@ namespace Microsoft.O365.Security.ETW.Schema
                 return default;
             }
 
-            int length = 0;
-            while (nameOffset + length < structSize && metadata[nameOffset + length] != 0)
-            {
-                length++;
-            }
+            int available = structSize - nameOffset;
+            int terminator = ShortSpan.IndexOfZero(metadata + nameOffset, available);
 
-            return new ReadOnlySpan<byte>(metadata + nameOffset, length);
-        }
+            return new ReadOnlySpan<byte>(metadata + nameOffset, terminator < 0 ? available : terminator);        }
     }
 }
