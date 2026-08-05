@@ -121,6 +121,34 @@ namespace krabs {
          */
         void on_error(const EVENT_RECORD& record, const std::string& error_message) const;
 
+        /**
+         * <summary>
+         *   Returns true when the record satisfies this filter's event id list.
+         * </summary>
+         * <remarks>
+         *   The event ids are also handed to ETW as an EVENT_FILTER_TYPE_EVENT_ID
+         *   descriptor, but that is an optimization rather than a guarantee: ETW does
+         *   not apply event id filtering to MOF or WPP events, the descriptor is
+         *   dropped when more than MAX_EVENT_FILTER_EVENT_ID_COUNT ids are requested,
+         *   and the ids of every filter on a provider are unioned before being pushed
+         *   down. Re-testing here makes each filter see only its own event ids.
+         * </remarks>
+         */
+        bool matches_event_id(const EVENT_RECORD& record) const
+        {
+            if (provider_filter_event_ids_.empty()) {
+                return true;
+            }
+
+            for (auto id : provider_filter_event_ids_) {
+                if (id == record.EventHeader.EventDescriptor.Id) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
     private:
         std::deque<provider_event_callback> event_callbacks_;
         std::deque<provider_error_callback> error_callbacks_;
@@ -213,6 +241,10 @@ namespace krabs {
 
         try
         {
+            if (!matches_event_id(record)) {
+                return;
+            }
+
             if (predicate_ != nullptr && !predicate_(record, trace_context)) {
                 return;
             }

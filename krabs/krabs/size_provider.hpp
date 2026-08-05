@@ -45,11 +45,34 @@ namespace krabs {
         static ULONG get_tdh_size(
             const wchar_t*,
             const EVENT_RECORD&);
+
+        static ULONG scale_length(
+            const EVENT_PROPERTY_INFO&,
+            ULONG);
     };
 
     // Implementation
     // ------------------------------------------------------------------------
 
+    /**
+     * <summary>
+     * Converts EVENT_PROPERTY_INFO::length into a byte count.
+     * </summary>
+     * <remarks>
+     * tdh.h documents the length for TDH_INTYPE_UNICODESTRING as a count of WCHARs,
+     * not a count of bytes. Every other in-type whose length is meaningful expresses
+     * it in bytes, including TDH_INTYPE_ANSISTRING.
+     * </remarks>
+     */
+    inline ULONG size_provider::scale_length(
+        const EVENT_PROPERTY_INFO& propertyInfo,
+        ULONG length)
+    {
+        if (propertyInfo.nonStructType.InType == TDH_INTYPE_UNICODESTRING)
+            return length * sizeof(wchar_t);
+
+        return length;
+    }
     inline ULONG size_provider::get_property_size(
         const BYTE* propertyStart,
         const wchar_t* propertyName,
@@ -79,7 +102,7 @@ namespace krabs {
                 return record.EventHeader.Flags & EVENT_HEADER_FLAG_32_BIT_HEADER ? 4 : 8;
             }
 
-            return propertyInfo.length;
+            return scale_length(propertyInfo, propertyInfo.length);
         }
 
         ULONG propertyLength = 0;
@@ -89,7 +112,7 @@ namespace krabs {
         if (propertyInfo.Flags == 0)
         {
             if (propertyInfo.length > 0)
-                propertyLength = propertyInfo.length;
+                propertyLength = scale_length(propertyInfo, propertyInfo.length);
             else
                 propertyLength = get_heuristic_size(propertyStart, propertyInfo, record);
         }
