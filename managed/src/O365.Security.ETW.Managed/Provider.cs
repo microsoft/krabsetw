@@ -1,15 +1,57 @@
 using System;
 using System.Collections.Generic;
-using System.Security.Cryptography;
-using System.Text;
+using Microsoft.O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Schema;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
+    /// <summary>
+    /// EVENT_ENABLE_PROPERTY_* values passed to EnableTraceEx2.
+    /// </summary>
+    [Flags]
+    public enum TraceFlags : uint
+    {
+        None = 0x00000000,
+
+        /// <summary>User SID for the event is included in the ExtendedData field.</summary>
+        IncludeUserSid = 0x00000001,
+
+        /// <summary>Terminal Session ID for the event is included in the ExtendedData field.</summary>
+        IncludeTerminalSessionId = 0x00000002,
+
+        /// <summary>Stack trace for the event is included in the ExtendedData field.</summary>
+        IncludeStackTrace = 0x00000004,
+
+        /// <summary>Filters out all events that do not have a non-zero keyword specified.</summary>
+        IgnoreKeyword0 = 0x00000010,
+
+        /// <summary>Enable a provider group rather than an individual provider.</summary>
+        EnableProviderGroup = 0x00000020,
+
+        /// <summary>Include the Process Start Key in the extended data.</summary>
+        IncludeProcessStartKey = 0x00000080,
+
+        /// <summary>Include the Event Key in the extended data.</summary>
+        IncludeProcessEventKey = 0x00000100,
+
+        /// <summary>Filters out events marked InPrivate, or from processes marked InPrivate.</summary>
+        ExcludeInPrivateEventKey = 0x00000200,
+
+        /// <summary>Receive events from processes running inside Windows containers.</summary>
+        EnableSilosEventKey = 0x00000400,
+
+        /// <summary>Include the container ID in the ExtendedData field.</summary>
+        SourceContainerTrackingEventKey = 0x00000800
+    }
+
     /// <summary>
     /// An ETW provider to enable on a trace, together with the filters applied to its events.
     /// </summary>
-    public sealed class Provider
+    public sealed class Provider : IDisposable
     {
+        /// <summary>A keyword mask with every bit set.</summary>
+        public const ulong AllBitsSet = ulong.MaxValue;
+
         private readonly List<EventFilter> _filters = new List<EventFilter>();
 
         public Provider(Guid id)
@@ -18,9 +60,9 @@ namespace O365.Security.ETW
         }
 
         /// <summary>
-        /// Resolves a provider name to its GUID using the algorithm shared by TraceLogging
-        /// and EventSource.
+        /// Resolves a provider name to its GUID by asking TDH for the registered providers.
         /// </summary>
+        /// <exception cref="ArgumentException">The name is not a registered provider.</exception>
         public Provider(string name)
         {
             if (string.IsNullOrEmpty(name))
@@ -42,23 +84,43 @@ namespace O365.Security.ETW
         /// <summary>Events are delivered only when all of these keyword bits match.</summary>
         public ulong All { get; set; }
 
-        /// <summary>Maximum event level to deliver. Defaults to all levels.</summary>
-        public byte Level { get; set; } = 0xFF;
+        /// <summary>
+        /// Maximum event level to deliver. Defaults to 5 (verbose), matching native krabs.
+        /// </summary>
+        public byte Level { get; set; } = 5;
 
         /// <summary>EVENT_ENABLE_PROPERTY_* flags passed to EnableTraceEx2.</summary>
-        public uint TraceFlags { get; set; }
+        public TraceFlags TraceFlags { get; set; }
 
-        /// <summary>Invoked for events that no filter claimed. Zero-copy path.</summary>
+        /// <summary>Whether the provider is asked to log its state on enable.</summary>
+        public bool RundownEnabled { get; private set; }
+
+        /// <summary>Invoked for every event delivered to this provider. Zero-copy path.</summary>
         public event EventRecordDelegate OnEventSpan;
 
-        /// <summary>Invoked for events that no filter claimed.</summary>
+        /// <summary>Invoked for every event delivered to this provider.</summary>
         public event IEventRecordDelegate OnEvent;
 
-        /// <summary>Invoked for events whose schema could not be resolved.</summary>
+        /// <summary>
+        /// Invoked for every event delivered to this provider, before any schema is resolved.
+        /// </summary>
+        /// <remarks>
+        /// Fires unconditionally and first, matching the native CallbackBridge. Handlers see
+        /// header fields only; touching a payload accessor would force a schema lookup and
+        /// defeat the point of the callback.
+        /// </remarks>
         public event IEventRecordMetadataDelegate OnMetadata;
 
-        /// <summary>Invoked when a handler throws.</summary>
+        /// <summary>Invoked when an event's schema could not be resolved.</summary>
         public event EventRecordErrorDelegate OnError;
+
+        /// <summary>
+        /// Requests that the provider log its state information when enabled.
+        /// </summary>
+        public void EnableRundownEvents()
+        {
+            RundownEnabled = true;
+        }
 
         public void AddFilter(EventFilter filter)
         {
@@ -74,89 +136,129 @@ namespace O365.Security.ETW
 
         internal bool HasProviderHandlers
         {
-            get { return OnEventSpan != null || OnEvent != null; }
+            get { return OnEventSpan != null || OnEvent != null || OnMetadata != null; }
         }
 
         internal void Dispatch(in EventRecordRef record, EventRecordAdapter adapter)
         {
+            // Order matches krabs::details::base_provider::on_event: the provider's own
+            // callbacks run before its filters, and within the callback bridge OnMetadata
+            // runs before OnEvent.
+            OnMetadata?.Invoke(adapter);
+
+            var span = OnEventSpan;
+            var compat = OnEvent;
+
+            if (span != null || compat != null)
+            {
+                // The span surface reads the record header without a schema, so it is not
+                // gated on one. The compat IEventRecord surface mirrors C++/CLI, whose
+                // EventRecord wraps a krabs::schema.
+                span?.Invoke(record);
+
+                if (compat != null)
+                {
+                    SchemaEntry schema = record.SchemaEntry;
+
+                    if (schema.Status != NativeConstants.ERROR_SUCCESS)
+                    {
+                        RaiseError(schema.Status, record, adapter);
+                    }
+                    else
+                    {
+                        compat(adapter);
+                    }
+                }
+            }
+
             for (int i = 0; i < _filters.Count; i++)
             {
                 _filters[i].Dispatch(record, adapter);
             }
+        }
 
-            var span = OnEventSpan;
-            var compat = OnEvent;
-            var metadata = OnMetadata;
-
-            if (span == null && compat == null && metadata == null)
+        private void RaiseError(int status, in EventRecordRef record, EventRecordAdapter adapter)
+        {
+            var handler = OnError;
+            if (handler == null)
             {
                 return;
             }
 
-            try
-            {
-                if (record.HasSchema)
-                {
-                    span?.Invoke(record);
-                    compat?.Invoke(adapter);
-                }
-                else
-                {
-                    // No schema, so only header fields are meaningful.
-                    metadata?.Invoke(adapter);
-                }
-            }
-            catch (Exception ex)
-            {
-                var handler = OnError;
-                if (handler == null)
-                {
-                    throw;
-                }
-
-                handler(new EventRecordError(ex.Message, adapter));
-            }
+            handler(new EventRecordError(
+                ErrorMessages.StatusAndRecordContext(status, record.ProviderId, record.Id),
+                adapter));
         }
 
         /// <summary>
-        /// Derives a provider GUID from its name, matching TraceLogging and EventSource:
-        /// SHA-1 over a fixed namespace followed by the upper-cased name in big-endian UTF-16,
-        /// truncated to 16 bytes and stamped as a version 5 GUID.
+        /// Resolves a provider name to its GUID via TdhEnumerateProviders, matching
+        /// krabs::provider::provider_name_to_guid.
         /// </summary>
-        internal static Guid GuidFromName(string name)
+        /// <remarks>
+        /// Deliberately not the EventSource/TraceLogging name hash: that would happily
+        /// produce a GUID for a provider that does not exist, and the resulting session
+        /// would silently receive nothing.
+        /// </remarks>
+        internal static unsafe Guid GuidFromName(string name)
         {
-            byte[] namespaceBytes =
-            {
-                0x48, 0x2C, 0x2D, 0xB2, 0xC3, 0x90, 0x47, 0xC8,
-                0x87, 0xF8, 0x1A, 0x15, 0xBF, 0xC1, 0x30, 0xFB
-            };
+            uint size = 0;
+            int status = NativeMethods.TdhEnumerateProviders(null, &size);
 
-            string upper = name.ToUpperInvariant();
-            var buffer = new byte[namespaceBytes.Length + (upper.Length * 2)];
-            Buffer.BlockCopy(namespaceBytes, 0, buffer, 0, namespaceBytes.Length);
-
-            for (int i = 0; i < upper.Length; i++)
+            if (status != NativeConstants.ERROR_INSUFFICIENT_BUFFER)
             {
-                int offset = namespaceBytes.Length + (i * 2);
-                buffer[offset] = (byte)(upper[i] >> 8);
-                buffer[offset + 1] = (byte)upper[i];
+                throw new TraceException("TdhEnumerateProviders failed.", status);
             }
 
-            byte[] hash;
-            using (var sha1 = SHA1.Create())
+            var buffer = new byte[size];
+
+            fixed (byte* p = buffer)
             {
-                hash = sha1.ComputeHash(buffer);
+                status = NativeMethods.TdhEnumerateProviders(p, &size);
+
+                if (status != NativeConstants.ERROR_SUCCESS)
+                {
+                    throw new TraceException("TdhEnumerateProviders failed.", status);
+                }
+
+                var header = (PROVIDER_ENUMERATION_INFO*)p;
+                var entries = (TRACE_PROVIDER_INFO*)(p + sizeof(PROVIDER_ENUMERATION_INFO));
+
+                for (uint i = 0; i < header->NumberOfProviders; i++)
+                {
+                    var candidate = (char*)(p + entries[i].ProviderNameOffset);
+
+                    int j = 0;
+                    while (j < name.Length && candidate[j] != '\0' && candidate[j] == name[j])
+                    {
+                        j++;
+                    }
+
+                    if (j == name.Length && candidate[j] == '\0')
+                    {
+                        return entries[i].ProviderGuid;
+                    }
+                }
             }
 
-            var guidBytes = new byte[16];
-            Array.Copy(hash, guidBytes, 16);
+            throw new ArgumentException("Provider name does not exist. (" + name + ")", nameof(name));
+        }
 
-            // Stamp the version 5 nibble, exactly as EventSource does. The hash bytes are
-            // already laid out the way Guid's byte-array constructor expects, so no field
-            // byte swapping is applied.
-            guidBytes[7] = (byte)((guidBytes[7] & 0x0F) | 0x50);
+        public void Dispose()
+        {
+        }
+    }
 
-            return new Guid(guidBytes);
+    internal static class ErrorMessages
+    {
+        /// <summary>
+        /// Mirrors krabs::get_status_and_record_context so error text is comparable between
+        /// the two implementations.
+        /// </summary>
+        public static string StatusAndRecordContext(int status, Guid providerId, ushort eventId)
+        {
+            return "status_code=" + ((uint)status).ToString()
+                + " provider_id=" + providerId.ToString("D")
+                + " event_id=" + eventId.ToString();
         }
     }
 }

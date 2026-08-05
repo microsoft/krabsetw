@@ -1,8 +1,8 @@
 using System;
 using System.Runtime.CompilerServices;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
 
-namespace O365.Security.ETW.Schema
+namespace Microsoft.O365.Security.ETW.Schema
 {
     /// <summary>
     /// Resolves the byte offset of each property within an event's UserData.
@@ -121,21 +121,46 @@ namespace O365.Security.ETW.Schema
                 return -1;
             }
 
-            ushort length = _table.Lengths[index];
+            int length;
             if ((flags & NativeConstants.PropertyParamLength) != 0)
             {
-                if (!TryReadUnsigned(_table.Lengths[index], out ulong dynamicLength))
+                // The union holds a property index rather than a length. A length that
+                // resolves to zero is a legitimately empty field and must stay distinct from
+                // "unspecified", which would otherwise send a string scanning to the end of
+                // the payload.
+                int lengthIndex = _table.Lengths[index];
+
+                if (lengthIndex >= index)
+                {
+                    // A property can only be sized by one that precedes it. Anything else is
+                    // a malformed schema and would recurse without terminating.
+                    return -1;
+                }
+
+                if (!TryReadUnsigned(lengthIndex, out ulong dynamicLength) || dynamicLength > int.MaxValue)
                 {
                     return -1;
                 }
 
-                length = (ushort)dynamicLength;
+                length = (int)dynamicLength;
+            }
+            else
+            {
+                ushort schemaLength = _table.Lengths[index];
+                length = schemaLength == 0 ? PropertySizer.LengthUnspecified : schemaLength;
             }
 
             int count = _table.Counts[index];
             if ((flags & NativeConstants.PropertyParamCount) != 0)
             {
-                if (!TryReadUnsigned(_table.Counts[index], out ulong dynamicCount))
+                int countIndex = _table.Counts[index];
+
+                if (countIndex >= index)
+                {
+                    return -1;
+                }
+
+                if (!TryReadUnsigned(countIndex, out ulong dynamicCount) || dynamicCount > int.MaxValue)
                 {
                     return -1;
                 }
@@ -151,6 +176,7 @@ namespace O365.Security.ETW.Schema
 
             return PropertySizer.GetRuntimeSize(
                 _table.InTypes[index],
+                _table.OutTypes[index],
                 length,
                 count,
                 _pointerSize,
@@ -172,7 +198,14 @@ namespace O365.Security.ETW.Schema
                 return false;
             }
 
-            int size = PropertySizer.TryGetFixedElementSize(_table.InTypes[index], _table.Lengths[index], _pointerSize);
+            ushort schemaLength = _table.Lengths[index];
+
+            int size = PropertySizer.TryGetFixedElementSize(
+                _table.InTypes[index],
+                _table.OutTypes[index],
+                schemaLength == 0 ? PropertySizer.LengthUnspecified : schemaLength,
+                _pointerSize);
+
             if (size < 0 || offset + size > _dataLength)
             {
                 return false;

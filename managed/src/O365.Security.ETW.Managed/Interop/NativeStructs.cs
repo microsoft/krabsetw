@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace O365.Security.ETW.Interop
+namespace Microsoft.O365.Security.ETW.Interop
 {
     // Layouts below are validated against ground truth emitted from the real Windows
     // headers by managed/tools/layoutprobe. See LayoutFacts.cs in the test project.

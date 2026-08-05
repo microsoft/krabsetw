@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>Session buffer configuration, passed through to StartTrace.</summary>
     public sealed class EventTraceProperties
@@ -35,16 +35,45 @@ namespace O365.Security.ETW
     }
 
     /// <summary>
+    /// Represents an instance of an ETW trace session.
+    /// </summary>
+    public interface ITrace
+    {
+        /// <summary>Sets the trace properties. Must be called before Open()/Start().</summary>
+        void SetTraceProperties(EventTraceProperties properties);
+
+        /// <summary>Starts listening for events from the enabled providers.</summary>
+        void Start();
+
+        /// <summary>Stops listening for events.</summary>
+        void Stop();
+
+        /// <summary>Gets stats about events handled by this trace.</summary>
+        TraceStats QueryStats();
+    }
+
+    /// <summary>
+    /// User ETW trace specific interface of <see cref="ITrace"/>.
+    /// </summary>
+    public interface IUserTrace : ITrace
+    {
+        /// <summary>Enables a provider for the given user trace.</summary>
+        void Enable(Provider provider);
+    }
+
+    /// <summary>
     /// A real-time ETW session.
     /// </summary>
-    public sealed unsafe class UserTrace : IDisposable
+    public sealed unsafe class UserTrace : IUserTrace, IDisposable
     {
         private readonly object _gate = new object();
         private readonly List<Provider> _providers = new List<Provider>();
         private readonly string _name;
+        private readonly ManualResetEventSlim _processingStopped = new ManualResetEventSlim(true);
 
         private TraceContext _context;
         private int _contextIndex = -1;
+        private Thread _processingThread;
 
         private ulong _sessionHandle;
         private ulong _traceHandle;
@@ -80,30 +109,50 @@ namespace O365.Security.ETW
         }
 
         /// <summary>Number of buffers ProcessTrace has delivered.</summary>
-        public ulong BuffersProcessed { get; private set; }
+        public ulong BuffersProcessed
+        {
+            get { return _context.BuffersProcessed; }
+        }
 
-        public bool MOFEventProcessingEnabled { get; set; }
+        /// <summary>
+        /// Routes MOF (classic/WBEM) events to providers. Off by default because it forces a
+        /// TDH lookup on every classic event in the session.
+        /// </summary>
+        public bool MOFEventProcessingEnabled
+        {
+            get { return _context.MofEventsEnabled; }
+            set { _context.MofEventsEnabled = value; }
+        }
 
-        public bool WPPEventProcessingEnabled { get; set; }
+        /// <summary>Routes WPP events to providers. Off by default, for the same reason.</summary>
+        public bool WPPEventProcessingEnabled
+        {
+            get { return _context.WppEventsEnabled; }
+            set { _context.WppEventsEnabled = value; }
+        }
 
         /// <summary>Handles events with no matching provider. Zero-copy path.</summary>
         public EventRecordDelegate DefaultEventSpan
         {
+            get { return _context.DefaultEventSpan; }
             set { _context.DefaultEventSpan = value; }
         }
 
         public IEventRecordDelegate DefaultEvent
         {
+            get { return _context.DefaultEvent; }
             set { _context.DefaultEvent = value; }
         }
 
         public IEventRecordMetadataDelegate DefaultMetadata
         {
+            get { return _context.DefaultMetadata; }
             set { _context.DefaultMetadata = value; }
         }
 
         public EventRecordErrorDelegate DefaultError
         {
+            get { return _context.DefaultError; }
             set { _context.DefaultError = value; }
         }
 
@@ -122,7 +171,7 @@ namespace O365.Security.ETW
 
                 if (_opened)
                 {
-                    EnableProvider(provider);
+                    EnableProviders();
                     _context.SetProviders(_providers);
                 }
             }
@@ -143,11 +192,7 @@ namespace O365.Security.ETW
                 }
 
                 StartSession();
-
-                foreach (Provider provider in _providers)
-                {
-                    EnableProvider(provider);
-                }
+                EnableProviders();
 
                 _context.SetProviders(_providers);
                 _contextIndex = TraceRegistry.Register(_context);
@@ -166,7 +211,20 @@ namespace O365.Security.ETW
             Open();
 
             ulong handle = _traceHandle;
-            int status = NativeMethods.ProcessTrace(&handle, 1, IntPtr.Zero, IntPtr.Zero);
+
+            _processingThread = Thread.CurrentThread;
+            _processingStopped.Reset();
+
+            int status;
+            try
+            {
+                status = NativeMethods.ProcessTrace(&handle, 1, IntPtr.Zero, IntPtr.Zero);
+            }
+            finally
+            {
+                _processingThread = null;
+                _processingStopped.Set();
+            }
 
             if (status != NativeConstants.ERROR_SUCCESS && status != NativeConstants.ERROR_CANCELLED)
             {
@@ -195,6 +253,12 @@ namespace O365.Security.ETW
                     _traceHandle = 0;
                 }
 
+                // CloseTrace only requests that processing end; ProcessTrace keeps draining
+                // buffered events for a while afterwards. Unregistering the context or
+                // freeing the cached schema blobs before it returns would leave the callback
+                // thread reading freed memory.
+                WaitForProcessingToStop();
+
                 if (_contextIndex >= 0)
                 {
                     TraceRegistry.Unregister(_contextIndex);
@@ -209,6 +273,18 @@ namespace O365.Security.ETW
 
                 _opened = false;
             }
+        }
+
+        private void WaitForProcessingToStop()
+        {
+            // Stopping from inside a handler is legal; the processing thread cannot wait for
+            // itself, and the callback frames below it still need the context alive.
+            if (_processingThread == Thread.CurrentThread)
+            {
+                return;
+            }
+
+            _processingStopped.Wait(TimeSpan.FromSeconds(30));
         }
 
         public TraceStats QueryStats()
@@ -342,15 +418,104 @@ namespace O365.Security.ETW
             get { return IntPtr.Size == 8 ? ulong.MaxValue : 0x00000000FFFFFFFFUL; }
         }
 
-        private void EnableProvider(Provider provider)
+        /// <summary>
+        /// Enables every provider, merged by GUID.
+        /// </summary>
+        /// <remarks>
+        /// Two Provider objects with the same GUID describe one ETW registration: EnableTraceEx2
+        /// replaces the previous settings for a GUID rather than adding to them, so enabling
+        /// them separately would leave only the last one's level and keywords in effect. The
+        /// flags are OR'd and the pushdown id sets unioned, matching krabs::details::ut.
+        /// </remarks>
+        private void EnableProviders()
         {
-            List<ushort> eventIds = CollectPushdownEventIds(provider);
+            var merged = new List<MergedProvider>();
+
+            foreach (Provider provider in _providers)
+            {
+                MergedProvider entry = null;
+
+                for (int i = 0; i < merged.Count; i++)
+                {
+                    if (merged[i].Id == provider.Id)
+                    {
+                        entry = merged[i];
+                        break;
+                    }
+                }
+
+                if (entry == null)
+                {
+                    entry = new MergedProvider(provider.Id);
+                    merged.Add(entry);
+                }
+
+                entry.Add(provider);
+            }
+
+            foreach (MergedProvider entry in merged)
+            {
+                EnableMerged(entry);
+            }
+        }
+
+        private sealed class MergedProvider
+        {
+            public readonly Guid Id;
+            public byte Level;
+            public ulong Any;
+            public ulong All;
+            public uint TraceFlags;
+            public bool Rundown;
+
+            /// <summary>Null once any contributing provider declines pushdown.</summary>
+            public List<ushort> EventIds = new List<ushort>();
+
+            private bool _pushdownDeclined;
+
+            public MergedProvider(Guid id)
+            {
+                Id = id;
+            }
+
+            public void Add(Provider provider)
+            {
+                Level |= provider.Level;
+                Any |= provider.Any;
+                All |= provider.All;
+                TraceFlags |= (uint)provider.TraceFlags;
+                Rundown |= provider.RundownEnabled;
+
+                if (_pushdownDeclined)
+                {
+                    return;
+                }
+
+                if (!CollectPushdownEventIds(provider, EventIds))
+                {
+                    _pushdownDeclined = true;
+                    EventIds = null;
+                }
+            }
+        }
+
+        private void EnableMerged(MergedProvider provider)
+        {
+            List<ushort> eventIds = provider.EventIds;
+
+            if (eventIds != null
+                && (eventIds.Count == 0 || eventIds.Count > NativeConstants.MAX_EVENT_FILTER_EVENT_ID_COUNT))
+            {
+                eventIds = null;
+            }
 
             var parameters = default(ENABLE_TRACE_PARAMETERS);
             parameters.Version = 2;
             parameters.EnableProperty = provider.TraceFlags;
 
             Guid id = provider.Id;
+            parameters.SourceId = id;
+
             int status;
 
             if (eventIds == null)
@@ -404,33 +569,54 @@ namespace O365.Security.ETW
             {
                 throw new TraceException("EnableTraceEx2 failed for provider " + provider.Id + ".", status);
             }
+
+            if (provider.Rundown)
+            {
+                status = NativeMethods.EnableTraceEx2(
+                    _sessionHandle,
+                    &id,
+                    NativeConstants.EVENT_CONTROL_CODE_CAPTURE_STATE,
+                    0,
+                    0,
+                    0,
+                    0,
+                    null);
+
+                if (status != NativeConstants.ERROR_SUCCESS)
+                {
+                    throw new TraceException("EnableTraceEx2(CAPTURE_STATE) failed for provider " + provider.Id + ".", status);
+                }
+            }
         }
 
         private const int EventFilterEventIdHeaderSize = 4;
 
         /// <summary>
-        /// Collects the event ids that can be pushed into ETW for a provider.
+        /// Adds a provider's pushdown-eligible event ids to <paramref name="ids"/>.
         /// </summary>
+        /// <returns>
+        /// False when the provider is not eligible, in which case nothing may be pushed into
+        /// ETW for its GUID.
+        /// </returns>
         /// <remarks>
-        /// Only safe when every filter reduces to a bounded id set and the provider itself
-        /// has no unconditional handler. If anything on the provider might want an event
-        /// outside those ids, filtering in the kernel would silently drop it.
+        /// Native krabs unions whatever ids its filters happen to declare and pushes them
+        /// regardless, which silently starves any filter or provider callback that wanted a
+        /// different event. Declining pushdown for the whole GUID is the conservative
+        /// equivalent: it can only ever cost throughput, never correctness.
         /// </remarks>
-        private static List<ushort> CollectPushdownEventIds(Provider provider)
+        private static bool CollectPushdownEventIds(Provider provider, List<ushort> ids)
         {
             if (provider.HasProviderHandlers || provider.Filters.Count == 0)
             {
-                return null;
+                return false;
             }
-
-            var ids = new List<ushort>();
 
             foreach (EventFilter filter in provider.Filters)
             {
                 IReadOnlyList<ushort> filterIds = filter.EventIds;
                 if (filterIds == null)
                 {
-                    return null;
+                    return false;
                 }
 
                 foreach (ushort id in filterIds)
@@ -442,12 +628,7 @@ namespace O365.Security.ETW
                 }
             }
 
-            if (ids.Count == 0 || ids.Count > NativeConstants.MAX_EVENT_FILTER_EVENT_ID_COUNT)
-            {
-                return null;
-            }
-
-            return ids;
+            return true;
         }
 
         #endregion
@@ -462,6 +643,7 @@ namespace O365.Security.ETW
             _disposed = true;
 
             Stop();
+            _processingStopped.Dispose();
             _context.Dispose();
         }
     }

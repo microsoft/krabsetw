@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/O365.Security.ETW.Managed.Benchmarks/O365.Security.ETW.Managed.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/O365.Security.ETW.Managed/O365.Security.ETW.Managed.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/O365.Security.ETW.Managed.Tests/O365.Security.ETW.Managed.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
 
-namespace O365.Security.ETW.Schema
+namespace Microsoft.O365.Security.ETW.Schema
 {
     /// <summary>
     /// A cached schema, or a cached failure to obtain one.

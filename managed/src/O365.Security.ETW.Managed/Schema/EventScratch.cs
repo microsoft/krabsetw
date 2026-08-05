@@ -1,7 +1,7 @@
 using System;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
 
-namespace O365.Security.ETW.Schema
+namespace Microsoft.O365.Security.ETW.Schema
 {
     /// <summary>
     /// Per-event mutable state, owned by a trace and reused for every event it delivers.

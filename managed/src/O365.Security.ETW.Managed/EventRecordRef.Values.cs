@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Interop;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
     /// Typed property accessors.
@@ -62,18 +62,65 @@ namespace O365.Security.ETW
             return true;
         }
 
+        /// <summary>
+        /// Reads a property as a counted UTF-16 string: a little-endian UINT16 byte count
+        /// followed by that many bytes of character data.
+        /// </summary>
+        /// <remarks>
+        /// Unlike <see cref="TryGetUnicodeString"/> the interpretation is forced rather than
+        /// derived from the TDH in-type, matching krabs::predicates::adapters::counted_string.
+        /// Classic WBEM schemas routinely describe a length-prefixed field as a plain
+        /// UNICODESTRING, and letting the in-type decide would leave the count bytes at the
+        /// head of the value.
+        /// </remarks>
+        public bool TryGetCountedString(ReadOnlySpan<char> name, out ReadOnlySpan<char> value)
+        {
+            value = default;
+
+            int index = IndexOf(name);
+            if (index < 0 || !TryGetRaw(index, out ReadOnlySpan<byte> raw) || raw.Length < 2)
+            {
+                return false;
+            }
+
+            int byteCount = raw[0] | (raw[1] << 8);
+            ReadOnlySpan<byte> body = raw.Slice(2);
+
+            if (byteCount < body.Length)
+            {
+                body = body.Slice(0, byteCount);
+            }
+
+            // An odd byte count cannot describe whole characters; drop the trailing byte
+            // rather than reading past the field.
+            value = Reinterpret(body.Slice(0, body.Length & ~1));
+            return true;
+        }
+
+        public ReadOnlySpan<char> GetCountedString(ReadOnlySpan<char> name)
+        {
+            if (!TryGetCountedString(name, out ReadOnlySpan<char> value))
+            {
+                ThrowMissing(name);
+            }
+
+            return value;
+        }
+
         private static ReadOnlySpan<char> DecodeUnicode(ReadOnlySpan<byte> raw, ushort inType)
         {
             switch ((TdhInType)inType)
             {
                 case TdhInType.CountedString:
                 case TdhInType.ReversedCountedString:
+                case TdhInType.ManifestCountedString:
                     if (raw.Length < 2)
                     {
                         return default;
                     }
 
-                    // Leading UINT16 is a byte count.
+                    // Leading UINT16 is a byte count; the sizer has already bounded the span
+                    // to exactly that many bytes plus the prefix.
                     return Reinterpret(raw.Slice(2));
 
                 default:
@@ -87,6 +134,7 @@ namespace O365.Security.ETW
             {
                 case TdhInType.CountedAnsiString:
                 case TdhInType.ReversedCountedAnsiString:
+                case TdhInType.ManifestCountedAnsiString:
                     return raw.Length < 2 ? default : raw.Slice(2);
 
                 default:

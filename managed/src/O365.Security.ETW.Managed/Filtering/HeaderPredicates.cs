@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     internal sealed class AnyEventPredicate : Predicate
     {

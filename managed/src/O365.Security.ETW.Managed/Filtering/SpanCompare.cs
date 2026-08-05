@@ -1,6 +1,6 @@
 using System;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
     /// Ordinal span comparisons, with an ignore-case variant that behaves identically on

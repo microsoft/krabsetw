@@ -1,6 +1,6 @@
 using System;
 
-namespace O365.Security.ETW
+namespace Microsoft.O365.Security.ETW
 {
     /// <summary>Receives an event on the zero-copy path.</summary>
     public delegate void EventRecordDelegate(in EventRecordRef record);
