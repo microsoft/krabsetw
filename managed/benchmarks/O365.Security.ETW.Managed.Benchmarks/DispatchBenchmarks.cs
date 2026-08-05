@@ -233,6 +233,46 @@ namespace Microsoft.O365.Security.ETW.Benchmarks
         }
 
         /// <summary>
+        /// Isolates the offset walk: three offsets resolved, nothing sized or decoded.
+        /// </summary>
+        [Benchmark]
+        public int StageOffsetsOnly()
+        {
+            int total = 0;
+            for (int i = 0; i < _records.Length; i++)
+            {
+                _scratch.Begin(_records[i]);
+                OffsetResolver offsets = _scratch.Offsets;
+                total += offsets.GetOffset(0);
+                total += offsets.GetOffset(1);
+                total += offsets.GetOffset(2);
+            }
+
+            return total;
+        }
+
+        /// <summary>
+        /// The offset walk plus sizing: three raw payload slices, no value decoding.
+        /// </summary>
+        [Benchmark]
+        public int StageRawSlices()
+        {
+            var record = new EventRecordRef();
+            int total = 0;
+            for (int i = 0; i < _records.Length; i++)
+            {
+                _scratch.Begin(_records[i]);
+                record = new EventRecordRef(_records[i], _scratch);
+
+                if (record.TryGetRaw(0, out ReadOnlySpan<byte> a)) { total += a.Length; }
+                if (record.TryGetRaw(1, out ReadOnlySpan<byte> b)) { total += b.Length; }
+                if (record.TryGetRaw(2, out ReadOnlySpan<byte> c)) { total += c.Length; }
+            }
+
+            return total;
+        }
+
+        /// <summary>
         /// Isolates the per-property name scan: three lookups against an already resolved schema.
         /// </summary>
         [Benchmark]
