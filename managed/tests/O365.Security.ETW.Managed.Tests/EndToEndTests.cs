@@ -308,29 +308,7 @@ namespace Microsoft.O365.Security.ETW.Tests
 
         private static void RunTrace(Provider provider, ManualResetEventSlim signal, Action emit)
         {
-            using (var trace = new UserTrace("Krabs-Managed-Tests-" + Guid.NewGuid().ToString("N")))
-            {
-                trace.Enable(provider);
-                trace.Open();
-
-                Task processing = Task.Run(() => trace.Start());
-
-                try
-                {
-                    var deadline = DateTime.UtcNow + Timeout;
-
-                    while (DateTime.UtcNow < deadline && !signal.IsSet)
-                    {
-                        emit();
-                        signal.Wait(TimeSpan.FromMilliseconds(250));
-                    }
-                }
-                finally
-                {
-                    trace.Stop();
-                    processing.Wait(Timeout);
-                }
-            }
+            EtwHarness.Run(provider, signal, emit);
         }
     }
 }
