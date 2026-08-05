@@ -22,6 +22,38 @@ namespace Microsoft.O365.Security.ETW
         public uint FlushTimer { get; set; }
     }
 
+    /// <summary>Options for <see cref="EventTraceProperties.LogFileMode"/>.</summary>
+    public enum LogFileModeFlags : uint
+    {
+        FLAG_EVENT_TRACE_FILE_MODE_NONE = 0x00000000,
+        FLAG_EVENT_TRACE_FILE_MODE_SEQUENTIAL = 0x00000001,
+        FLAG_EVENT_TRACE_FILE_MODE_CIRCULAR = 0x00000002,
+        FLAG_EVENT_TRACE_FILE_MODE_APPEND = 0x00000004,
+        FLAG_EVENT_TRACE_FILE_MODE_NEWFILE = 0x00000008,
+        FLAG_EVENT_TRACE_FILE_MODE_PREALLOCATE = 0x00000020,
+        FLAG_EVENT_TRACE_NONSTOPPABLE_MODE = 0x00000040,
+        FLAG_EVENT_TRACE_SECURE_MODE = 0x00000080,
+        FLAG_EVENT_TRACE_REAL_TIME_MODE = 0x00000100,
+        FLAG_EVENT_TRACE_DELAY_OPEN_FILE_MODE = 0x00000200,
+        FLAG_EVENT_TRACE_BUFFERING_MODE = 0x00000400,
+        FLAG_EVENT_TRACE_PRIVATE_LOGGER_MODE = 0x00000800,
+        FLAG_EVENT_TRACE_ADD_HEADER_MODE = 0x00001000,
+        FLAG_EVENT_TRACE_USE_KBYTES_FOR_SIZE = 0x00002000,
+        FLAG_EVENT_TRACE_USE_GLOBAL_SEQUENCE = 0x00004000,
+        FLAG_EVENT_TRACE_USE_LOCAL_SEQUENCE = 0x00008000,
+        FLAG_EVENT_TRACE_RELOG_MODE = 0x00010000,
+        FLAG_EVENT_TRACE_PRIVATE_IN_PROC = 0x00020000,
+        FLAG_EVENT_TRACE_MODE_RESERVED = 0x00100000,
+        FLAG_EVENT_TRACE_STOP_ON_HYBRID_SHUTDOWN = 0x00400000,
+        FLAG_EVENT_TRACE_PERSIST_ON_HYBRID_SHUTDOWN = 0x00800000,
+        FLAG_EVENT_TRACE_USE_PAGED_MEMORY = 0x01000000,
+        FLAG_EVENT_TRACE_SYSTEM_LOGGER_MODE = 0x02000000,
+        FLAG_EVENT_TRACE_COMPRESSED_MODE = 0x04000000,
+        FLAG_EVENT_TRACE_INDEPENDENT_SESSION_MODE = 0x08000000,
+        FLAG_EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING = 0x10000000,
+        FLAG_EVENT_TRACE_ADDTO_TRIAGE_DUMP = 0x80000000
+    }
+
     /// <summary>Counters describing how a session is behaving.</summary>
     public struct TraceStats
     {
@@ -175,6 +207,15 @@ namespace Microsoft.O365.Security.ETW
                     _context.SetProviders(_providers);
                 }
             }
+        }
+
+        /// <summary>Enables a deprecated raw provider for the given trace.</summary>
+        [Obsolete("RawProvider is deprecated. Use Provider with the OnMetadata event instead.")]
+        public void Enable(RawProvider provider)
+        {
+            if (provider == null) throw new ArgumentNullException(nameof(provider));
+
+            Enable(provider.Underlying);
         }
 
         /// <summary>

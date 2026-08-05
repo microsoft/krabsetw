@@ -7,5 +7,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/O365.Security.ETW.Managed.Tests/O365.Security.ETW.Managed.Tests.csproj" />
+    <Project Path="../tests/ManagedETWTests.PureDotNet/EtwTestsCS.PureDotNet.csproj" />
   </Folder>
 </Solution>

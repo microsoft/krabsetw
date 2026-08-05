@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.O365.Security.ETW.Interop;
@@ -174,6 +175,7 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetUInt8(ReadOnlySpan<char> name, out byte value)
         {
+            AssertInType(name, TdhInType.UInt8);
             value = 0;
             if (!TryGetFixed(name, 1, out byte* p))
             {
@@ -186,6 +188,7 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetInt8(ReadOnlySpan<char> name, out sbyte value)
         {
+            AssertInType(name, TdhInType.Int8);
             value = 0;
             if (!TryGetFixed(name, 1, out byte* p))
             {
@@ -198,6 +201,7 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetUInt16(ReadOnlySpan<char> name, out ushort value)
         {
+            AssertInType(name, TdhInType.UInt16);
             value = 0;
             if (!TryGetFixed(name, 2, out byte* p))
             {
@@ -210,6 +214,7 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetInt16(ReadOnlySpan<char> name, out short value)
         {
+            AssertInType(name, TdhInType.Int16);
             value = 0;
             if (!TryGetFixed(name, 2, out byte* p))
             {
@@ -222,6 +227,7 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetUInt32(ReadOnlySpan<char> name, out uint value)
         {
+            AssertInType(name, TdhInType.UInt32);
             value = 0;
             if (!TryGetFixed(name, 4, out byte* p))
             {
@@ -234,6 +240,7 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetInt32(ReadOnlySpan<char> name, out int value)
         {
+            AssertInType(name, TdhInType.Int32);
             value = 0;
             if (!TryGetFixed(name, 4, out byte* p))
             {
@@ -246,6 +253,7 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetUInt64(ReadOnlySpan<char> name, out ulong value)
         {
+            AssertInType(name, TdhInType.UInt64);
             value = 0;
             if (!TryGetFixed(name, 8, out byte* p))
             {
@@ -258,6 +266,7 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetInt64(ReadOnlySpan<char> name, out long value)
         {
+            AssertInType(name, TdhInType.Int64);
             value = 0;
             if (!TryGetFixed(name, 8, out byte* p))
             {
@@ -282,13 +291,15 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetBoolean(ReadOnlySpan<char> name, out bool value)
         {
+            // Deliberately not type-asserted: krabs excludes bool because ETW's
+            // representation (a 4-byte BOOL) does not line up with the C++ or C# type.
             value = false;
-            if (!TryGetUInt32(name, out uint raw))
+            if (!TryGetFixed(name, 4, out byte* p))
             {
                 return false;
             }
 
-            value = raw != 0;
+            value = Unsafe.ReadUnaligned<uint>(p) != 0;
             return true;
         }
 
@@ -335,7 +346,10 @@ namespace Microsoft.O365.Security.ETW
                 return false;
             }
 
-            if (raw.Length < size)
+            // krabs::parser::parse requires sizeof(T) == propInfo.length_ exactly. Accepting
+            // a wider property would silently truncate, and the C++/CLI surface reports that
+            // as a failed parse rather than a value.
+            if (raw.Length != size)
             {
                 return false;
             }
@@ -344,25 +358,52 @@ namespace Microsoft.O365.Security.ETW
             return true;
         }
 
+        /// <summary>
+        /// Fails a read whose requested type does not match the schema's TDH in-type.
+        /// </summary>
+        /// <remarks>
+        /// Debug only, exactly like krabs::debug::assert_valid_assignment. Enforcing it in
+        /// release would change the behaviour of shipped consumers that today read, say, an
+        /// INT32-typed property through GetUInt32 and get a working value.
+        ///
+        /// Applied to the fixed-width numeric accessors only. krabs also asserts on strings
+        /// because parse&lt;std::wstring&gt; blindly reinterprets the payload; the decoders
+        /// here branch on the in-type instead and correctly handle the counted and
+        /// non-null-terminated variants, which .NET Framework's TraceLogging emits.
+        /// </remarks>
+        [Conditional("DEBUG")]
+        private void AssertInType(ReadOnlySpan<char> name, TdhInType expected)
+        {
+            int index = IndexOf(name);
+
+            if (index < 0)
+            {
+                return;
+            }
+
+            var actual = (TdhInType)InTypeAt(index);
+
+            if (actual != expected)
+            {
+                ThrowTypeMismatch(name, actual, expected);
+            }
+        }
+
+        private static void ThrowTypeMismatch(ReadOnlySpan<char> name, TdhInType actual, TdhInType expected)
+        {
+            throw new TypeMismatchAssert(
+                "Type mismatch assert for property " + name.ToString()
+                + " Actual: " + actual + " Requested: " + expected);
+        }
+
         #endregion
 
         private static void ThrowMissing(ReadOnlySpan<char> name)
         {
-            throw new PropertyNotFoundException(name.ToString());
+            // C++/CLI wraps every parse failure as ParserException, and callers written
+            // against it match on that exact type, so the port raises it directly rather
+            // than a subclass.
+            throw new ParserException("Could not find property in event schema: " + name.ToString());
         }
-    }
-
-    /// <summary>
-    /// Thrown when a requested property is absent from the event schema, or cannot be decoded.
-    /// </summary>
-    public class PropertyNotFoundException : Exception
-    {
-        public PropertyNotFoundException(string propertyName)
-            : base("Could not find property in event schema: " + propertyName)
-        {
-            PropertyName = propertyName;
-        }
-
-        public string PropertyName { get; }
     }
 }

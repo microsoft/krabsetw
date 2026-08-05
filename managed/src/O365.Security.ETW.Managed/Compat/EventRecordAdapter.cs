@@ -410,9 +410,9 @@ namespace Microsoft.O365.Security.ETW
 
         #endregion
 
-        private static PropertyNotFoundException Missing(string name)
+        private static ParserException Missing(string name)
         {
-            return new PropertyNotFoundException(name);
+            return new ParserException("Could not find property in event schema: " + name);
         }
     }
 }
