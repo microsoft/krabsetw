@@ -64,14 +64,22 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// </summary>
         public int GetOffset(int index)
         {
-            if (_broken || _table == null || index < 0 || index >= _table.Count)
+            if (_table == null || index < 0 || index >= _table.Count)
             {
                 return -1;
             }
 
+            // Deliberately ahead of the _broken check. An offset below the high-water mark was
+            // resolved before the walk stalled and is still correct, so a caller reading
+            // properties out of order sees the same answers as one reading them in order.
             if (index < _resolved)
             {
                 return _offsets[index];
+            }
+
+            if (_broken)
+            {
+                return -1;
             }
 
             // Walk forward from the last known offset, memoising as we go.
