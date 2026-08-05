@@ -63,25 +63,26 @@ BenchmarkDotNet, and it reports a `sink/event` column.
 
 Four cells: {.NET Framework, .NET 10} × {C++/CLI, pure .NET}. All Release, x64, same
 machine, all run in-process (`-i`) so every cell is measured identically. Times are per
-event.
+event. All four cells were collected in a single sitting, after the schema-lookup and
+property-lookup optimisations described in `managed/src/.../Schema`.
 
 ### .NET Framework (C++/CLI net462 vs pure net48)
 
 | | C++/CLI | Pure .NET | |
 | --- | ---: | ---: | ---: |
-| Dispatch | 293.6 ns | 124.2 ns | 2.4x |
-| Decode 3 strings | 1439.6 ns | 556.0 ns | 2.6x |
-| Filter, match | 679.2 ns | 335.9 ns | 2.0x |
-| Filter, reject | 387.4 ns | 326.7 ns | 1.2x |
+| Dispatch | 288.6 ns | 87.2 ns | 3.3x |
+| Decode 3 strings | 1421.0 ns | 504.4 ns | 2.8x |
+| Filter, match | 669.2 ns | 290.4 ns | 2.3x |
+| Filter, reject | 398.9 ns | 279.1 ns | 1.4x |
 
 ### .NET 10 (C++/CLI net8.0 rolled forward vs pure net10.0)
 
 | | C++/CLI | Pure .NET | |
 | --- | ---: | ---: | ---: |
-| Dispatch | 256.0 ns | 48.9 ns | 5.2x |
-| Decode 3 strings | 1272.9 ns | 325.8 ns | 3.9x |
-| Filter, match | 578.8 ns | 177.1 ns | 3.3x |
-| Filter, reject | 354.7 ns | 185.4 ns | 1.9x |
+| Dispatch | 308.9 ns | 29.2 ns | 10.6x |
+| Decode 3 strings | 1414.2 ns | 283.4 ns | 5.0x |
+| Filter, match | 692.2 ns | 152.7 ns | 4.5x |
+| Filter, reject | 411.2 ns | 148.9 ns | 2.8x |
 
 ### Allocation
 

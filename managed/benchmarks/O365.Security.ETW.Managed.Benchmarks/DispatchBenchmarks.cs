@@ -184,6 +184,75 @@ namespace Microsoft.O365.Security.ETW.Benchmarks
 
             return total;
         }
+
+        /// <summary>
+        /// Isolates the TraceLogging name walk, the first stage of a schema cache lookup.
+        /// </summary>
+        [Benchmark]
+        public int StageEventNameOnly()
+        {
+            int total = 0;
+            for (int i = 0; i < _records.Length; i++)
+            {
+                total += TraceLoggingMetadata.GetEventName(_records[i]).Length;
+            }
+
+            return total;
+        }
+
+        /// <summary>
+        /// Isolates the name walk plus the FNV hash of the name, the second stage.
+        /// </summary>
+        [Benchmark]
+        public int StageEventNameAndHash()
+        {
+            int total = 0;
+            for (int i = 0; i < _records.Length; i++)
+            {
+                ReadOnlySpan<byte> name = TraceLoggingMetadata.GetEventName(_records[i]);
+                total += (int)SchemaCache.HashName(name);
+            }
+
+            return total;
+        }
+
+        /// <summary>
+        /// The whole cache lookup, but without the offset resolver reset that
+        /// <see cref="SchemaLookupOnly"/> also pays for.
+        /// </summary>
+        [Benchmark]
+        public int StageCacheGet()
+        {
+            int total = 0;
+            for (int i = 0; i < _records.Length; i++)
+            {
+                total += _scratch.Cache.Get(_records[i]).BlobSize;
+            }
+
+            return total;
+        }
+
+        /// <summary>
+        /// Isolates the per-property name scan: three lookups against an already resolved schema.
+        /// </summary>
+        [Benchmark]
+        public int StagePropertyIndexOf()
+        {
+            _scratch.Begin(_records[0]);
+            SchemaEntry schema = _scratch.Schema;
+            PropertyTable table = schema.Table;
+            byte* blob = (byte*)schema.Blob;
+
+            int total = 0;
+            for (int i = 0; i < _records.Length; i++)
+            {
+                total += table.IndexOf("message".AsSpan(), blob);
+                total += table.IndexOf("number".AsSpan(), blob);
+                total += table.IndexOf("identifier".AsSpan(), blob);
+            }
+
+            return total;
+        }
     }
 
     public static class Program

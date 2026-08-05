@@ -10,7 +10,7 @@ namespace Microsoft.O365.Security.ETW.Schema
     /// <remarks>
     /// Native krabs performs a hinted linear scan over property names on every lookup.
     /// We pay the name-walk once, when the schema is first seen, and index thereafter.
-    /// Parallel arrays are used deliberately: the hot path only touches <see cref="NameHashes"/>
+    /// Parallel arrays are used deliberately: the hot path only touches <see cref="NameSignatures"/>
     /// until a candidate matches, which keeps the scan inside one or two cache lines.
     /// </remarks>
     internal sealed unsafe class PropertyTable
@@ -18,7 +18,7 @@ namespace Microsoft.O365.Security.ETW.Schema
         public readonly int Count;
 
         /// <summary>Hash of each property name, scanned linearly on lookup.</summary>
-        public readonly ulong[] NameHashes;
+        public readonly ulong[] NameSignatures;
 
         /// <summary>Byte offset of each property name (UTF-16, NUL terminated) within the schema blob.</summary>
         public readonly int[] NameOffsets;
@@ -45,10 +45,16 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// <summary>Index of the first property whose offset cannot be precomputed, or Count if all are fixed.</summary>
         public readonly int FirstDynamicIndex;
 
+        /// <summary>
+        /// Index at which the next name scan starts. Callers read properties in event order,
+        /// so resuming after the last hit usually turns the scan into a single comparison.
+        /// </summary>
+        private int _hint;
+
         public PropertyTable(TRACE_EVENT_INFO* schema, int pointerSize)
         {
             Count = (int)schema->PropertyCount;
-            NameHashes = new ulong[Count];
+            NameSignatures = new ulong[Count];
             NameOffsets = new int[Count];
             NameLengths = new int[Count];
             InTypes = new ushort[Count];
@@ -89,10 +95,9 @@ namespace Microsoft.O365.Security.ETW.Schema
                 }
 
                 NameLengths[i] = nameLength;
-                NameHashes[i] = nameOffset > 0
-                    ? NameHash.Compute(new ReadOnlySpan<char>(blob + nameOffset, nameLength))
+                NameSignatures[i] = nameOffset > 0
+                    ? NameSignature.Compute(new ReadOnlySpan<char>(blob + nameOffset, nameLength))
                     : 0UL;
-
                 if (stillFixed)
                 {
                     FixedOffsets[i] = runningOffset;
@@ -132,25 +137,29 @@ namespace Microsoft.O365.Security.ETW.Schema
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(ReadOnlySpan<char> name, byte* blob)
         {
-            ulong hash = NameHash.Compute(name);
-            var hashes = NameHashes;
+            ulong signature = NameSignature.Compute(name);
+            var signatures = NameSignatures;
+            int count = signatures.Length;
+            int start = _hint;
 
-            for (int i = 0; i < hashes.Length; i++)
+            for (int n = 0; n < count; n++)
             {
-                if (hashes[i] != hash)
+                int i = start + n;
+                if (i >= count)
+                {
+                    i -= count;
+                }
+
+                if (signatures[i] != signature)
                 {
                     continue;
                 }
 
-                // Hash hit - confirm against the real name to rule out collisions.
-                if (NameLengths[i] != name.Length)
+                // The signature already agrees on length; confirm the rest to rule out collisions.
+                if (ShortSpan.Equal((char*)(blob + NameOffsets[i]), name))
                 {
-                    continue;
-                }
-
-                var candidate = new ReadOnlySpan<char>(blob + NameOffsets[i], NameLengths[i]);
-                if (candidate.SequenceEqual(name))
-                {
+                    int next = i + 1;
+                    _hint = next == count ? 0 : next;
                     return i;
                 }
             }
@@ -169,28 +178,34 @@ namespace Microsoft.O365.Security.ETW.Schema
     }
 
     /// <summary>
-    /// FNV-1a over UTF-16 code units. Only used for in-memory lookup, never persisted.
+    /// A cheap fixed-cost signature of a property name, used to reject non-matching entries
+    /// during the linear scan. Only used for in-memory lookup, never persisted.
     /// </summary>
-    internal static class NameHash
+    /// <remarks>
+    /// A real hash (this was FNV-1a) walks every character through a serially dependent
+    /// multiply chain, which measured as the dominant cost of a property lookup - more than
+    /// the scan it was meant to accelerate. Property names are short and share few
+    /// length/first/middle/last combinations, so this rejects just as effectively at a
+    /// constant handful of instructions. Survivors are confirmed by comparing the real name,
+    /// so collisions cost time but never correctness.
+    /// </remarks>
+    internal static class NameSignature
     {
-        private const ulong OffsetBasis = 14695981039346656037UL;
-        private const ulong Prime = 1099511628211UL;
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ulong Compute(ReadOnlySpan<char> value)
         {
-            ulong hash = OffsetBasis;
+            int length = value.Length;
 
-            for (int i = 0; i < value.Length; i++)
+            if (length == 0)
             {
-                ushort c = value[i];
-                hash ^= (byte)c;
-                hash *= Prime;
-                hash ^= (byte)(c >> 8);
-                hash *= Prime;
+                // Distinct from the zero stored for properties that carry no name at all.
+                return 1UL;
             }
 
-            return hash;
+            return (uint)length
+                | ((ulong)value[0] << 16)
+                | ((ulong)value[length - 1] << 32)
+                | ((ulong)value[length >> 1] << 48);
         }
     }
 }
