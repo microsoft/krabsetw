@@ -61,6 +61,31 @@ namespace Microsoft.O365.Security.ETW.Interop
         public static extern int TdhEnumerateProviders(
             byte* buffer,
             uint* bufferSize);
+
+        [DllImport("ntdll.dll", EntryPoint = "NtQuerySystemInformation", SetLastError = false)]
+        public static extern int NtQuerySystemInformation(
+            int systemInformationClass,
+            void* systemInformation,
+            uint systemInformationLength,
+            uint* returnLength);
+
+        [DllImport("ntdll.dll", EntryPoint = "NtSetSystemInformation", SetLastError = false)]
+        public static extern int NtSetSystemInformation(
+            int systemInformationClass,
+            void* systemInformation,
+            uint systemInformationLength);
+    }
+
+    /// <summary>
+    /// EVENT_TRACE_GROUPMASK_INFORMATION, the undocumented structure the kernel logger uses
+    /// to enable providers that have no EVENT_TRACE_FLAG_* bit.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal unsafe struct EVENT_TRACE_GROUPMASK_INFORMATION
+    {
+        public uint EventTraceInformationClass;
+        public ulong TraceHandle;
+        public fixed uint Masks[8];
     }
 
     /// <summary>

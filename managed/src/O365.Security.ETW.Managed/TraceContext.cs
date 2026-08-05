@@ -24,6 +24,9 @@ namespace Microsoft.O365.Security.ETW
         private Provider[] _providers = Array.Empty<Provider>();
         private Guid[] _providerIds = Array.Empty<Guid>();
 
+        private KernelProvider[] _kernelProviders = Array.Empty<KernelProvider>();
+        private Guid[] _kernelProviderIds = Array.Empty<Guid>();
+
         public ulong EventsTotal;
         public ulong EventsHandled;
         public ulong BuffersProcessed;
@@ -47,6 +50,17 @@ namespace Microsoft.O365.Security.ETW
             for (int i = 0; i < _providers.Length; i++)
             {
                 _providerIds[i] = _providers[i].Id;
+            }
+        }
+
+        public void SetKernelProviders(List<KernelProvider> providers)
+        {
+            _kernelProviders = providers.ToArray();
+            _kernelProviderIds = new Guid[_kernelProviders.Length];
+
+            for (int i = 0; i < _kernelProviders.Length; i++)
+            {
+                _kernelProviderIds[i] = _kernelProviders[i].Id;
             }
         }
 
@@ -89,6 +103,25 @@ namespace Microsoft.O365.Security.ETW
         /// </remarks>
         private bool Route(in EventRecordRef view, EVENT_RECORD* record)
         {
+            if (_kernelProviderIds.Length != 0)
+            {
+                // krabs::details::kt::forward_events matches on the header GUID alone: the
+                // kernel logger stamps the real provider GUID there even though its events
+                // are classic MOF, so no schema lookup is needed to route them.
+                Guid kernelId = record->EventHeader.ProviderId;
+
+                for (int i = 0; i < _kernelProviderIds.Length; i++)
+                {
+                    if (_kernelProviderIds[i] == kernelId)
+                    {
+                        _kernelProviders[i].Dispatch(view, _adapter);
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
             DecodingSource type = EventRecordRef.GetEventType(record);
 
             if (type == DecodingSource.XMLFile || type == DecodingSource.Tlg)

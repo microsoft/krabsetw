@@ -61,6 +61,45 @@ namespace Microsoft.O365.Security.ETW
             return new NotPredicate(this);
         }
 
+        /// <summary>
+        /// Tests a synthetic record. For testing scenarios only.
+        /// </summary>
+        public unsafe bool Test(Testing.SynthRecord record)
+        {
+            if (record == null) throw new ArgumentNullException(nameof(record));
+
+            var scratch = new Schema.EventScratch();
+
+            try
+            {
+                Interop.EVENT_RECORD* raw = record.Record;
+                scratch.Begin(raw);
+                return Test(new EventRecordRef(raw, scratch));
+            }
+            finally
+            {
+                scratch.Dispose();
+            }
+        }
+
+        // C++/CLI emits its instance operator&& / operator|| / operator! as methods with
+        // these names, and that is the only way C# can reach them. Kept so test and client
+        // code written against the C++/CLI assembly compiles unchanged.
+        public Predicate op_LogicalAnd(Predicate other)
+        {
+            return new AndPredicate(this, other);
+        }
+
+        public Predicate op_LogicalOr(Predicate other)
+        {
+            return new OrPredicate(this, other);
+        }
+
+        public Predicate op_LogicalNot()
+        {
+            return new NotPredicate(this);
+        }
+
         public static Predicate operator &(Predicate left, Predicate right)
         {
             return new AndPredicate(left, right);

@@ -24,6 +24,15 @@ namespace Microsoft.O365.Security.ETW.Interop
 
         // Log file modes
         public const uint EVENT_TRACE_REAL_TIME_MODE = 0x00000100;
+
+        /// <summary>Marks the session as a system (NT kernel) logger. Windows 8 and later.</summary>
+        public const uint EVENT_TRACE_SYSTEM_LOGGER_MODE = 0x02000000;
+
+        /// <summary>SYSTEM_INFORMATION_CLASS::SystemPerformanceTraceInformation.</summary>
+        public const int SystemPerformanceTraceInformation = 31;
+
+        /// <summary>EVENT_TRACE_INFORMATION_CLASS::EventTraceGroupMaskInformation.</summary>
+        public const uint EventTraceGroupMaskInformation = 3;
         public const uint EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING = 0x10000000;
 
         // Process trace modes
