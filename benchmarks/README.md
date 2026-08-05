@@ -1,9 +1,20 @@
 # Head-to-head benchmarks
 
-`Shared\ProxyBenchmarks.cs` is compiled twice — once against the C++/CLI wrapper
-(`Krabs.Benchmarks.Cli`, net462) and once against the pure .NET port
-(`Krabs.Benchmarks.Pure`, net48). Same source, same machine, same CLR family, both
-Release. That is what makes the comparison meaningful.
+`Shared\ProxyBenchmarks.cs` is compiled four times, giving a
+{.NET Framework, .NET 10} × {C++/CLI, pure .NET} matrix:
+
+| Project | Implementation | Runtime |
+| --- | --- | --- |
+| `Krabs.Benchmarks.Cli` | C++/CLI wrapper | net462 |
+| `Krabs.Benchmarks.Pure` | pure .NET port | net48 |
+| `Krabs.Benchmarks.CliCore` | C++/CLI wrapper | net10.0-windows |
+| `Krabs.Benchmarks.PureCore` | pure .NET port | net10.0-windows |
+
+Same source, same machine, both Release. That is what makes the comparison meaningful.
+
+The C++/CLI toolset has no net10.0 target, so `Krabs.Benchmarks.CliCore` references the
+net8.0 build and sets `RollForward=Major`. That runs the same assembly on the .NET 10
+runtime, which is exactly what a consumer upgrading their host would get.
 
 Events are driven through `Testing.Proxy` rather than a live ETW session. A real session
 would mostly measure the kernel's buffering and flush cadence, which is identical for both
@@ -13,26 +24,89 @@ predicate evaluation and property decoding.
 
 ## Running
 
-The C++/CLI wrapper must be built first — its vcxproj needs MSBuild.exe from Visual Studio
-and cannot be imported by the dotnet CLI, so it is referenced as a built assembly:
+Both C++/CLI wrappers must be built first — their vcxproj files need MSBuild.exe from
+Visual Studio and cannot be imported by the dotnet CLI, so they are referenced as built
+assemblies:
 
 ```powershell
 msbuild krabs\krabs.sln /t:Microsoft_O365_Security_Native_ETW `
         /p:Configuration=Release /p:Platform=x64
 
-cd benchmarks\Krabs.Benchmarks.Cli
-dotnet build -c Release
-.\bin\Release\net462\Krabs.Benchmarks.Cli.exe
-
-cd ..\Krabs.Benchmarks.Pure
-dotnet build -c Release
-.\bin\Release\net48\Krabs.Benchmarks.Pure.exe
+msbuild Microsoft.O365.Security.Native.ETW.NetCore\Microsoft.O365.Security.Native.ETW.NetCore.vcxproj `
+        /t:Restore`;Build /p:Configuration=Release /p:Platform=x64
 ```
 
-Pass `--manual` to either executable for a plain stopwatch harness. It exists as a
-cross-check on BenchmarkDotNet, and it reports a `sink/event` column.
+Then run each arm in-process, so every cell is measured the same way:
 
-## The sink/event column matters
+```powershell
+cd benchmarks\Krabs.Benchmarks.Cli
+dotnet build -c Release; .\bin\Release\net462\Krabs.Benchmarks.Cli.exe -i
+
+cd ..\Krabs.Benchmarks.Pure
+dotnet build -c Release; .\bin\Release\net48\Krabs.Benchmarks.Pure.exe -i
+
+cd ..\Krabs.Benchmarks.CliCore
+dotnet build -c Release; dotnet .\bin\Release\net10.0-windows\Krabs.Benchmarks.CliCore.dll -i
+
+cd ..\Krabs.Benchmarks.PureCore
+dotnet build -c Release; dotnet .\bin\Release\net10.0-windows\Krabs.Benchmarks.PureCore.dll -i
+```
+
+`-i` is required for the net10.0-windows arms: BenchmarkDotNet's generated host project
+targets plain `net10.0` and cannot reference a `net10.0-windows` assembly. It is used for
+all four so the cells stay comparable.
+
+Pass `--manual` to any of them for a plain stopwatch harness. It exists as a cross-check on
+BenchmarkDotNet, and it reports a `sink/event` column.
+
+## Results
+
+Four cells: {.NET Framework, .NET 10} × {C++/CLI, pure .NET}. All Release, x64, same
+machine, all run in-process (`-i`) so every cell is measured identically. Times are per
+event.
+
+### .NET Framework (C++/CLI net462 vs pure net48)
+
+| | C++/CLI | Pure .NET | |
+| --- | ---: | ---: | ---: |
+| Dispatch | 293.6 ns | 124.2 ns | 2.4x |
+| Decode 3 strings | 1439.6 ns | 556.0 ns | 2.6x |
+| Filter, match | 679.2 ns | 335.9 ns | 2.0x |
+| Filter, reject | 387.4 ns | 326.7 ns | 1.2x |
+
+### .NET 10 (C++/CLI net8.0 rolled forward vs pure net10.0)
+
+| | C++/CLI | Pure .NET | |
+| --- | ---: | ---: | ---: |
+| Dispatch | 256.0 ns | 48.9 ns | 5.2x |
+| Decode 3 strings | 1272.9 ns | 325.8 ns | 3.9x |
+| Filter, match | 578.8 ns | 177.1 ns | 3.3x |
+| Filter, reject | 354.7 ns | 185.4 ns | 1.9x |
+
+### Allocation
+
+Identical in every cell: 0 B except `DecodeThreeStrings`, which is 281 B on .NET Framework
+and 256 B on .NET 10 for both implementations. Those are the three `System.String`s the
+`IEventRecord` API contractually returns, so neither implementation can avoid them. The
+C++/CLI double copy (payload to `std::wstring` to `String^`) costs time, not surviving
+bytes.
+
+Zero-allocation decoding needs the span API (`OnEventSpan` / `EventRecordRef`), which the
+C++/CLI wrapper has no equivalent of and which this benchmark therefore cannot compare.
+See `managed\benchmarks` for that measurement.
+
+### Reading it
+
+The pure port gains far more from the modern runtime than the C++/CLI wrapper does:
+dispatch goes 124.2 to 48.9 ns (2.5x) for the port, but only 293.6 to 256.0 ns (1.15x) for
+C++/CLI. That is expected — the C++/CLI hot path is native code the .NET JIT never sees,
+so runtime improvements largely bypass it. End to end, pure .NET on .NET 10 dispatches 6x
+faster than C++/CLI on .NET Framework.
+
+`Filter, reject` is the weakest cell (1.2x on .NET Framework) and the one to be least
+confident about.
+
+
 
 Both harnesses assert that the event handlers actually ran. This is not defensive
 boilerplate: the first version of this benchmark reported the C++/CLI decode costing 1 ns
