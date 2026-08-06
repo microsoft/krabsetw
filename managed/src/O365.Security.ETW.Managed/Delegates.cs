@@ -12,12 +12,24 @@ namespace Microsoft.O365.Security.ETW
     public delegate void IEventRecordMetadataDelegate(IEventRecordMetadata record);
 
     /// <summary>Receives a failure raised while dispatching an event.</summary>
-    public delegate void EventRecordErrorDelegate(EventRecordError error);
+    public delegate void EventRecordErrorDelegate(IEventRecordError error);
 
     /// <summary>
     /// Reports a failure that occurred while handling an event.
     /// </summary>
-    public sealed class EventRecordError
+    public interface IEventRecordError
+    {
+        /// <summary>Describes the failure.</summary>
+        string Message { get; }
+
+        /// <summary>The event that could not be handled.</summary>
+        IEventRecordMetadata Record { get; }
+    }
+
+    /// <summary>
+    /// Reports a failure that occurred while handling an event.
+    /// </summary>
+    public sealed class EventRecordError : IEventRecordError
     {
         internal EventRecordError(string message, IEventRecordMetadata record)
         {
@@ -25,8 +37,10 @@ namespace Microsoft.O365.Security.ETW
             Record = record;
         }
 
+        /// <inheritdoc/>
         public string Message { get; }
 
+        /// <inheritdoc/>
         public IEventRecordMetadata Record { get; }
     }
 }

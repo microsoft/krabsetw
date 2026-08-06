@@ -351,16 +351,24 @@ namespace Microsoft.O365.Security.ETW
             return TryGetSocketAddress(name, out SocketAddress v) ? v : defaultValue;
         }
 
+        /// <remarks>
+        /// The C++/CLI implementation declared this as <c>DateTime^</c> — a boxed value type,
+        /// which surfaces to C# as <see cref="ValueType"/>. Returning <see cref="DateTime"/>
+        /// removes the boxing allocation, but is a breaking change for implementors of
+        /// <see cref="IEventRecord"/>. See PARITY.md.
+        /// </remarks>
         public DateTime GetDateTime(string name)
         {
             return TryGetDateTime(name, out DateTime v) ? v : throw Missing(name);
         }
 
+        /// <inheritdoc cref="GetDateTime(string)"/>
         public DateTime GetDateTime(string name, DateTime defaultValue)
         {
             return TryGetDateTime(name, out DateTime v) ? v : defaultValue;
         }
 
+        /// <inheritdoc cref="GetDateTime(string)"/>
         public bool TryGetDateTime(string name, out DateTime result)
         {
             result = default;

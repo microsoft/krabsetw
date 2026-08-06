@@ -58,8 +58,83 @@ page.
 
 ### `DateTime` property signature
 
-Documented at the call site in `EventRecordAdapter`. Deliberate and load-bearing for
-source compatibility.
+C++/CLI declared `GetDateTime` as `DateTime^` — a *boxed* value type, which surfaces to C#
+as `System.ValueType`. The port returns `DateTime`, dropping the boxing allocation.
+
+This is a breaking change, taken deliberately as part of the major version bump:
+
+* Implementors of `IEventRecord` break at compile time. C# requires an exact signature
+  match for interface implementation — there is no return-type covariance — so a class
+  declaring `public ValueType GetDateTime(string)` no longer implements the member.
+* `TryGetDateTime(name, out ValueType v)` breaks for the same reason: `out` parameters
+  require exact type identity.
+* Callers of the return value are mostly unaffected; `ValueType x = record.GetDateTime(…)`
+  still compiles via implicit boxing. Only `var` inference shifts.
+* Binary compatibility is not preserved. Assemblies compiled against 4.4.9 must be
+  recompiled or they will throw `MissingMethodException`.
+
+The one capability genuinely lost is that `null` was a *distinguishable* "no value"
+sentinel, where `default(DateTime)` is a legal date. That is the situation `GetUInt32` has
+always been in — `0` was never distinguishable either — so this makes `DateTime`
+consistent with the rest of the API rather than an outlier.
+
+`SYSTEMTIME`-shaped payloads are decoded with `DateTimeKind.Utc` assumed rather than read
+from the out-type. That assumption is port-only new behaviour — krabs' `GetValue<FILETIME>`
+rejects a 16-byte property outright — and is folded into **#3190317**.
+
+### `TryGet*` leaves nothing behind on failure
+
+krabs assigns the out parameter only on success:
+
+```cpp
+// EventRecord.hpp:853
+if (success) result = value;
+```
+
+`[Out]` in C++/CLI is metadata only — the CLR does not enforce assignment — so a failed
+lookup leaves the caller's variable holding whatever it held before the call. The port
+writes the default first, so a failed lookup always zeroes it.
+
+```csharp
+uint v = 42;
+if (!record.TryGetUInt32("missing", out v)) { /* C++/CLI: 42    port: 0 */ }
+```
+
+This applies uniformly to every `TryGet*`, not just `TryGetDateTime`. The port's behaviour
+is deterministic and is kept.
+
+### `KernelProvider` group mask narrowed to `uint`
+
+Native `PERFINFO_MASK` is `typedef ULONG` (`krabs/perfinfo_groupmask.hpp:16`), and C++/CLI
+mirrored it as `UInt32`. The port originally widened it to `ulong` and then truncated it
+back at the only consumption site in `KernelTrace.EnableGroupMasks`, so any bit above 32
+was silently discarded. Narrowed to `uint`, which restores the C++/CLI signature and makes
+the invalid value unrepresentable.
+
+### Public surface that was removed
+
+`managed/tools/ApiDiff` compares the public surface of two assemblies by reading metadata
+directly — one side is a mixed-mode C++/CLI binary that cannot be loaded for reflection on
+.NET. Run it against the C++/CLI net462 output and the port's to reproduce this list.
+
+Deliberately not restored, because nothing in the known consumer set uses them:
+
+| Removed | Reason |
+| --- | --- |
+| `EventRecord`, `EventRecordMetadata` classes | The port's adapter is reused and mutated per event; naming it publicly makes "hold it past the callback" look supported. C++/CLI also exposed public `_EVENT_HEADER*` / `_EVENT_RECORD*` fields with no C# equivalent. |
+| `PropertyEnumerable`, `PropertyEnumerator` | Allocates a `Property` per property; unused. |
+| `IDisposable` on `Predicate`, `Property`, `KernelProvider`, `RawProvider` | These held a `NativePtr<T>` in C++/CLI, so disposal freed C-runtime heap. The port's equivalents are plain managed objects with nothing to release; an empty `Dispose` would imply ownership that does not exist. |
+| `IUserTrace.Enable(RawProvider)` | `RawProvider` is `[Obsolete]` in both implementations; the replacement is `Provider.OnMetadata`. |
+| `Property.Type`, 3-argument `Property` ctor, `OutType` as `int` | The port exposes `InType`/`OutType`/`Length` as `uint`. Unused. |
+| `EventHeaderProperty.LEGACY_EVENTLOG`, `FORWARDED_XML` | Renamed to `LegacyEventLog`, `ForwardedXML`. |
+| `EventTraceProperties` public fields | Now properties. Object-initializer syntax is unaffected; only `ref`/`out` use breaks. |
+
+`IEventRecordError` *was* restored — `EventRecordError` implements it — because
+`EventRecordErrorDelegate` is declared in terms of it and the interface is mocked by
+consumers.
+
+Note the differ does not currently compare custom attributes, so `[Obsolete]` differences
+are invisible to it.
 
 ### Structs are not decoded
 

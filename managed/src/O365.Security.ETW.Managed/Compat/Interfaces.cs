@@ -142,10 +142,17 @@ namespace Microsoft.O365.Security.ETW
 
         bool TryGetSocketAddress(string name, out SocketAddress result);
 
+        /// <remarks>
+        /// The C++/CLI implementation used <c>DateTime^</c>, a boxed value type, which C# sees
+        /// as <see cref="ValueType"/>. Returning <see cref="DateTime"/> drops that boxing
+        /// allocation and is an intentional breaking change. See PARITY.md.
+        /// </remarks>
         DateTime GetDateTime(string name);
 
+        /// <inheritdoc cref="GetDateTime(string)"/>
         DateTime GetDateTime(string name, DateTime defaultValue);
 
+        /// <inheritdoc cref="GetDateTime(string)"/>
         bool TryGetDateTime(string name, out DateTime result);
 
         sbyte GetInt8(string name);
