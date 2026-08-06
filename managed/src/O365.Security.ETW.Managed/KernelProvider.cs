@@ -27,7 +27,7 @@ namespace Microsoft.O365.Security.ETW
         /// Constructs a KernelProvider identified by its GUID and enabled by a group mask.
         /// </summary>
         /// <remarks>Only supported on Windows 8 and newer.</remarks>
-        public KernelProvider(Guid id, ulong mask)
+        public KernelProvider(Guid id, uint mask)
         {
             Id = id;
             GroupMask = mask;
@@ -40,7 +40,11 @@ namespace Microsoft.O365.Security.ETW
         public uint Flags { get; }
 
         /// <summary>The PERFINFO group mask OR'd into the session's group mask.</summary>
-        public ulong GroupMask { get; }
+        /// <remarks>
+        /// Native PERFINFO_MASK is a ULONG, so this is 32 bits wide. A wider type would let
+        /// callers pass bits that <see cref="KernelTrace"/> silently discards.
+        /// </remarks>
+        public uint GroupMask { get; }
 
         /// <summary>Fired for every event, before any schema is resolved.</summary>
         public event IEventRecordMetadataDelegate OnMetadata;

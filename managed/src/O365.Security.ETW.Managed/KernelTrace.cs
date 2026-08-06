@@ -384,7 +384,7 @@ namespace Microsoft.O365.Security.ETW
 
             for (int i = 0; i < _providers.Count; i++)
             {
-                uint group = (uint)_providers[i].GroupMask;
+                uint group = _providers[i].GroupMask;
 
                 if (group == 0)
                 {
