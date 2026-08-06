@@ -21,7 +21,7 @@ namespace Microsoft.O365.Security.ETW.Interop
         [DllImport(Advapi32, EntryPoint = "ControlTraceW", CharSet = CharSet.Unicode, SetLastError = false)]
         public static extern int ControlTrace(
             ulong sessionHandle,
-            [MarshalAs(UnmanagedType.LPWStr)] string sessionName,
+            [MarshalAs(UnmanagedType.LPWStr)] string? sessionName,
             EVENT_TRACE_PROPERTIES* properties,
             uint controlCode);
 

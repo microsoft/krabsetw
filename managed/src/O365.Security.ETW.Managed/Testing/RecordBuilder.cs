@@ -129,7 +129,7 @@ namespace Microsoft.O365.Security.ETW.Testing
         /// </remarks>
         public void AddValue<T>(string name, T value)
         {
-            object boxed = value;
+            object? boxed = value;
 
             switch (boxed)
             {
@@ -199,7 +199,7 @@ namespace Microsoft.O365.Security.ETW.Testing
         {
             // The schema is resolved from a stub record carrying only the header, which is
             // all TDH needs to identify the event.
-            using (var stub = new SynthRecord(_header, null, null))
+            using (var stub = new SynthRecord(_header, null!, null!))
             using (var cache = new SchemaCache())
             {
                 SchemaEntry schema = cache.Get(stub.Record);
@@ -214,7 +214,7 @@ namespace Microsoft.O365.Security.ETW.Testing
                 var payload = new List<byte>();
                 var unfilled = new List<string>();
                 var blob = (byte*)schema.Blob;
-                PropertyTable table = schema.Table;
+                PropertyTable table = schema.Table!;
 
                 int bytesToTrim = 0;
 

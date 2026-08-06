@@ -55,15 +55,39 @@ namespace Microsoft.O365.Security.ETW
     }
 
     /// <summary>Counters describing how a session is behaving.</summary>
-    public struct TraceStats
+    /// <remarks>
+    /// Readonly so that reading a counter through a field or an <c>in</c> parameter does not
+    /// force the compiler to take a defensive copy of the whole struct. The fields stay public
+    /// for source compatibility with the C++/CLI value class; only assignment to them is gone,
+    /// and nothing outside the library ever produced one.
+    /// </remarks>
+    public readonly struct TraceStats
     {
-        public uint BuffersCount;
-        public uint BuffersFree;
-        public uint BuffersWritten;
-        public uint BuffersLost;
-        public ulong EventsTotal;
-        public ulong EventsHandled;
-        public uint EventsLost;
+        internal TraceStats(
+            uint buffersCount,
+            uint buffersFree,
+            uint buffersWritten,
+            uint buffersLost,
+            ulong eventsTotal,
+            ulong eventsHandled,
+            uint eventsLost)
+        {
+            BuffersCount = buffersCount;
+            BuffersFree = buffersFree;
+            BuffersWritten = buffersWritten;
+            BuffersLost = buffersLost;
+            EventsTotal = eventsTotal;
+            EventsHandled = eventsHandled;
+            EventsLost = eventsLost;
+        }
+
+        public readonly uint BuffersCount;
+        public readonly uint BuffersFree;
+        public readonly uint BuffersWritten;
+        public readonly uint BuffersLost;
+        public readonly ulong EventsTotal;
+        public readonly ulong EventsHandled;
+        public readonly uint EventsLost;
     }
 
     /// <summary>
@@ -105,7 +129,7 @@ namespace Microsoft.O365.Security.ETW
 
         private TraceContext _context;
         private int _contextIndex = -1;
-        private Thread _processingThread;
+        private Thread? _processingThread;
 
         private ulong _sessionHandle;
         private ulong _traceHandle;
@@ -357,8 +381,6 @@ namespace Microsoft.O365.Security.ETW
 
         public TraceStats QueryStats()
         {
-            var stats = default(TraceStats);
-
             byte* buffer = stackalloc byte[PropertiesBufferSize];
             var properties = (EVENT_TRACE_PROPERTIES*)buffer;
             InitialiseProperties(properties, buffer);
@@ -374,15 +396,14 @@ namespace Microsoft.O365.Security.ETW
                 throw new TraceException("ControlTrace(QUERY) failed.", status);
             }
 
-            stats.BuffersCount = properties->NumberOfBuffers;
-            stats.BuffersFree = properties->FreeBuffers;
-            stats.BuffersWritten = properties->BuffersWritten;
-            stats.BuffersLost = properties->RealTimeBuffersLost;
-            stats.EventsLost = properties->EventsLost;
-            stats.EventsTotal = _context.EventsTotal;
-            stats.EventsHandled = _context.EventsHandled;
-
-            return stats;
+            return new TraceStats(
+                properties->NumberOfBuffers,
+                properties->FreeBuffers,
+                properties->BuffersWritten,
+                properties->RealTimeBuffersLost,
+                _context.EventsTotal,
+                _context.EventsHandled,
+                properties->EventsLost);
         }
 
         #region Session setup
@@ -501,7 +522,7 @@ namespace Microsoft.O365.Security.ETW
 
             foreach (Provider provider in _providers)
             {
-                MergedProvider entry = null;
+                MergedProvider? entry = null;
 
                 for (int i = 0; i < merged.Count; i++)
                 {
@@ -537,7 +558,7 @@ namespace Microsoft.O365.Security.ETW
             public bool Rundown;
 
             /// <summary>Null once any contributing provider declines pushdown.</summary>
-            public List<ushort> EventIds = new List<ushort>();
+            public List<ushort>? EventIds = new List<ushort>();
 
             private bool _pushdownDeclined;
 
@@ -559,7 +580,7 @@ namespace Microsoft.O365.Security.ETW
                     return;
                 }
 
-                if (!CollectPushdownEventIds(provider, EventIds))
+                if (!CollectPushdownEventIds(provider, EventIds!))
                 {
                     _pushdownDeclined = true;
                     EventIds = null;
@@ -569,7 +590,7 @@ namespace Microsoft.O365.Security.ETW
 
         private void EnableMerged(MergedProvider provider)
         {
-            List<ushort> eventIds = provider.EventIds;
+            List<ushort>? eventIds = provider.EventIds;
 
             if (eventIds != null
                 && (eventIds.Count == 0 || eventIds.Count > NativeConstants.MAX_EVENT_FILTER_EVENT_ID_COUNT))
@@ -681,7 +702,7 @@ namespace Microsoft.O365.Security.ETW
 
             foreach (EventFilter filter in provider.Filters)
             {
-                IReadOnlyList<ushort> filterIds = filter.EventIds;
+                IReadOnlyList<ushort>? filterIds = filter.EventIds;
                 if (filterIds == null)
                 {
                     return false;

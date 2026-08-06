@@ -19,7 +19,7 @@ namespace Microsoft.O365.Security.ETW.Schema
     internal sealed unsafe class OffsetResolver
     {
         private int[] _offsets = new int[32];
-        private PropertyTable _table;
+        private PropertyTable _table = null!;
         private EVENT_RECORD* _record;
         private byte* _data;
         private int _dataLength;
@@ -34,7 +34,7 @@ namespace Microsoft.O365.Security.ETW.Schema
         public void Begin(EVENT_RECORD* record, SchemaEntry schema)
         {
             _record = record;
-            _table = schema.Table;
+            _table = schema.Table!;
             _data = (byte*)record->UserData;
             _dataLength = record->UserDataLength;
             _pointerSize = SchemaCache.PointerSizeFor(record);

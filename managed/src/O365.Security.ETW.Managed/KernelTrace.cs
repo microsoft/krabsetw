@@ -32,7 +32,7 @@ namespace Microsoft.O365.Security.ETW
 
         private readonly TraceContext _context;
         private int _contextIndex = -1;
-        private Thread _processingThread;
+        private Thread? _processingThread;
 
         private ulong _sessionHandle;
         private ulong _traceHandle;
@@ -250,8 +250,6 @@ namespace Microsoft.O365.Security.ETW
 
         public TraceStats QueryStats()
         {
-            var stats = default(TraceStats);
-
             byte* buffer = stackalloc byte[PropertiesBufferSize];
             var properties = (EVENT_TRACE_PROPERTIES*)buffer;
             InitialiseProperties(properties, buffer);
@@ -267,15 +265,14 @@ namespace Microsoft.O365.Security.ETW
                 throw new TraceException("ControlTrace(QUERY) failed.", status);
             }
 
-            stats.BuffersCount = properties->NumberOfBuffers;
-            stats.BuffersFree = properties->FreeBuffers;
-            stats.BuffersWritten = properties->BuffersWritten;
-            stats.BuffersLost = properties->RealTimeBuffersLost;
-            stats.EventsLost = properties->EventsLost;
-            stats.EventsTotal = _context.EventsTotal;
-            stats.EventsHandled = _context.EventsHandled;
-
-            return stats;
+            return new TraceStats(
+                properties->NumberOfBuffers,
+                properties->FreeBuffers,
+                properties->BuffersWritten,
+                properties->RealTimeBuffersLost,
+                _context.EventsTotal,
+                _context.EventsHandled,
+                properties->EventsLost);
         }
 
         #region Session setup

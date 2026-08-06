@@ -11,12 +11,12 @@ namespace Microsoft.O365.Security.ETW.Testing
     /// </summary>
     public sealed unsafe class Proxy : IDisposable
     {
-        private readonly UserTrace _userTrace;
-        private readonly KernelTrace _kernelTrace;
-        private readonly EventFilter _filter;
+        private readonly UserTrace? _userTrace;
+        private readonly KernelTrace? _kernelTrace;
+        private readonly EventFilter? _filter;
 
-        private EventScratch _scratch;
-        private EventRecordAdapter _adapter;
+        private EventScratch? _scratch;
+        private EventRecordAdapter? _adapter;
 
         /// <summary>Constructs a proxy for the given user trace.</summary>
         public Proxy(UserTrace trace)
@@ -69,16 +69,16 @@ namespace Microsoft.O365.Security.ETW.Testing
 
             EVENT_RECORD* raw = record.Record;
 
-            _scratch.Begin(raw);
-            _adapter.Begin(raw, _scratch);
+            _scratch!.Begin(raw);
+            _adapter!.Begin(raw, _scratch);
 
             try
             {
-                _filter.Dispatch(new EventRecordRef(raw, _scratch), _adapter);
+                _filter!.Dispatch(new EventRecordRef(raw, _scratch), _adapter);
             }
             finally
             {
-                _adapter.End();
+                _adapter!.End();
             }
         }
 

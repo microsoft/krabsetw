@@ -9,6 +9,7 @@
          assembly); this only affects the PE architecture flag of the library itself. -->
     <PlatformTarget>AnyCPU</PlatformTarget>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <PropertyGroup>

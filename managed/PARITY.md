@@ -137,6 +137,33 @@ back at the only consumption site in `KernelTrace.EnableGroupMasks`, so any bit 
 was silently discarded. Narrowed to `uint`, which restores the C++/CLI signature and makes
 the invalid value unrepresentable.
 
+### `TraceStats` is a `readonly struct`
+
+C++/CLI declared `TraceStats` as a mutable value type with public mutable fields. The port
+declares it `readonly struct` with an internal constructor. Reading fields — the only thing
+consumers do with it — is unchanged, as is `new TraceStats()`, so this is source-compatible.
+Assigning a field on a `TraceStats` local no longer compiles, but nothing in the ecosystem
+did that: the type is only ever produced by `UserTrace.QueryStats`/`KernelTrace.QueryStats`.
+It is a binary-breaking change, which costs nothing here because the assembly rename already
+forces every consumer to recompile.
+
+### Nullable reference annotations
+
+The library is compiled with `<Nullable>enable</Nullable>` and its public surface is
+annotated, so consumers that opt into nullable reference types get accurate diagnostics
+instead of the "oblivious" default. The `TryGet*` methods carry `[MaybeNullWhen(false)]`,
+which is what lets `if (record.TryGetUnicodeString(name, out var s))` narrow `s` to
+non-null in the true branch without a redundant null check.
+
+`[MaybeNullWhen]` and `[NotNullWhen]` do not exist in the net462/net48 reference assemblies,
+so `Interop/NullableAttributes.cs` declares them under `#if !NET`. Roslyn matches these
+attributes by full name rather than by identity, so an `internal` declaration is honoured by
+external consumers compiling against net462/net48.
+
+Annotations are metadata only; they cannot break a compile that was not already opted into
+nullable analysis, and `tools/ApiDiff` deliberately ignores the `Nullable*` attributes for
+that reason.
+
 ### Public surface that was removed
 
 `managed/tools/ApiDiff` compares the public surface of two assemblies by reading metadata

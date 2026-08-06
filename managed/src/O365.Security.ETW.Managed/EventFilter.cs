@@ -21,8 +21,8 @@ namespace Microsoft.O365.Security.ETW
     /// </remarks>
     public sealed class EventFilter : IDisposable
     {
-        private readonly ushort[] _eventIds;
-        private readonly List<ushort> _pushdownIds;
+        private readonly ushort[]? _eventIds;
+        private readonly List<ushort>? _pushdownIds;
 
         public EventFilter(Predicate predicate)
         {
@@ -36,7 +36,7 @@ namespace Microsoft.O365.Security.ETW
         {
         }
 
-        public EventFilter(ushort eventId, Predicate predicate)
+        public EventFilter(ushort eventId, Predicate? predicate)
         {
             Predicate = predicate;
             _eventIds = new[] { eventId };
@@ -48,7 +48,7 @@ namespace Microsoft.O365.Security.ETW
         {
         }
 
-        public EventFilter(List<ushort> eventIds, Predicate predicate)
+        public EventFilter(List<ushort> eventIds, Predicate? predicate)
         {
             if (eventIds == null) throw new ArgumentNullException(nameof(eventIds));
             if (eventIds.Count == 0) throw new ArgumentException("At least one event id is required.", nameof(eventIds));
@@ -58,16 +58,16 @@ namespace Microsoft.O365.Security.ETW
             _pushdownIds = new List<ushort>(eventIds);
         }
 
-        internal Predicate Predicate { get; }
+        internal Predicate? Predicate { get; }
 
         /// <summary>Invoked for each event that satisfies the filter. Zero-copy path.</summary>
-        public event EventRecordDelegate OnEventSpan;
+        public event EventRecordDelegate? OnEventSpan;
 
         /// <summary>Invoked for each event that satisfies the filter.</summary>
-        public event IEventRecordDelegate OnEvent;
+        public event IEventRecordDelegate? OnEvent;
 
         /// <summary>Invoked when an event's schema could not be resolved.</summary>
-        public event EventRecordErrorDelegate OnError;
+        public event EventRecordErrorDelegate? OnError;
 
         internal bool HasHandlers
         {
@@ -78,12 +78,12 @@ namespace Microsoft.O365.Security.ETW
         /// Event ids that can be pushed into ETW, or null when the filter cannot be reduced
         /// to a bounded id set.
         /// </summary>
-        internal IReadOnlyList<ushort> EventIds
+        internal IReadOnlyList<ushort>? EventIds
         {
             get { return _pushdownIds; }
         }
 
-        private static List<ushort> DeriveEventIds(Predicate predicate)
+        private static List<ushort>? DeriveEventIds(Predicate predicate)
         {
             var ids = new List<ushort>();
 
@@ -99,7 +99,7 @@ namespace Microsoft.O365.Security.ETW
 
         private bool MatchesEventId(ushort id)
         {
-            ushort[] ids = _eventIds;
+            ushort[]? ids = _eventIds;
             if (ids == null)
             {
                 return true;
@@ -131,7 +131,7 @@ namespace Microsoft.O365.Security.ETW
                 return;
             }
 
-            Predicate predicate = Predicate;
+            Predicate? predicate = Predicate;
 
             if (predicate != null)
             {
