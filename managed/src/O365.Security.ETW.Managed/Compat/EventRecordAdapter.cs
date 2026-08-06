@@ -164,6 +164,16 @@ namespace Microsoft.O365.Security.ETW
             return false;
         }
 
+        public ReadOnlySpan<char> GetUnicodeString(ReadOnlySpan<char> name)
+        {
+            return Ref.GetUnicodeString(name);
+        }
+
+        public bool TryGetUnicodeString(ReadOnlySpan<char> name, out ReadOnlySpan<char> value)
+        {
+            return Ref.TryGetUnicodeString(name, out value);
+        }
+
         public string GetCountedString(string name)
         {
             return TryGetCountedString(name, out string? result) ? result : throw Missing(name);
@@ -186,6 +196,16 @@ namespace Microsoft.O365.Security.ETW
             return false;
         }
 
+        public ReadOnlySpan<char> GetCountedString(ReadOnlySpan<char> name)
+        {
+            return Ref.GetCountedString(name);
+        }
+
+        public bool TryGetCountedString(ReadOnlySpan<char> name, out ReadOnlySpan<char> value)
+        {
+            return Ref.TryGetCountedString(name, out value);
+        }
+
         public string GetAnsiString(string name)
         {
             return TryGetAnsiString(name, out string? result) ? result : throw Missing(name);
@@ -206,6 +226,11 @@ namespace Microsoft.O365.Security.ETW
 
             result = null;
             return false;
+        }
+
+        public bool TryGetAnsiStringBytes(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value)
+        {
+            return Ref.TryGetAnsiStringBytes(name, out value);
         }
 
         /// <summary>
@@ -291,6 +316,11 @@ namespace Microsoft.O365.Security.ETW
 
             result = null;
             return false;
+        }
+
+        public bool TryGetBinary(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value)
+        {
+            return Ref.TryGetBinary(name, out value);
         }
 
         public bool TryGetIPAddress(string name, [MaybeNullWhen(false)] out IPAddress result)

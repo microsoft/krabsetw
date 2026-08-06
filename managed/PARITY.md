@@ -164,6 +164,60 @@ Annotations are metadata only; they cannot break a compile that was not already 
 nullable analysis, and `tools/ApiDiff` deliberately ignores the `Nullable*` attributes for
 that reason.
 
+### Allocation-free accessors on `IEventRecord`
+
+`IEventRecord` is the compat surface, and every one of its getters allocates: the payload
+lives in the ETW buffer, and returning a `string` or a `byte[]` means copying out of it.
+The adapter itself is reused for the life of the trace, so the allocation is entirely in
+the return types.
+
+`EventRecordRef` has no such problem — it hands back `ReadOnlySpan<T>` views straight into
+the buffer — but it is a `ref struct`, so it can never implement an interface, and a
+consumer cannot reach it without rewriting its callback signature. Six span-returning
+members were therefore added to `IEventRecord` so an existing consumer can migrate one call
+site at a time:
+
+```csharp
+ReadOnlySpan<char> GetUnicodeString(ReadOnlySpan<char> name);
+bool TryGetUnicodeString(ReadOnlySpan<char> name, out ReadOnlySpan<char> value);
+ReadOnlySpan<char> GetCountedString(ReadOnlySpan<char> name);
+bool TryGetCountedString(ReadOnlySpan<char> name, out ReadOnlySpan<char> value);
+bool TryGetAnsiStringBytes(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value);
+bool TryGetBinary(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value);
+```
+
+The signatures are character-identical to the `EventRecordRef` members they delegate to, so
+a call site that later moves onto the ref struct does not change.
+
+The returned spans are views into the ETW buffer. They are valid only for the duration of
+the callback, exactly like the record itself.
+
+**Why overloads rather than new names.** These overload on the *name* parameter, keeping the
+method name, following `Path.GetFileName`, `Encoding.GetString`, `int.Parse` and
+`Stream.Read`: in the BCL the return type follows the argument type, and the `Span` suffix
+is reserved for properties (`Memory<T>.Span`, `Utf8JsonReader.ValueSpan`). Overloading on
+the *out* parameter instead was measured and rejected — it makes every existing
+`TryGetUnicodeString(name, out var v)` call site ambiguous (CS0121). Overloading on the name
+is safe: a `string` argument binds to the allocating overload by identity conversion, which
+beats the implicit span conversion, so existing source is unaffected.
+
+**`Bytes` rather than characters for ANSI.** Transcoding from the provider's ANSI code page
+to UTF-16 is what forces the allocation, so there is no allocation-free span of `char` to
+return. The suffix follows `AsnDecoder.TryReadPrimitiveCharacterStringBytes`, which draws the
+same raw-versus-decoded distinction.
+
+**What was left out.** The index-based members (`PropertyCount`, `IndexOf`, `TryGetRaw`) and
+span forms of the four name properties (`Name`, `ProviderName`, `TaskName`, `OpcodeName`)
+stay off the interface. Nothing was found that would use them, and a consumer that wants
+them can move the callback to `EventRecordRef`. There is no span form of the IP-address
+accessors because `IPAddress` is a class.
+
+**Effect on implementors.** Adding members to a public interface is source-breaking for
+anyone who implements it. Adding them to `EventRecordAdapter`, which is internal, is not.
+A `ref struct` cannot appear in an expression tree, so a mocking framework can still create
+a proxy and invoke these members, but cannot `Setup` them (CS8640, CS9244) — build the
+record with `Testing.RecordBuilder` and push it through `Testing.Proxy` instead.
+
 ### Public surface that was removed
 
 `managed/tools/ApiDiff` compares the public surface of two assemblies by reading metadata

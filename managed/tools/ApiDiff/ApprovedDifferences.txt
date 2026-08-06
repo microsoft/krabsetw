@@ -11,6 +11,7 @@
 # The rationale for each group is in managed/PARITY.md. To regenerate after a reviewed
 # change, from managed\:
 #   dotnet run --project tools\ApiDiff\ApiDiff.csproj -c Release -- <baseline.dll> <candidate.dll> > tools\ApiDiff\ApprovedDifferences.txt
+# (the redirect drops this header -- paste it back at the top afterwards)
 + field Microsoft.O365.Security.ETW.EventHeaderProperty.ForwardedXML : Microsoft.O365.Security.ETW.EventHeaderProperty
 + field Microsoft.O365.Security.ETW.EventHeaderProperty.LegacyEventLog : Microsoft.O365.Security.ETW.EventHeaderProperty
 + field Microsoft.O365.Security.ETW.EventHeaderProperty.None : Microsoft.O365.Security.ETW.EventHeaderProperty
@@ -92,9 +93,15 @@
 + method Microsoft.O365.Security.ETW.Filter.IsUInt64(System.String, System.UInt64) : Microsoft.O365.Security.ETW.Predicate
 + method Microsoft.O365.Security.ETW.Filter.NoEvent() : Microsoft.O365.Security.ETW.Predicate
 + method Microsoft.O365.Security.ETW.Filter.ProviderIdIs(System.Guid) : Microsoft.O365.Security.ETW.Predicate
++ method Microsoft.O365.Security.ETW.IEventRecord.GetCountedString(System.ReadOnlySpan`1<System.Char>) : System.ReadOnlySpan`1<System.Char>
 + method Microsoft.O365.Security.ETW.IEventRecord.GetDateTime(System.String) : System.DateTime
 + method Microsoft.O365.Security.ETW.IEventRecord.GetDateTime(System.String, System.DateTime) : System.DateTime
++ method Microsoft.O365.Security.ETW.IEventRecord.GetUnicodeString(System.ReadOnlySpan`1<System.Char>) : System.ReadOnlySpan`1<System.Char>
++ method Microsoft.O365.Security.ETW.IEventRecord.TryGetAnsiStringBytes(System.ReadOnlySpan`1<System.Char>, System.ReadOnlySpan`1<System.Byte>&) : System.Boolean
++ method Microsoft.O365.Security.ETW.IEventRecord.TryGetBinary(System.ReadOnlySpan`1<System.Char>, System.ReadOnlySpan`1<System.Byte>&) : System.Boolean
++ method Microsoft.O365.Security.ETW.IEventRecord.TryGetCountedString(System.ReadOnlySpan`1<System.Char>, System.ReadOnlySpan`1<System.Char>&) : System.Boolean
 + method Microsoft.O365.Security.ETW.IEventRecord.TryGetDateTime(System.String, System.DateTime&) : System.Boolean
++ method Microsoft.O365.Security.ETW.IEventRecord.TryGetUnicodeString(System.ReadOnlySpan`1<System.Char>, System.ReadOnlySpan`1<System.Char>&) : System.Boolean
 + method Microsoft.O365.Security.ETW.InvalidParameter..ctor(System.String) : System.Void
 + method Microsoft.O365.Security.ETW.KernelProvider.add_OnEventSpan(Microsoft.O365.Security.ETW.EventRecordDelegate) : System.Void
 + method Microsoft.O365.Security.ETW.KernelProvider.get_Flags() : System.UInt32
