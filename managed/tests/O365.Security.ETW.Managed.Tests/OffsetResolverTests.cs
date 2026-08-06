@@ -12,9 +12,9 @@ namespace Microsoft.O365.Security.ETW.Tests
     /// <remarks>
     /// Offsets are memoised behind a high-water mark, so reading a late property and then an
     /// early one costs a single walk rather than two. That memoisation must not become a way
-    /// for a property that fails to decode to take working ones down with it: krabs resolves
-    /// every offset from scratch on each access and so cannot have that problem, and the port
-    /// has to behave the same.
+    /// for a property that fails to decode to take working ones down with it: krabs memoises
+    /// too, but its cache lookup precedes the walk, so an earlier property stays readable
+    /// after a later one fails. The port has to behave the same.
     ///
     /// <see cref="OffsetResolverDifferentialTests"/> makes the same guarantee generally, over
     /// generated schemas. These cases pin the specific shape that regressed.

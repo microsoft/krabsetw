@@ -15,13 +15,21 @@ The parity tests are written against behaviour krabs already has, so they only e
 mechanisms that exist in both implementations. Anything the port *added* is invisible to
 them by construction.
 
-The clearest example: krabs recomputes every property offset from scratch on each
-access, while the port memoises them behind a high-water mark. A bug in that memoisation
-cannot be expressed as a parity failure, because there is nothing on the krabs side to
-diverge from. One such bug shipped and was found by accident (see
-`OffsetResolverTests`); the general guard against the class of bug is
+The clearest example: both implementations memoise resolved offsets behind a high-water
+mark, but they are separate implementations of that memoisation, and a divergence between
+them is not expressible as a parity failure — the parity tests read properties in schema
+order, which is the one access pattern under which a memoisation bug cannot show up.
+
+A bug of exactly that shape shipped in the port and was found by accident (see
+`OffsetResolverTests`): reading a late property and then an early one returned -1 for the
+early one, which krabs gets right. The general guard is
 `OffsetResolverDifferentialTests`, which differences memoised resolution against a fresh
 resolver per access.
+
+Note that krabs memoises too — `parser::find_property` keeps `propertyCache_`, a
+`lastPropertyIndex_` high-water mark and a `nextHint_` scan hint. Earlier revisions of
+this file claimed krabs resolved every offset from scratch; that was wrong, and the
+caching was added as a performance change.
 
 Tests covering port-only state live in `managed/tests/O365.Security.ETW.Managed.Tests`
 and should be validated by mutation — reintroduce the defect and confirm the test fails —
@@ -60,7 +68,9 @@ The port returns -1 from `OffsetResolver.SizeOf` for a property carrying
 everything after it unreadable. This was scoped out of the initial milestone and has not
 been revisited.
 
-krabs does not handle structs either, but it fails differently and worse — see below.
+krabs does not decode structs either, and fails worse — see below. Nothing that worked
+before stops working, but the failure mode changes from silent corruption to a visible
+failure. Tracked as **#3190318**.
 
 ## Things that look like divergences and are not
 
@@ -92,6 +102,12 @@ misaligns every subsequent property in the event.
 
 This is a real bug in the shipping implementation. It is untested on both sides. The
 port avoids it by refusing to size structs at all, which fails visibly instead.
+
+Struct properties are not rare: 1148 events across 88 of the 1503 providers registered on
+a build machine declare one, including three providers whose GUIDs appear in HostIDS
+source (SMBClient, BITS-Client, Hyper-V-Compute). That does not by itself establish
+impact — a read only breaks if it targets a property at or after the struct in the same
+event — but it does rule out "no provider does this".
 
 ### ANSI decoding ignores the out-type (open, both sides)
 
