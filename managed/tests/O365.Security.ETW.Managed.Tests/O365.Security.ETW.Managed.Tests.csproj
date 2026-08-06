@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net48;net10.0-windows</TargetFrameworks>
+    <TargetFrameworks>net48;net8.0-windows;net10.0-windows</TargetFrameworks>
     <AssemblyName>O365.Security.ETW.Managed.Tests</AssemblyName>
     <RootNamespace>O365.Security.ETW.Tests</RootNamespace>
     <IsPackable>false</IsPackable>

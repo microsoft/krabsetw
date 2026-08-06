@@ -61,10 +61,13 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// Returns the size of a single element when determinable without reading the
         /// payload, else -1.
         /// </summary>
+        /// <param name="inType">TDH in-type of the property.</param>
+        /// <param name="outType">TDH out-type of the property.</param>
         /// <param name="length">
         /// Element length from the schema, in the unit the in-type documents, or
         /// <see cref="LengthUnspecified"/>.
         /// </param>
+        /// <param name="pointerSize">Pointer size of the event source, in bytes.</param>
         public static int TryGetFixedElementSize(ushort inType, ushort outType, int length, int pointerSize)
         {
             switch ((TdhInType)inType)

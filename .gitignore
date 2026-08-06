@@ -24,6 +24,8 @@ ARM64/
 **/packages/*
 #!**/packages/repositories.config
 *.nupkg
+*.snupkg
+managed/artifacts/
 
 # githooks specific
 githooks/*.dll

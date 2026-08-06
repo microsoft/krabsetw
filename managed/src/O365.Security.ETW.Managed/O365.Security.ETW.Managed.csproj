@@ -1,10 +1,45 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net462;net48;net10.0-windows</TargetFrameworks>
-    <AssemblyName>O365.Security.ETW.Managed</AssemblyName>
-    <RootNamespace>O365.Security.ETW</RootNamespace>
+    <TargetFrameworks>net462;net48;net8.0-windows;net10.0-windows</TargetFrameworks>
+    <AssemblyName>Microsoft.O365.Security.ETW</AssemblyName>
+    <RootNamespace>Microsoft.O365.Security.ETW</RootNamespace>
+    <!-- Pure IL with no native dependency, so one assembly serves x64 and ARM64. The solution
+         still builds under the x64 platform (the parity tests load the x64-only C++/CLI
+         assembly); this only affects the PE architecture flag of the library itself. -->
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Microsoft.O365.Security.ETW</PackageId>
+    <Version>5.0.0</Version>
+    <Title>Microsoft.O365.Security.ETW - a pure .NET ETW consumer</Title>
+    <Authors>Microsoft</Authors>
+    <Company>Microsoft</Company>
+    <Description>Microsoft.O365.Security.ETW is a pure .NET implementation of the krabsetw ETW consumer API. It replaces the C++/CLI wrapper shipped as Microsoft.O365.Security.Native.ETW with managed code that allocates nothing on the event callback path.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Microsoft/krabsetw</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Microsoft/krabsetw</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
+    <PackageTags>ETW krabs managed</PackageTags>
+    <PackageReleaseNotes>
+      Version 5.0.0:
+        - Replaces the C++/CLI wrapper with a pure .NET implementation. The C++/CLI package
+          Microsoft.O365.Security.Native.ETW continues to ship on the 4.4.x line.
+        - No allocation on the event callback path, and no native binary, so a single AnyCPU
+          assembly serves x64 and ARM64.
+        - Targets net462, net48, net8.0-windows and net10.0-windows.
+        - The namespace (Microsoft.O365.Security.ETW) is unchanged, but the public surface is
+          not identical. See managed/PARITY.md for every reviewed difference; the notable
+          source break is IEventRecord.GetDateTime, which now returns DateTime rather than a
+          boxed DateTime.
+    </PackageReleaseNotes>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
