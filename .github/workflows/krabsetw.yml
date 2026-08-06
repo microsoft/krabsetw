@@ -16,6 +16,10 @@ jobs:
     - uses: actions/setup-dotnet@v4
       with:
         global-json-file: global.json
+    # managed/global.json pins the SDK that understands .slnx and net10.0-windows.
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
     - uses: microsoft/setup-msbuild@v1
     - uses: NuGet/setup-nuget@v1.0.5
     - uses: darenm/Setup-VSTest@v1
@@ -35,3 +39,21 @@ jobs:
       run: vstest.console.exe tests\ManagedETWTests\bin\x64\Debug\net462\EtwTestsCS.dll
     - name: test debug net8.0
       run: vstest.console.exe tests\ManagedETWTests\bin\x64\Debug\net8.0\EtwTestsCS.dll
+
+    # The pure .NET port. Run from managed\ so the .NET 10 global.json there is the one that
+    # applies -- the repository root pins an SDK that cannot parse .slnx.
+    - name: build managed release
+      working-directory: managed
+      run: dotnet build Krabs.Managed.slnx -c Release
+    - name: build managed debug
+      working-directory: managed
+      run: dotnet build Krabs.Managed.slnx -c Debug
+    - name: test managed release
+      working-directory: managed
+      run: dotnet test Krabs.Managed.slnx -c Release --no-build
+    - name: test managed debug
+      working-directory: managed
+      run: dotnet test Krabs.Managed.slnx -c Debug --no-build
+    - name: check public api surface
+      working-directory: managed
+      run: dotnet run --project tools\ApiDiff\ApiDiff.csproj -c Release -- ..\Microsoft.O365.Security.Native.ETW\x64\Release\net462\Microsoft.O365.Security.Native.ETW.dll src\O365.Security.ETW.Managed\bin\Release\net462\O365.Security.ETW.Managed.dll tools\ApiDiff\ApprovedDifferences.txt
