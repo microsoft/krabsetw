@@ -69,7 +69,10 @@ namespace Microsoft.O365.Security.ETW.Tests
                 trace.Enable(provider);
                 trace.Open();
 
-                Task processing = Task.Run(() => trace.Start());
+                // A dedicated thread rather than the thread pool: ProcessTrace blocks for the
+                // whole life of the trace, so a pool thread would be held hostage for 20s.
+                var processing = new Thread(() => trace.Start()) { IsBackground = true };
+                processing.Start();
 
                 try
                 {
@@ -83,7 +86,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                 finally
                 {
                     trace.Stop();
-                    processing.Wait(TimeSpan.FromSeconds(20));
+                    processing.Join(TimeSpan.FromSeconds(20));
                 }
             }
 

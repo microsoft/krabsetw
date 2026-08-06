@@ -6,12 +6,31 @@
     <AssemblyName>O365.Security.ETW.Managed.Benchmarks</AssemblyName>
     <RootNamespace>O365.Security.ETW.Benchmarks</RootNamespace>
     <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    app.config carries binding redirects that only mean anything on .NET Framework. Leaving
+    redirect generation on for net10.0 makes MSBuild compare them against the shared framework
+    and report MSB3836 for every one of them.
+  -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+  </ItemGroup>
+
+  <!--
+    BenchmarkDotNet 0.14.0 drags in System.Collections.Immutable 5.0.0, but the Roslyn 4.1.0
+    it also depends on was compiled against 8.0.0.0. On net48 there is no shared framework to
+    unify them, so MSBuild picks the lower one and reports MSB3277. Referencing the higher
+    version directly makes it primary and resolves the conflict.
+  -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
+    <PackageReference Include="System.Reflection.Metadata" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

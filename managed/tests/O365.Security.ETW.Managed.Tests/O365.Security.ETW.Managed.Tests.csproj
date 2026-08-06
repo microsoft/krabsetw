@@ -5,6 +5,14 @@
     <AssemblyName>O365.Security.ETW.Managed.Tests</AssemblyName>
     <RootNamespace>O365.Security.ETW.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    app.config carries binding redirects that only mean anything on .NET Framework. Leaving
+    redirect generation on for the .NET TFMs makes MSBuild compare them against the shared
+    framework and report MSB3836 for every one of them.
+  -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
