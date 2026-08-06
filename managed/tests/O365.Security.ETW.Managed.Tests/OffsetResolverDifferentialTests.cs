@@ -17,8 +17,10 @@ namespace Microsoft.O365.Security.ETW.Tests
     /// mechanisms krabs has. Any divergence introduced by memoisation therefore has to be
     /// caught here, by differencing the two strategies directly.
     ///
-    /// The reference is a fresh resolver per access, which is exactly krabs' model and shares
-    /// all of the sizing logic, so this isolates the caching and nothing else.
+    /// The reference is a fresh resolver per access, which shares all of the sizing logic,
+    /// so this isolates the caching and nothing else. It is not a model of krabs -- krabs
+    /// memoises as well -- it is simply the definition of what the cache is supposed to
+    /// preserve.
     /// </remarks>
     public unsafe class OffsetResolverDifferentialTests
     {
