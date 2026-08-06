@@ -11,7 +11,8 @@ namespace ApiDiff
     /// <summary>
     /// Renders metadata signatures as stable, comparable strings.
     /// </summary>
-    internal sealed class SignatureProvider : ISignatureTypeProvider<string, object>
+    internal sealed class SignatureProvider :
+        ISignatureTypeProvider<string, object>, ICustomAttributeTypeProvider<string>
     {
         private readonly MetadataReader reader;
 
@@ -121,5 +122,13 @@ namespace ApiDiff
 
         public string GetFunctionPointerType(MethodSignature<string> signature)
             => "delegate*<" + string.Join(", ", signature.ParameterTypes) + ", " + signature.ReturnType + ">";
+
+        public string GetSystemType() => "System.Type";
+
+        public bool IsSystemType(string type) => type == "System.Type";
+
+        public string GetTypeFromSerializedName(string name) => name;
+
+        public PrimitiveTypeCode GetUnderlyingEnumType(string type) => PrimitiveTypeCode.Int32;
     }
 }

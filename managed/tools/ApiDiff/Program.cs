@@ -27,8 +27,9 @@ namespace ApiDiff
         {
             if (args.Length < 1)
             {
-                Console.Error.WriteLine("usage: ApiDiff <assembly>              # dump surface");
-                Console.Error.WriteLine("       ApiDiff <baseline> <candidate>  # diff surfaces");
+                Console.Error.WriteLine("usage: ApiDiff <assembly>                          # dump surface");
+                Console.Error.WriteLine("       ApiDiff <baseline> <candidate>             # diff surfaces");
+                Console.Error.WriteLine("       ApiDiff <baseline> <candidate> <approved>  # diff against approved list");
                 return 2;
             }
 
@@ -45,23 +46,66 @@ namespace ApiDiff
             var baseline = new SortedSet<string>(Surface(args[0]), StringComparer.Ordinal);
             var candidate = new SortedSet<string>(Surface(args[1]), StringComparer.Ordinal);
 
-            var missing = baseline.Except(candidate, StringComparer.Ordinal).ToList();
-            var added = candidate.Except(baseline, StringComparer.Ordinal).ToList();
+            var differences = new List<string>();
+            differences.AddRange(baseline.Except(candidate, StringComparer.Ordinal).Select(l => "- " + l));
+            differences.AddRange(candidate.Except(baseline, StringComparer.Ordinal).Select(l => "+ " + l));
+            differences.Sort(StringComparer.Ordinal);
 
-            foreach (string line in missing)
+            if (args.Length == 2)
             {
-                Console.WriteLine("- " + line);
+                foreach (string line in differences)
+                {
+                    Console.WriteLine(line);
+                }
+
+                Console.Error.WriteLine(
+                    $"baseline {baseline.Count}, candidate {candidate.Count}, differences {differences.Count}");
+
+                return differences.Count == 0 ? 0 : 1;
             }
 
-            foreach (string line in added)
+            return Approve(differences, args[2]);
+        }
+
+        /// <summary>
+        /// Compares the differences against a checked-in list of ones that have been reviewed.
+        /// </summary>
+        /// <remarks>
+        /// The two implementations are not expected to converge — the port drops surface that
+        /// nothing consumes. What must not happen is a difference appearing that nobody looked
+        /// at, so the list is the gate rather than an empty diff.
+        /// </remarks>
+        private static int Approve(List<string> differences, string approvedPath)
+        {
+            var approved = File.ReadAllLines(approvedPath)
+                .Select(l => l.Trim())
+                .Where(l => l.Length > 0 && !l.StartsWith("#", StringComparison.Ordinal))
+                .ToList();
+
+            var unapproved = differences.Except(approved, StringComparer.Ordinal).ToList();
+            var stale = approved.Except(differences, StringComparer.Ordinal).ToList();
+
+            foreach (string line in unapproved)
             {
-                Console.WriteLine("+ " + line);
+                Console.Error.WriteLine("UNAPPROVED  " + line);
+            }
+
+            foreach (string line in stale)
+            {
+                Console.Error.WriteLine("STALE       " + line);
+            }
+
+            if (unapproved.Count == 0 && stale.Count == 0)
+            {
+                Console.Error.WriteLine($"{differences.Count} differences, all approved.");
+                return 0;
             }
 
             Console.Error.WriteLine(
-                $"baseline {baseline.Count}, candidate {candidate.Count}, missing {missing.Count}, added {added.Count}");
+                $"{unapproved.Count} unapproved difference(s), {stale.Count} stale entr(y|ies). " +
+                "Review, then regenerate with: ApiDiff <baseline> <candidate> > ApprovedDifferences.txt");
 
-            return missing.Count == 0 && added.Count == 0 ? 0 : 1;
+            return 1;
         }
 
         private static IEnumerable<string> Surface(string path)
@@ -81,7 +125,9 @@ namespace ApiDiff
                 }
 
                 string name = TypeName(md, type);
-                lines.Add($"type {Kind(md, type)} {name}{BaseSuffix(md, type, provider)}");
+                lines.Add(
+                    $"type {Kind(md, type)} {name}{BaseSuffix(md, type, provider)}" +
+                    Attributes(md, type.GetCustomAttributes(), provider));
 
                 foreach (FieldDefinitionHandle fh in type.GetFields())
                 {
@@ -92,7 +138,9 @@ namespace ApiDiff
                     }
 
                     string fieldType = field.DecodeSignature(provider, null);
-                    lines.Add($"field {name}.{md.GetString(field.Name)} : {fieldType}");
+                    lines.Add(
+                        $"field {name}.{md.GetString(field.Name)} : {fieldType}" +
+                        Attributes(md, field.GetCustomAttributes(), provider));
                 }
 
                 foreach (MethodDefinitionHandle mh in type.GetMethods())
@@ -106,11 +154,96 @@ namespace ApiDiff
                     MethodSignature<string> sig = method.DecodeSignature(provider, null);
                     string parameters = string.Join(", ", sig.ParameterTypes);
                     lines.Add(
-                        $"method {name}.{md.GetString(method.Name)}({parameters}) : {sig.ReturnType}");
+                        $"method {name}.{md.GetString(method.Name)}({parameters}) : {sig.ReturnType}" +
+                        Attributes(md, method.GetCustomAttributes(), provider));
                 }
             }
 
             return lines;
+        }
+
+        /// <summary>
+        /// Renders the custom attributes that change how a consumer may use the member.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately a fixed list rather than everything. C++/CLI and Roslyn each emit their
+        /// own bookkeeping attributes, and rendering those would report differences that no
+        /// consumer can observe.
+        /// </remarks>
+        private static string Attributes(
+            MetadataReader md, CustomAttributeHandleCollection handles, SignatureProvider provider)
+        {
+            var names = new List<string>();
+
+            foreach (CustomAttributeHandle handle in handles)
+            {
+                CustomAttribute attribute = md.GetCustomAttribute(handle);
+                string name = AttributeTypeName(md, attribute, provider);
+
+                if (!Significant.Contains(name))
+                {
+                    continue;
+                }
+
+                if (name == "System.ObsoleteAttribute")
+                {
+                    string message = ObsoleteMessage(attribute, provider);
+
+                    // Roslyn stamps this on every ref struct when the target framework has no
+                    // IsByRefLikeAttribute. It is a down-level compiler guard, not a deprecation,
+                    // and it appears on net462/net48 but not net10.
+                    if (message != null && message.StartsWith(
+                        "Types with embedded references are not supported", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    names.Add(message == null ? "[Obsolete]" : $"[Obsolete(\"{message}\")]");
+                    continue;
+                }
+
+                names.Add("[" + name + "]");
+            }
+
+            names.Sort(StringComparer.Ordinal);
+            return names.Count == 0 ? string.Empty : " " + string.Join(" ", names);
+        }
+
+        private static string ObsoleteMessage(CustomAttribute attribute, SignatureProvider provider)
+        {
+            try
+            {
+                CustomAttributeValue<string> value = attribute.DecodeValue(provider);
+                return value.FixedArguments.Length > 0 ? value.FixedArguments[0].Value as string : null;
+            }
+            catch (BadImageFormatException)
+            {
+                return null;
+            }
+        }
+
+        private static readonly HashSet<string> Significant = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "System.ObsoleteAttribute",
+            "System.FlagsAttribute",
+            "System.ParamArrayAttribute",
+            "System.Runtime.CompilerServices.ExtensionAttribute",
+        };
+
+        private static string AttributeTypeName(
+            MetadataReader md, CustomAttribute attribute, SignatureProvider provider)
+        {
+            switch (attribute.Constructor.Kind)
+            {
+                case HandleKind.MethodDefinition:
+                    MethodDefinition def = md.GetMethodDefinition((MethodDefinitionHandle)attribute.Constructor);
+                    return provider.FromHandle(def.GetDeclaringType());
+                case HandleKind.MemberReference:
+                    MemberReference reference = md.GetMemberReference((MemberReferenceHandle)attribute.Constructor);
+                    return provider.FromHandle(reference.Parent);
+                default:
+                    return "?";
+            }
         }
 
         private static string BaseSuffix(MetadataReader md, TypeDefinition type, SignatureProvider provider)

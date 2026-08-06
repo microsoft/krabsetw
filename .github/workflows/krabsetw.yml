@@ -16,6 +16,10 @@ jobs:
     - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
       with:
         global-json-file: global.json
+    # managed/global.json pins the SDK that understands .slnx and net10.0-windows.
+    - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      with:
+        dotnet-version: '10.0.x'
     - uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
     - uses: NuGet/setup-nuget@b26b823c478ee115be5c9403e62c90b0bf943843 # v3.1.0
     - uses: darenm/Setup-VSTest@3a16d909a1f3bbc65b52f8270d475d905e7d3e44 # v1.3
@@ -35,3 +39,21 @@ jobs:
       run: vstest.console.exe tests\ManagedETWTests\bin\x64\Debug\net462\EtwTestsCS.dll
     - name: test debug net8.0
       run: vstest.console.exe tests\ManagedETWTests\bin\x64\Debug\net8.0\EtwTestsCS.dll
+
+    # The pure .NET port. Run from managed\ so the .NET 10 global.json there is the one that
+    # applies -- the repository root pins an SDK that cannot parse .slnx.
+    - name: build managed release
+      working-directory: managed
+      run: dotnet build Krabs.Managed.slnx -c Release
+    - name: build managed debug
+      working-directory: managed
+      run: dotnet build Krabs.Managed.slnx -c Debug
+    - name: test managed release
+      working-directory: managed
+      run: dotnet test Krabs.Managed.slnx -c Release --no-build
+    - name: test managed debug
+      working-directory: managed
+      run: dotnet test Krabs.Managed.slnx -c Debug --no-build
+    - name: check public api surface
+      working-directory: managed
+      run: dotnet run --project tools\ApiDiff\ApiDiff.csproj -c Release -- ..\Microsoft.O365.Security.Native.ETW\x64\Release\net462\Microsoft.O365.Security.Native.ETW.dll src\O365.Security.ETW.Managed\bin\Release\net462\O365.Security.ETW.Managed.dll tools\ApiDiff\ApprovedDifferences.txt
