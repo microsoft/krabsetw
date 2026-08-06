@@ -56,4 +56,11 @@ jobs:
       run: dotnet test Krabs.Managed.slnx -c Debug --no-build
     - name: check public api surface
       working-directory: managed
-      run: dotnet run --project tools\ApiDiff\ApiDiff.csproj -c Release -- ..\Microsoft.O365.Security.Native.ETW\x64\Release\net462\Microsoft.O365.Security.Native.ETW.dll src\O365.Security.ETW.Managed\bin\Release\net462\O365.Security.ETW.Managed.dll tools\ApiDiff\ApprovedDifferences.txt
+      run: dotnet run --project tools\ApiDiff\ApiDiff.csproj -c Release -- ..\Microsoft.O365.Security.Native.ETW\x64\Release\net462\Microsoft.O365.Security.Native.ETW.dll src\O365.Security.ETW.Managed\bin\Release\net462\Microsoft.O365.Security.ETW.dll tools\ApiDiff\ApprovedDifferences.txt
+    - name: pack managed
+      working-directory: managed
+      run: dotnet pack src\O365.Security.ETW.Managed\O365.Security.ETW.Managed.csproj -c Release --no-build -o artifacts
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Microsoft.O365.Security.ETW
+        path: managed/artifacts/*.*upkg

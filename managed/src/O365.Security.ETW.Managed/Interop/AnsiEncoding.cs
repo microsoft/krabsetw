@@ -34,9 +34,12 @@ namespace Microsoft.O365.Security.ETW.Interop
 
         private static Encoding Resolve()
         {
-#if NET10_0_OR_GREATER
+#if NET
             // .NET ships only ASCII, Latin1, UTF-8, UTF-16 and UTF-32 in the box; the rest of
             // the code pages come from this provider. .NET Framework has them all already.
+            // This must cover every .NET (Core) target, not just the newest one: without it
+            // GetEncoding falls through to the Encoding.Default fallback below, which is UTF-8
+            // on .NET, and ANSI properties silently decode with the wrong code page.
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 #endif
 
