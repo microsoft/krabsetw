@@ -19,12 +19,12 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// <summary>TDH status. ERROR_SUCCESS means <see cref="Blob"/> and <see cref="Table"/> are valid.</summary>
         public readonly int Status;
 
-        public readonly PropertyTable Table;
+        public readonly PropertyTable? Table;
 
         /// <summary>TraceLogging event name, used to disambiguate keys that collide on hash.</summary>
-        private readonly byte[] _traceLoggingName;
+        private readonly byte[]? _traceLoggingName;
 
-        public SchemaEntry(IntPtr blob, int blobSize, PropertyTable table, byte[] traceLoggingName)
+        public SchemaEntry(IntPtr blob, int blobSize, PropertyTable table, byte[]? traceLoggingName)
         {
             Blob = blob;
             BlobSize = blobSize;
@@ -33,7 +33,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             _traceLoggingName = traceLoggingName;
         }
 
-        public SchemaEntry(int status, byte[] traceLoggingName)
+        public SchemaEntry(int status, byte[]? traceLoggingName)
         {
             Blob = IntPtr.Zero;
             BlobSize = 0;
@@ -111,7 +111,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 && Provider == other.Provider;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj is SchemaKey other && Equals(other);
         }
@@ -142,7 +142,7 @@ namespace Microsoft.O365.Security.ETW.Schema
         private readonly Dictionary<SchemaKey, SchemaEntry> _cache = new Dictionary<SchemaKey, SchemaEntry>();
         private readonly List<IntPtr> _blobs = new List<IntPtr>();
         private SchemaKey _lastKey;
-        private SchemaEntry _lastEntry;
+        private SchemaEntry? _lastEntry;
         private bool _disposed;
 
         /// <summary>Number of TDH lookups performed. A well-behaved trace resolves each distinct schema once.</summary>
@@ -185,7 +185,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 descriptor.Opcode,
                 descriptor.Level);
 
-            if (_cache.TryGetValue(key, out SchemaEntry entry) && entry.NameMatches(tlName))
+            if (_cache.TryGetValue(key, out SchemaEntry? entry) && entry.NameMatches(tlName))
             {
                 _lastKey = key;
                 _lastEntry = entry;
@@ -202,7 +202,7 @@ namespace Microsoft.O365.Security.ETW.Schema
 
         private SchemaEntry Load(EVENT_RECORD* record, ReadOnlySpan<byte> tlName)
         {
-            byte[] nameCopy = tlName.Length == 0 ? null : tlName.ToArray();
+            byte[]? nameCopy = tlName.Length == 0 ? null : tlName.ToArray();
 
             uint size = 0;
             int status = NativeMethods.TdhGetEventInformation(record, 0, IntPtr.Zero, null, &size);

@@ -76,7 +76,11 @@ namespace Microsoft.O365.Security.ETW
 
         public Guid Id { get; }
 
-        public string Name { get; }
+        /// <summary>
+        /// The provider name, when the provider was constructed from one. Null when it was
+        /// constructed from a GUID, because nothing resolves a GUID back to a name.
+        /// </summary>
+        public string? Name { get; }
 
         /// <summary>Events are delivered when any of these keyword bits match.</summary>
         public ulong Any { get; set; }
@@ -96,10 +100,10 @@ namespace Microsoft.O365.Security.ETW
         public bool RundownEnabled { get; private set; }
 
         /// <summary>Invoked for every event delivered to this provider. Zero-copy path.</summary>
-        public event EventRecordDelegate OnEventSpan;
+        public event EventRecordDelegate? OnEventSpan;
 
         /// <summary>Invoked for every event delivered to this provider.</summary>
-        public event IEventRecordDelegate OnEvent;
+        public event IEventRecordDelegate? OnEvent;
 
         /// <summary>
         /// Invoked for every event delivered to this provider, before any schema is resolved.
@@ -109,10 +113,10 @@ namespace Microsoft.O365.Security.ETW
         /// header fields only; touching a payload accessor would force a schema lookup and
         /// defeat the point of the callback.
         /// </remarks>
-        public event IEventRecordMetadataDelegate OnMetadata;
+        public event IEventRecordMetadataDelegate? OnMetadata;
 
         /// <summary>Invoked when an event's schema could not be resolved.</summary>
-        public event EventRecordErrorDelegate OnError;
+        public event EventRecordErrorDelegate? OnError;
 
         /// <summary>
         /// Requests that the provider log its state information when enabled.

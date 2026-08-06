@@ -37,10 +37,10 @@ namespace Microsoft.O365.Security.ETW
         /// <summary>Whether WPP events are routed to providers by schema provider GUID.</summary>
         public bool WppEventsEnabled;
 
-        public EventRecordDelegate DefaultEventSpan;
-        public IEventRecordDelegate DefaultEvent;
-        public IEventRecordMetadataDelegate DefaultMetadata;
-        public EventRecordErrorDelegate DefaultError;
+        public EventRecordDelegate DefaultEventSpan = null!;
+        public IEventRecordDelegate DefaultEvent = null!;
+        public IEventRecordMetadataDelegate DefaultMetadata = null!;
+        public EventRecordErrorDelegate DefaultError = null!;
 
         public void SetProviders(List<Provider> providers)
         {
@@ -215,7 +215,7 @@ namespace Microsoft.O365.Security.ETW
     internal static class TraceRegistry
     {
         private static readonly object Gate = new object();
-        private static TraceContext[] _contexts = new TraceContext[8];
+        private static TraceContext?[] _contexts = new TraceContext?[8];
 
         public static int Register(TraceContext context)
         {
@@ -235,7 +235,7 @@ namespace Microsoft.O365.Security.ETW
                 // Grow into a fresh array and publish it only once fully populated, so a
                 // callback thread reading the field concurrently sees either the old array
                 // or a complete new one.
-                var grown = new TraceContext[_contexts.Length * 2];
+                var grown = new TraceContext?[_contexts.Length * 2];
                 Array.Copy(_contexts, grown, _contexts.Length);
                 grown[index] = context;
                 Volatile.Write(ref _contexts, grown);
@@ -248,7 +248,7 @@ namespace Microsoft.O365.Security.ETW
         {
             lock (Gate)
             {
-                TraceContext[] contexts = _contexts;
+                TraceContext?[] contexts = _contexts;
 
                 if (index >= 0 && index < contexts.Length)
                 {
@@ -261,9 +261,9 @@ namespace Microsoft.O365.Security.ETW
         /// Resolves a context without locking. The array reference is only ever replaced by a
         /// fully populated copy, so a torn read is not possible.
         /// </summary>
-        public static TraceContext Get(int index)
+        public static TraceContext? Get(int index)
         {
-            TraceContext[] contexts = Volatile.Read(ref _contexts);
+            TraceContext?[] contexts = Volatile.Read(ref _contexts);
             return (uint)index < (uint)contexts.Length ? Volatile.Read(ref contexts[index]) : null;
         }
     }
@@ -336,7 +336,7 @@ namespace Microsoft.O365.Security.ETW
         }
 #endif
 
-        internal static Exception LastException;
+        internal static Exception? LastException;
 
         // EVENT_TRACE_LOGFILE is not blittable, so the buffer callback receives it as an
         // opaque pointer. Only the trailing Context field is needed, and its offset is taken
@@ -354,7 +354,7 @@ namespace Microsoft.O365.Security.ETW
                 }
 
                 var index = (int)*(IntPtr*)((byte*)logfile + ContextOffset);
-                TraceContext context = TraceRegistry.Get(index);
+                TraceContext? context = TraceRegistry.Get(index);
 
                 if (context != null)
                 {
@@ -373,7 +373,7 @@ namespace Microsoft.O365.Security.ETW
             // process would be torn down.
             try
             {
-                TraceContext context = TraceRegistry.Get((int)record->UserContext);
+                TraceContext? context = TraceRegistry.Get((int)record->UserContext);
                 context?.OnEvent(record);
             }
             catch (Exception ex)

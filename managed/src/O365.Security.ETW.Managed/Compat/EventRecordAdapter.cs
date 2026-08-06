@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -20,7 +21,7 @@ namespace Microsoft.O365.Security.ETW
     internal sealed unsafe class EventRecordAdapter : IEventRecord
     {
         private EVENT_RECORD* _record;
-        private EventScratch _scratch;
+        private EventScratch _scratch = null!;
 
         public void Begin(EVENT_RECORD* record, EventScratch scratch)
         {
@@ -143,15 +144,15 @@ namespace Microsoft.O365.Security.ETW
 
         public string GetUnicodeString(string name)
         {
-            return TryGetUnicodeString(name, out string result) ? result : throw Missing(name);
+            return TryGetUnicodeString(name, out string? result) ? result : throw Missing(name);
         }
 
         public string GetUnicodeString(string name, string defaultValue)
         {
-            return TryGetUnicodeString(name, out string result) ? result : defaultValue;
+            return TryGetUnicodeString(name, out string? result) ? result : defaultValue;
         }
 
-        public bool TryGetUnicodeString(string name, out string result)
+        public bool TryGetUnicodeString(string name, [MaybeNullWhen(false)] out string result)
         {
             if (Ref.TryGetUnicodeString(name.AsSpan(), out ReadOnlySpan<char> value))
             {
@@ -165,15 +166,15 @@ namespace Microsoft.O365.Security.ETW
 
         public string GetCountedString(string name)
         {
-            return TryGetCountedString(name, out string result) ? result : throw Missing(name);
+            return TryGetCountedString(name, out string? result) ? result : throw Missing(name);
         }
 
         public string GetCountedString(string name, string defaultValue)
         {
-            return TryGetCountedString(name, out string result) ? result : defaultValue;
+            return TryGetCountedString(name, out string? result) ? result : defaultValue;
         }
 
-        public bool TryGetCountedString(string name, out string result)
+        public bool TryGetCountedString(string name, [MaybeNullWhen(false)] out string result)
         {
             if (Ref.TryGetCountedString(name.AsSpan(), out ReadOnlySpan<char> value))
             {
@@ -187,15 +188,15 @@ namespace Microsoft.O365.Security.ETW
 
         public string GetAnsiString(string name)
         {
-            return TryGetAnsiString(name, out string result) ? result : throw Missing(name);
+            return TryGetAnsiString(name, out string? result) ? result : throw Missing(name);
         }
 
         public string GetAnsiString(string name, string defaultValue)
         {
-            return TryGetAnsiString(name, out string result) ? result : defaultValue;
+            return TryGetAnsiString(name, out string? result) ? result : defaultValue;
         }
 
-        public bool TryGetAnsiString(string name, out string result)
+        public bool TryGetAnsiString(string name, [MaybeNullWhen(false)] out string result)
         {
             if (Ref.TryGetAnsiStringBytes(name.AsSpan(), out ReadOnlySpan<byte> value))
             {
@@ -277,10 +278,10 @@ namespace Microsoft.O365.Security.ETW
 
         public byte[] GetBinary(string name)
         {
-            return TryGetBinary(name, out byte[] result) ? result : throw Missing(name);
+            return TryGetBinary(name, out byte[]? result) ? result : throw Missing(name);
         }
 
-        public bool TryGetBinary(string name, out byte[] result)
+        public bool TryGetBinary(string name, [MaybeNullWhen(false)] out byte[] result)
         {
             if (Ref.TryGetBinary(name.AsSpan(), out ReadOnlySpan<byte> value))
             {
@@ -292,7 +293,7 @@ namespace Microsoft.O365.Security.ETW
             return false;
         }
 
-        public bool TryGetIPAddress(string name, out IPAddress result)
+        public bool TryGetIPAddress(string name, [MaybeNullWhen(false)] out IPAddress result)
         {
             result = null;
 
@@ -310,7 +311,7 @@ namespace Microsoft.O365.Security.ETW
             return true;
         }
 
-        public bool TryGetSocketAddress(string name, out SocketAddress result)
+        public bool TryGetSocketAddress(string name, [MaybeNullWhen(false)] out SocketAddress result)
         {
             result = null;
 
@@ -333,22 +334,22 @@ namespace Microsoft.O365.Security.ETW
 
         public IPAddress GetIPAddress(string name)
         {
-            return TryGetIPAddress(name, out IPAddress v) ? v : throw Missing(name);
+            return TryGetIPAddress(name, out IPAddress? v) ? v : throw Missing(name);
         }
 
         public IPAddress GetIPAddress(string name, IPAddress defaultValue)
         {
-            return TryGetIPAddress(name, out IPAddress v) ? v : defaultValue;
+            return TryGetIPAddress(name, out IPAddress? v) ? v : defaultValue;
         }
 
         public SocketAddress GetSocketAddress(string name)
         {
-            return TryGetSocketAddress(name, out SocketAddress v) ? v : throw Missing(name);
+            return TryGetSocketAddress(name, out SocketAddress? v) ? v : throw Missing(name);
         }
 
         public SocketAddress GetSocketAddress(string name, SocketAddress defaultValue)
         {
-            return TryGetSocketAddress(name, out SocketAddress v) ? v : defaultValue;
+            return TryGetSocketAddress(name, out SocketAddress? v) ? v : defaultValue;
         }
 
         /// <remarks>

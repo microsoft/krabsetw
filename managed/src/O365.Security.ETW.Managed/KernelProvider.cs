@@ -47,18 +47,18 @@ namespace Microsoft.O365.Security.ETW
         public uint GroupMask { get; }
 
         /// <summary>Fired for every event, before any schema is resolved.</summary>
-        public event IEventRecordMetadataDelegate OnMetadata;
+        public event IEventRecordMetadataDelegate? OnMetadata;
 
         /// <summary>Fired for every event whose schema could be resolved.</summary>
-        public event IEventRecordDelegate OnEvent;
+        public event IEventRecordDelegate? OnEvent;
 
         /// <summary>
         /// Zero-allocation counterpart to <see cref="OnEvent"/>. Not gated on a schema.
         /// </summary>
-        public event EventRecordDelegate OnEventSpan;
+        public event EventRecordDelegate? OnEventSpan;
 
         /// <summary>Fired when an event arrives but cannot be handled.</summary>
-        public event EventRecordErrorDelegate OnError;
+        public event EventRecordErrorDelegate? OnError;
 
         /// <summary>Adds a filter to the provider.</summary>
         public void AddFilter(EventFilter filter)

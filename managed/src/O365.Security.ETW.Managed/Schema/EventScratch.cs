@@ -22,7 +22,7 @@ namespace Microsoft.O365.Security.ETW.Schema
         private readonly OffsetResolver _offsets = new OffsetResolver();
 
         private EVENT_RECORD* _record;
-        private SchemaEntry _schema;
+        private SchemaEntry? _schema;
         private bool _resolved;
 
         /// <summary>Begins a new event. Does not resolve the schema.</summary>
@@ -42,7 +42,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                     Resolve();
                 }
 
-                return _schema;
+                return _schema!;
             }
         }
 

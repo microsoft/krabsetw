@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 
@@ -116,31 +117,31 @@ namespace Microsoft.O365.Security.ETW
 
         string GetUnicodeString(string name, string defaultValue);
 
-        bool TryGetUnicodeString(string name, out string result);
+        bool TryGetUnicodeString(string name, [MaybeNullWhen(false)] out string result);
 
         string GetAnsiString(string name);
 
         string GetAnsiString(string name, string defaultValue);
 
-        bool TryGetAnsiString(string name, out string result);
+        bool TryGetAnsiString(string name, [MaybeNullWhen(false)] out string result);
 
         string GetCountedString(string name);
 
         string GetCountedString(string name, string defaultValue);
 
-        bool TryGetCountedString(string name, out string result);
+        bool TryGetCountedString(string name, [MaybeNullWhen(false)] out string result);
 
         IPAddress GetIPAddress(string name);
 
         IPAddress GetIPAddress(string name, IPAddress defaultValue);
 
-        bool TryGetIPAddress(string name, out IPAddress result);
+        bool TryGetIPAddress(string name, [MaybeNullWhen(false)] out IPAddress result);
 
         SocketAddress GetSocketAddress(string name);
 
         SocketAddress GetSocketAddress(string name, SocketAddress defaultValue);
 
-        bool TryGetSocketAddress(string name, out SocketAddress result);
+        bool TryGetSocketAddress(string name, [MaybeNullWhen(false)] out SocketAddress result);
 
         /// <remarks>
         /// The C++/CLI implementation used <c>DateTime^</c>, a boxed value type, which C# sees
@@ -205,7 +206,7 @@ namespace Microsoft.O365.Security.ETW
 
         byte[] GetBinary(string name);
 
-        bool TryGetBinary(string name, out byte[] result);
+        bool TryGetBinary(string name, [MaybeNullWhen(false)] out byte[] result);
 
         /// <summary>
         /// Returns the call stack captured with the event, or an empty list when the session

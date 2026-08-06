@@ -40,7 +40,7 @@ namespace Microsoft.O365.Security.ETW
         /// </summary>
         private SchemaEntry Schema
         {
-            get { return _scratch?.Schema; }
+            get { return _scratch.Schema; }
         }
 
         private OffsetResolver Offsets
@@ -60,7 +60,7 @@ namespace Microsoft.O365.Security.ETW
         /// <summary>TDH status from the schema lookup. Zero means a schema was obtained.</summary>
         internal int SchemaStatus
         {
-            get { return Schema?.Status ?? -1; }
+            get { return Schema.Status; }
         }
 
         /// <summary>Resolves and returns the schema entry, including a cached failure.</summary>
