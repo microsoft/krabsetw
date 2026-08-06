@@ -1,8 +1,34 @@
 # Parity with the C++/CLI implementation
 
-`O365.Security.ETW.Managed` is a pure .NET reimplementation of the C++/CLI wrapper in
+`Microsoft.O365.Security.ETW` is a pure .NET reimplementation of the C++/CLI wrapper in
 `Microsoft.O365.Security.Native.ETW`, which is itself a thin layer over the native
 `krabs` headers. The two are meant to be drop-in interchangeable for consumers.
+
+## Migrating from `Microsoft.O365.Security.Native.ETW`
+
+The port ships as a **different package**, `Microsoft.O365.Security.ETW`, starting at
+**5.0.0**. The C++/CLI package continues on the 4.4.x line, so the two can be installed
+side by side while consumers migrate. The old id kept "Native" in the name, which no
+longer describes anything about this implementation.
+
+| | `Microsoft.O365.Security.Native.ETW` | `Microsoft.O365.Security.ETW` |
+| --- | --- | --- |
+| Package version | 4.4.x | 5.0.0 |
+| Assembly | `Microsoft.O365.Security.Native.ETW.dll` | `Microsoft.O365.Security.ETW.dll` |
+| Namespace | `Microsoft.O365.Security.ETW` | *unchanged* |
+| Target frameworks | net462, net8.0 | net462, net48, net8.0-windows, net10.0-windows |
+| Architecture | x64 and ARM64 mixed-mode, under `runtimes/` | one AnyCPU assembly under `lib/` |
+
+Because the namespace is unchanged, most source compiles untouched — swapping the
+`PackageReference` is usually the whole migration. The assembly name *does* change, so
+this is not binary-compatible: anything already compiled against the old assembly must be
+recompiled, and `Assembly.Load` calls or binding redirects naming
+`Microsoft.O365.Security.Native.ETW` need updating.
+
+The public surface is deliberately not identical. Every difference is enumerated in
+`tools/ApiDiff/ApprovedDifferences.txt` and gated in CI; the ones that can break a
+compile are described under Deliberate divergences below, of which
+`IEventRecord.GetDateTime` is the one most likely to affect you.
 
 The parity suite (`tests/ManagedETWTests`, compiled twice — once against each
 implementation) is the mechanical check. This file records the things that suite
@@ -221,3 +247,17 @@ which would make the two target frameworks disagree.
 
 Covered by `describe_EventRecord.it_should_parse_ansi_strings_outside_of_ascii`, which
 runs against both implementations.
+
+It then regressed on net8.0 when that target framework was added, because the
+`CodePagesEncodingProvider` registration inside `AnsiEncoding` was guarded with
+`#if NET10_0_OR_GREATER`. Without the provider, `Encoding.GetEncoding` throws
+`NotSupportedException` for any code page outside the handful .NET ships in the box, and
+the `catch` fell back to exactly the `Encoding.Default` the previous paragraph rules out.
+The guard is now `#if NET`, which covers every .NET (Core) target.
+
+Two lessons worth keeping. A version-specific guard on a framework-family behaviour is a
+latent bug that only shows up when someone adds a target framework. And the fallback made
+the failure silent — it produced plausible wrong text rather than throwing.
+`AnsiEncodingTests.UsesTheMachineAnsiCodePage` is what caught it, and it only ran on
+net8.0 because the test project targets every framework the library does. Keep it that
+way.
