@@ -82,6 +82,8 @@ earlier note claiming the port truncated was stale.
 
 ### krabs mis-sizes struct properties (open, C++ side, affects shipping code)
 
+Tracked as onedrive/Security **#3190318**.
+
 `krabs/size_provider.hpp` checks `PropertyParamLength` and `propertyInfo.length`, but
 never tests the `PropertyStruct` flag before reading `propertyInfo.nonStructType.InType`.
 For a struct property that union member holds a struct-member start index and count, so
@@ -92,6 +94,8 @@ This is a real bug in the shipping implementation. It is untested on both sides.
 port avoids it by refusing to size structs at all, which fails visibly instead.
 
 ### ANSI decoding ignores the out-type (open, both sides)
+
+Tracked as onedrive/Security **#3190317**.
 
 `TDH_OUTTYPE_STRING` means the ANSI code page, but `TDH_OUTTYPE_UTF8` (35) and
 `TDH_OUTTYPE_JSON` (34) mean UTF-8, and `TDH_OUTTYPE_XML` (28) defers to the document's
