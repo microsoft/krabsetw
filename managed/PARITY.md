@@ -106,7 +106,7 @@ consistent with the rest of the API rather than an outlier.
 
 `SYSTEMTIME`-shaped payloads are decoded with `DateTimeKind.Utc` assumed rather than read
 from the out-type. That assumption is port-only new behaviour — krabs' `GetValue<FILETIME>`
-rejects a 16-byte property outright — and is folded into **#3190317**.
+rejects a 16-byte property outright — and is folded into the ANSI out-type defect below.
 
 ### `TryGet*` leaves nothing behind on failure
 
@@ -252,7 +252,7 @@ been revisited.
 
 krabs does not decode structs either, and fails worse — see below. Nothing that worked
 before stops working, but the failure mode changes from silent corruption to a visible
-failure. Tracked as **#3190318**.
+failure. Tracked internally.
 
 ## Things that look like divergences and are not
 
@@ -274,7 +274,7 @@ earlier note claiming the port truncated was stale.
 
 ### krabs mis-sizes struct properties (open, C++ side, affects shipping code)
 
-Tracked as onedrive/Security **#3190318**.
+Tracked internally.
 
 `krabs/size_provider.hpp` checks `PropertyParamLength` and `propertyInfo.length`, but
 never tests the `PropertyStruct` flag before reading `propertyInfo.nonStructType.InType`.
@@ -286,14 +286,14 @@ This is a real bug in the shipping implementation. It is untested on both sides.
 port avoids it by refusing to size structs at all, which fails visibly instead.
 
 Struct properties are not rare: 1148 events across 88 of the 1503 providers registered on
-a build machine declare one, including three providers whose GUIDs appear in HostIDS
-source (SMBClient, BITS-Client, Hyper-V-Compute). That does not by itself establish
+a build machine declare one, including three providers in common use (SMBClient,
+BITS-Client, Hyper-V-Compute). That does not by itself establish
 impact — a read only breaks if it targets a property at or after the struct in the same
 event — but it does rule out "no provider does this".
 
 ### ANSI decoding ignores the out-type (open, both sides)
 
-Tracked as onedrive/Security **#3190317**.
+Tracked internally.
 
 `TDH_OUTTYPE_STRING` means the ANSI code page, but `TDH_OUTTYPE_UTF8` (35) and
 `TDH_OUTTYPE_JSON` (34) mean UTF-8, and `TDH_OUTTYPE_XML` (28) defers to the document's
