@@ -265,19 +265,51 @@ private static void OnProcessStart(in EventRecordRef record)
 Note this is also the only form that works for an instance method on a class holding your
 state, since the handler itself cannot capture the record.
 
-### Comparing spans
+### Comparing string properties without allocating
 
-`ReadOnlySpan<char>` comparison needs nothing from this library. `Equals`, `StartsWith`,
-`EndsWith` and `Contains` all take a `StringComparison`, and `IsEmpty` / `IsWhiteSpace()`
-cover the guards — all allocation-free, including `OrdinalIgnoreCase`, and all available on
-.NET Framework through the `System.Memory` package the library already brings in.
+Every comparison below allocates nothing, on .NET Framework as well as modern .NET:
 
-`TryGetUnicodeString` and `TryGetCountedString` hand you a `ReadOnlySpan<char>` directly, so
-those properties need no further help.
+```csharp
+provider.OnEventRef += (in EventRecordRef record) =>
+{
+    if (!record.TryGetUnicodeString("ImageName", out var image)) return;
+
+    // equality
+    if (image.Equals("cmd.exe".AsSpan(), StringComparison.OrdinalIgnoreCase)) { }
+
+    // prefix / suffix
+    if (image.StartsWith(@"\Device".AsSpan(), StringComparison.Ordinal)) { }
+    if (image.EndsWith(".exe".AsSpan(), StringComparison.OrdinalIgnoreCase)) { }
+
+    // substring
+    if (image.Contains("system32".AsSpan(), StringComparison.OrdinalIgnoreCase)) { }
+
+    // presence and emptiness guards
+    if (image.IsEmpty) return;
+    if (image.IsWhiteSpace()) return;
+
+    // a counted string works exactly the same way
+    if (record.TryGetCountedString("CommandLine", out var cmdline)
+        && cmdline.Contains("-enc".AsSpan(), StringComparison.OrdinalIgnoreCase))
+    {
+        // only now pay for a string, and only for the events you kept
+        Report(image.ToString(), cmdline.ToString());
+    }
+};
+```
+
+Those are ordinary `MemoryExtensions` methods, not something this library adds —
+`TryGetUnicodeString` and `TryGetCountedString` hand back a `ReadOnlySpan<char>`, and the BCL
+takes it from there. On .NET Framework they come from the `System.Memory` package the library
+already brings in.
+
+**Always pass a `StringComparison` explicitly.** The overloads that omit it are ordinal for
+spans, but being explicit is what stops the call from silently meaning something else if it is
+ever refactored into a `string` comparison, where the default is the current culture.
 
 The spans are views into the ETW buffer and are valid **only for the duration of the
-callback**, exactly like the record itself. To keep a value, call `.ToString()` on it —
-which is the allocation you were avoiding, so do it after the guards, not before.
+callback**, exactly like the record itself. To keep a value, call `.ToString()` on it — which
+is the allocation you were avoiding, so do it after the guards, not before.
 
 ### What `EventRecordRef` deliberately does not have
 
