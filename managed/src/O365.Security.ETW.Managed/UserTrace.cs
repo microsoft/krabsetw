@@ -188,11 +188,14 @@ namespace Microsoft.O365.Security.ETW
             set { _context.WppEventsEnabled = value; }
         }
 
-        /// <summary>Handles events with no matching provider. Zero-copy path.</summary>
-        public EventRecordDelegate DefaultEventSpan
+        /// <summary>
+        /// Handles events with no matching provider, allocating nothing.
+        /// </summary>
+        /// <inheritdoc cref="Provider.OnEventRef" path="/remarks"/>
+        public EventRecordDelegate DefaultEventRef
         {
-            get { return _context.DefaultEventSpan; }
-            set { _context.DefaultEventSpan = value; }
+            get { return _context.DefaultEventRef; }
+            set { _context.DefaultEventRef = value; }
         }
 
         public IEventRecordDelegate DefaultEvent

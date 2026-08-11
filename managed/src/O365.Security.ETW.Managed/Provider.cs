@@ -99,8 +99,19 @@ namespace Microsoft.O365.Security.ETW
         /// <summary>Whether the provider is asked to log its state on enable.</summary>
         public bool RundownEnabled { get; private set; }
 
-        /// <summary>Invoked for every event delivered to this provider. Zero-copy path.</summary>
-        public event EventRecordDelegate? OnEventSpan;
+        /// <summary>
+        /// Invoked for every event delivered to this provider, allocating nothing.
+        /// </summary>
+        /// <remarks>
+        /// The record is an <see cref="EventRecordRef"/>, a ref struct that views the payload
+        /// in place, so the handler must be written with an explicit parameter type
+        /// (<c>(in EventRecordRef record) =&gt; ...</c>). An implicitly typed lambda cannot
+        /// bind here, because a lambda cannot infer the <c>in</c> modifier.
+        ///
+        /// The record is only valid for the duration of the call. Anything kept past the
+        /// handler must be copied out first.
+        /// </remarks>
+        public event EventRecordDelegate? OnEventRef;
 
         /// <summary>Invoked for every event delivered to this provider.</summary>
         public event IEventRecordDelegate? OnEvent;
@@ -140,7 +151,7 @@ namespace Microsoft.O365.Security.ETW
 
         internal bool HasProviderHandlers
         {
-            get { return OnEventSpan != null || OnEvent != null || OnMetadata != null; }
+            get { return OnEventRef != null || OnEvent != null || OnMetadata != null; }
         }
 
         internal void Dispatch(in EventRecordRef record, EventRecordAdapter adapter)
@@ -150,15 +161,15 @@ namespace Microsoft.O365.Security.ETW
             // runs before OnEvent.
             OnMetadata?.Invoke(adapter);
 
-            var span = OnEventSpan;
+            var handler = OnEventRef;
             var compat = OnEvent;
 
-            if (span != null || compat != null)
+            if (handler != null || compat != null)
             {
-                // The span surface reads the record header without a schema, so it is not
+                // The ref surface reads the record header without a schema, so it is not
                 // gated on one. The compat IEventRecord surface mirrors C++/CLI, whose
                 // EventRecord wraps a krabs::schema.
-                span?.Invoke(record);
+                handler?.Invoke(record);
 
                 if (compat != null)
                 {

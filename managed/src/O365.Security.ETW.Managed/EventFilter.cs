@@ -60,8 +60,11 @@ namespace Microsoft.O365.Security.ETW
 
         internal Predicate? Predicate { get; }
 
-        /// <summary>Invoked for each event that satisfies the filter. Zero-copy path.</summary>
-        public event EventRecordDelegate? OnEventSpan;
+        /// <summary>
+        /// Invoked for each event that satisfies the filter, allocating nothing.
+        /// </summary>
+        /// <inheritdoc cref="Provider.OnEventRef" path="/remarks"/>
+        public event EventRecordDelegate? OnEventRef;
 
         /// <summary>Invoked for each event that satisfies the filter.</summary>
         public event IEventRecordDelegate? OnEvent;
@@ -71,7 +74,7 @@ namespace Microsoft.O365.Security.ETW
 
         internal bool HasHandlers
         {
-            get { return OnEventSpan != null || OnEvent != null; }
+            get { return OnEventRef != null || OnEvent != null; }
         }
 
         /// <summary>
@@ -121,7 +124,7 @@ namespace Microsoft.O365.Security.ETW
             // Native returns immediately when a filter has no event callbacks. OnError is
             // included because the native filter still reports schema failures raised by its
             // predicate when only an error handler is attached.
-            if (OnEventSpan == null && OnEvent == null && OnError == null)
+            if (OnEventRef == null && OnEvent == null && OnError == null)
             {
                 return;
             }
@@ -149,18 +152,18 @@ namespace Microsoft.O365.Security.ETW
                 }
             }
 
-            var span = OnEventSpan;
+            var handler = OnEventRef;
             var compat = OnEvent;
 
-            if (span == null && compat == null)
+            if (handler == null && compat == null)
             {
                 return;
             }
 
-            // The span surface reads the record header without a schema, so it is not gated
+            // The ref surface reads the record header without a schema, so it is not gated
             // on one. The compat IEventRecord surface mirrors C++/CLI, whose EventRecord wraps
             // a krabs::schema and therefore cannot be handed to a handler without one.
-            span?.Invoke(record);
+            handler?.Invoke(record);
 
             if (compat != null && EnsureSchema(record, adapter))
             {

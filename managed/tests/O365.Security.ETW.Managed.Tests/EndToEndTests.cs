@@ -124,7 +124,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             var signal = new ManualResetEventSlim();
 
             var filter = new EventFilter(Filter.EventNameIs("Interesting"));
-            filter.OnEventSpan += (in EventRecordRef record) =>
+            filter.OnEventRef += (in EventRecordRef record) =>
             {
                 if (record.TryGetUnicodeString("message".AsSpan(), out ReadOnlySpan<char> message)
                     && record.TryGetInt32("number".AsSpan(), out int number))
@@ -157,14 +157,14 @@ namespace Microsoft.O365.Security.ETW.Tests
             // Two filters on one provider, so event id pushdown keeps both ids but each
             // filter still has to reject the other's events.
             var interesting = new EventFilter(Filter.EventIdIs(1));
-            interesting.OnEventSpan += (in EventRecordRef record) =>
+            interesting.OnEventRef += (in EventRecordRef record) =>
             {
                 Interlocked.Increment(ref matched);
                 signal.Set();
             };
 
             var boring = new EventFilter(Filter.EventIdIs(2));
-            boring.OnEventSpan += (in EventRecordRef record) =>
+            boring.OnEventRef += (in EventRecordRef record) =>
             {
                 Interlocked.Increment(ref rejected);
             };
@@ -222,7 +222,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             var filter = new EventFilter(
                 Filter.EventNameIs("Interesting").And(UnicodeString.Is("message", "needle")));
 
-            filter.OnEventSpan += (in EventRecordRef record) =>
+            filter.OnEventRef += (in EventRecordRef record) =>
             {
                 Interlocked.Increment(ref hits);
                 signal.Set();
@@ -271,19 +271,19 @@ namespace Microsoft.O365.Security.ETW.Tests
         /// <summary>
         /// TDH cannot decode manifest-based EventSource payloads, because the manifest is
         /// published in-band rather than registered with the machine. C++/CLI reports that
-        /// through OnError and never invokes OnEvent; the span surface does not need a schema
+        /// through OnError and never invokes OnEvent; the ref surface does not need a schema
         /// for header access, so it still fires.
         /// </summary>
         [Fact]
         public void MissingSchemaRoutesCompatHandlersToOnErrorButNotSpanHandlers()
         {
-            int spanHits = 0;
+            int refHits = 0;
             int compatHits = 0;
             string error = null;
             var signal = new ManualResetEventSlim();
 
             var filter = new EventFilter(Filter.EventIdIs(1));
-            filter.OnEventSpan += (in EventRecordRef record) => Interlocked.Increment(ref spanHits);
+            filter.OnEventRef += (in EventRecordRef record) => Interlocked.Increment(ref refHits);
             filter.OnEvent += record => Interlocked.Increment(ref compatHits);
             filter.OnError += e =>
             {
@@ -299,7 +299,7 @@ namespace Microsoft.O365.Security.ETW.Tests
 
             RunTrace(provider, signal, () => TestEventSource.Log.Interesting("no schema", 1));
 
-            Assert.True(spanHits > 0, "The span handler never fired.");
+            Assert.True(refHits > 0, "The ref handler never fired.");
             Assert.Equal(0, compatHits);
             Assert.NotNull(error);
             Assert.Contains("status_code=", error);

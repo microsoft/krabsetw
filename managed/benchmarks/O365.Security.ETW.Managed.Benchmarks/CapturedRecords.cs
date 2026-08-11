@@ -61,7 +61,7 @@ namespace Microsoft.O365.Security.ETW.Benchmarks
             var signal = new ManualResetEventSlim(false);
 
             var filter = new EventFilter(Filter.EventNameIs("Interesting"));
-            filter.OnEventSpan += (in EventRecordRef record) =>
+            filter.OnEventRef += (in EventRecordRef record) =>
             {
                 if (records.Count >= count)
                 {

@@ -92,7 +92,7 @@ and 256 B on .NET 10 for both implementations. Those are the three `System.Strin
 C++/CLI double copy (payload to `std::wstring` to `String^`) costs time, not surviving
 bytes.
 
-Zero-allocation decoding needs the span API (`OnEventSpan` / `EventRecordRef`), which the
+Zero-allocation decoding needs the ref API (`OnEventRef` / `EventRecordRef`), which the
 C++/CLI wrapper has no equivalent of and which this benchmark therefore cannot compare.
 See `managed\benchmarks` for that measurement.
 

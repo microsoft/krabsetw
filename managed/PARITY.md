@@ -35,6 +35,80 @@ implementation) is the mechanical check. This file records the things that suite
 *cannot* tell you: where the two implementations deliberately differ, where they agree
 in a way that looks wrong, and known defects that are still open on one side or both.
 
+### Unit tests
+
+Tests that mock `IEventRecord` keep working. The interface is unchanged in shape, so an
+existing `Mock<IEventRecord>` and every `It.IsAny<IEventRecord>()` compile and run against
+the port as they did against the C++/CLI assembly.
+
+Tests covering a handler you move to `OnEventRef` do not. `EventRecordRef` is a `ref
+struct`, and a mocking framework cannot help with one at all:
+
+- it cannot be a generic type argument, so `Mock<EventRecordRef>` and
+  `It.IsAny<EventRecordRef>()` do not compile;
+- it cannot appear in an expression tree, so `Setup` on a member that takes or returns one
+  fails (CS8640, CS9244);
+- it cannot be boxed, stored in a field, captured in a lambda, or returned from an `async`
+  method or iterator.
+
+Build a real record instead. `Testing.RecordBuilder` lays a payload out and `Testing.Proxy`
+pushes it through the same dispatch path a live trace uses, so the handler sees exactly what
+it would in production:
+
+```csharp
+using (var builder = new RecordBuilder(providerId, id: 7937, version: 1))
+{
+    builder.AddUnicodeString("UserData", "user");
+    builder.AddUnicodeString("ContextInfo", "context");
+    builder.AddUnicodeString("Payload", @"C:\Windows\System32\cmd.exe");
+
+    var filter = new EventFilter(Filter.AnyEvent());
+    filter.OnEventRef += (in EventRecordRef record) =>
+    {
+        Assert.True(record.TryGetUnicodeString("Payload", out ReadOnlySpan<char> payload));
+        Assert.True(payload.EndsWith("cmd.exe".AsSpan(), StringComparison.Ordinal));
+    };
+
+    using (var proxy = new Proxy(filter))
+    using (var record = builder.Pack())
+    {
+        proxy.PushEvent(record);
+    }
+}
+```
+
+`Proxy` also takes a `UserTrace` or a `KernelTrace` if the code under test wires providers
+onto a trace rather than a bare filter.
+
+Three things about `RecordBuilder` that are easy to get wrong:
+
+- **It needs a real, registered TDH schema.** `Pack()` resolves the layout from the
+  provider's manifest on the machine running the test, so an invented provider GUID fails
+  with `CouldNotFindSchema` (status 1168). Use an in-box provider whose schema you can rely
+  on being present.
+- **Use `PackIncomplete()` when the schema varies by Windows build.** `Pack()` requires every
+  property in the schema to be supplied; events that gained properties in later releases will
+  otherwise fail with "Not all the properties of the event were filled" on some machines.
+- **There is no adder for binary or counted-string properties.** `AddValue<T>` covers the
+  integral types. A counted string is a length-prefixed value in a `UNICODESTRING` property
+  (`"\u0008abcd"` reads back as `"abcd"`), and `TryGetBinary` works against any property.
+
+Assertions inside a ref handler have one constraint worth knowing: the record cannot be
+captured, so `Assert.Throws(() => record.GetUnicodeString("Missing"))` does not compile.
+Use an inline `try`/`catch` instead.
+
+To pin that a handler really does not allocate, measure inside the callback. This works on
+.NET Framework as well as modern .NET, but warm the schema and property caches with an
+unmeasured pass first, and avoid accidentally boxing the value you keep alive:
+
+```csharp
+long before = GC.GetAllocatedBytesForCurrentThread();
+// ... exercise the accessors ...
+Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+```
+
+`managed/tests/O365.Security.ETW.Managed.Tests/RefAccessorTests.cs` is a worked example of
+all of the above.
 ## Why the parity suite is not sufficient on its own
 
 The parity tests are written against behaviour krabs already has, so they only exercise
@@ -164,7 +238,14 @@ Annotations are metadata only; they cannot break a compile that was not already 
 nullable analysis, and `tools/ApiDiff` deliberately ignores the `Nullable*` attributes for
 that reason.
 
-### Allocation-free accessors on `IEventRecord`
+### The allocation-free surface is `EventRecordRef` only
+
+There are two ways to receive an event, and the split is deliberate.
+
+| | Callback | Record type | Allocates |
+| --- | --- | --- | --- |
+| Compat | `OnEvent` / `DefaultEvent` | `IEventRecord` | yes |
+| Allocation-free | `OnEventRef` / `DefaultEventRef` | `EventRecordRef` | no |
 
 `IEventRecord` is the compat surface, and every one of its getters allocates: the payload
 lives in the ETW buffer, and returning a `string` or a `byte[]` means copying out of it.
@@ -172,52 +253,39 @@ The adapter itself is reused for the life of the trace, so the allocation is ent
 the return types.
 
 `EventRecordRef` has no such problem — it hands back `ReadOnlySpan<T>` views straight into
-the buffer — but it is a `ref struct`, so it can never implement an interface, and a
-consumer cannot reach it without rewriting its callback signature. Six span-returning
-members were therefore added to `IEventRecord` so an existing consumer can migrate one call
-site at a time:
+the buffer. It is a `ref struct`, so it can never implement an interface; reaching it means
+subscribing `OnEventRef` instead of `OnEvent`. The returned spans are views into the ETW
+buffer and are valid only for the duration of the callback, exactly like the record itself.
+
+**Handlers must declare their parameter explicitly.** `EventRecordDelegate` takes
+`in EventRecordRef`, and a lambda cannot infer a parameter modifier, so an implicitly typed
+lambda will not bind:
 
 ```csharp
-ReadOnlySpan<char> GetUnicodeString(ReadOnlySpan<char> name);
-bool TryGetUnicodeString(ReadOnlySpan<char> name, out ReadOnlySpan<char> value);
-ReadOnlySpan<char> GetCountedString(ReadOnlySpan<char> name);
-bool TryGetCountedString(ReadOnlySpan<char> name, out ReadOnlySpan<char> value);
-bool TryGetAnsiStringBytes(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value);
-bool TryGetBinary(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value);
+provider.OnEventRef += (in EventRecordRef record) => { ... };   // required
+provider.OnEventRef += record => { ... };                       // does not compile
 ```
 
-The signatures are character-identical to the `EventRecordRef` members they delegate to, so
-a call site that later moves onto the ref struct does not change.
+**Why span accessors are not offered on `IEventRecord`.** An earlier revision added six
+span-returning members to `IEventRecord` so a consumer could migrate one call site at a time.
+They were removed before release. Overloading on the *name* parameter meant
+`ReadOnlySpan<char> v = record.GetUnicodeString("Path")` bound to the `string` overload — a
+`string` argument wins by identity conversion over the implicit span conversion — allocated,
+and then converted implicitly to the span. It compiled with no warning and no diagnostic, so
+the spelling that looks allocation-free was not. Overloading on the *out* parameter instead
+was also measured and rejected: it makes every existing `TryGetUnicodeString(name, out var v)`
+call site ambiguous (CS0121).
 
-The returned spans are views into the ETW buffer. They are valid only for the duration of
-the callback, exactly like the record itself.
+Keeping the two surfaces disjoint removes the question. If a handler needs to avoid
+allocating, it moves to `OnEventRef`; there is no half-migrated state in which a call site
+looks allocation-free but is not.
 
-**Why overloads rather than new names.** These overload on the *name* parameter, keeping the
-method name, following `Path.GetFileName`, `Encoding.GetString`, `int.Parse` and
-`Stream.Read`: in the BCL the return type follows the argument type, and the `Span` suffix
-is reserved for properties (`Memory<T>.Span`, `Utf8JsonReader.ValueSpan`). Overloading on
-the *out* parameter instead was measured and rejected — it makes every existing
-`TryGetUnicodeString(name, out var v)` call site ambiguous (CS0121). Overloading on the name
-is safe: a `string` argument binds to the allocating overload by identity conversion, which
-beats the implicit span conversion, so existing source is unaffected.
-
-**`Bytes` rather than characters for ANSI.** Transcoding from the provider's ANSI code page
-to UTF-16 is what forces the allocation, so there is no allocation-free span of `char` to
-return. The suffix follows `AsnDecoder.TryReadPrimitiveCharacterStringBytes`, which draws the
-same raw-versus-decoded distinction.
-
-**What was left out.** The index-based members (`PropertyCount`, `IndexOf`, `TryGetRaw`) and
-span forms of the four name properties (`Name`, `ProviderName`, `TaskName`, `OpcodeName`)
-stay off the interface. Nothing was found that would use them, and a consumer that wants
-them can move the callback to `EventRecordRef`. There is no span form of the IP-address
-accessors because `IPAddress` is a class.
-
-**Effect on implementors.** Adding members to a public interface is source-breaking for
-anyone who implements it. Adding them to `EventRecordAdapter`, which is internal, is not.
-A `ref struct` cannot appear in an expression tree, so a mocking framework can still create
-a proxy and invoke these members, but cannot `Setup` them (CS8640, CS9244) — build the
-record with `Testing.RecordBuilder` and push it through `Testing.Proxy` instead.
-
+**What `EventRecordRef` does not have.** There is no span form of the IP-address or socket
+-address accessors, because `IPAddress` and `SocketAddress` are classes; no `GetAnsiString`,
+because transcoding from the provider's ANSI code page is what forces the allocation
+(`TryGetAnsiStringBytes` returns the raw bytes instead, a suffix following
+`AsnDecoder.TryReadPrimitiveCharacterStringBytes`); and no `Properties` enumeration. A
+handler that needs those stays on `IEventRecord`.
 ### Public surface that was removed
 
 `managed/tools/ApiDiff` compares the public surface of two assemblies by reading metadata

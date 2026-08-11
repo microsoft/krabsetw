@@ -37,7 +37,7 @@ namespace Microsoft.O365.Security.ETW
         /// <summary>Whether WPP events are routed to providers by schema provider GUID.</summary>
         public bool WppEventsEnabled;
 
-        public EventRecordDelegate DefaultEventSpan = null!;
+        public EventRecordDelegate DefaultEventRef = null!;
         public IEventRecordDelegate DefaultEvent = null!;
         public IEventRecordMetadataDelegate DefaultMetadata = null!;
         public EventRecordErrorDelegate DefaultError = null!;
@@ -166,17 +166,17 @@ namespace Microsoft.O365.Security.ETW
             // CallbackBridge, so metadata fires unconditionally and first.
             DefaultMetadata?.Invoke(_adapter);
 
-            var span = DefaultEventSpan;
+            var handler = DefaultEventRef;
             var compat = DefaultEvent;
 
-            if (span == null && compat == null)
+            if (handler == null && compat == null)
             {
                 return;
             }
 
-            // The span surface reads the record header without a schema, so it is not gated
+            // The ref surface reads the record header without a schema, so it is not gated
             // on one. The compat IEventRecord surface mirrors C++/CLI.
-            span?.Invoke(view);
+            handler?.Invoke(view);
 
             if (compat == null)
             {
@@ -187,8 +187,8 @@ namespace Microsoft.O365.Security.ETW
 
             if (schema.Status != NativeConstants.ERROR_SUCCESS)
             {
-                var handler = DefaultError;
-                handler?.Invoke(new EventRecordError(
+                var errorHandler = DefaultError;
+                errorHandler?.Invoke(new EventRecordError(
                     ErrorMessages.StatusAndRecordContext(schema.Status, view.ProviderId, view.Id),
                     _adapter));
                 return;
