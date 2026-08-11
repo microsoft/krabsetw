@@ -47,3 +47,6 @@ githooks/*.dll
 *~
 *.swp
 *.swo
+
+# Internal public-surface differ. Kept out of tree; MIGRATION.md carries the reviewed list.
+managed/tools/ApiDiff/
