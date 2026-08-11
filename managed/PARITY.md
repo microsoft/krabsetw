@@ -4,111 +4,14 @@
 `Microsoft.O365.Security.Native.ETW`, which is itself a thin layer over the native
 `krabs` headers. The two are meant to be drop-in interchangeable for consumers.
 
-## Migrating from `Microsoft.O365.Security.Native.ETW`
-
-The port ships as a **different package**, `Microsoft.O365.Security.ETW`, starting at
-**5.0.0**. The C++/CLI package continues on the 4.4.x line, so the two can be installed
-side by side while consumers migrate. The old id kept "Native" in the name, which no
-longer describes anything about this implementation.
-
-| | `Microsoft.O365.Security.Native.ETW` | `Microsoft.O365.Security.ETW` |
-| --- | --- | --- |
-| Package version | 4.4.x | 5.0.0 |
-| Assembly | `Microsoft.O365.Security.Native.ETW.dll` | `Microsoft.O365.Security.ETW.dll` |
-| Namespace | `Microsoft.O365.Security.ETW` | *unchanged* |
-| Target frameworks | net462, net8.0 | net462, net48, net8.0-windows, net10.0-windows |
-| Architecture | x64 and ARM64 mixed-mode, under `runtimes/` | one AnyCPU assembly under `lib/` |
-
-Because the namespace is unchanged, most source compiles untouched — swapping the
-`PackageReference` is usually the whole migration. The assembly name *does* change, so
-this is not binary-compatible: anything already compiled against the old assembly must be
-recompiled, and `Assembly.Load` calls or binding redirects naming
-`Microsoft.O365.Security.Native.ETW` need updating.
-
-The public surface is deliberately not identical. Every difference is enumerated in
-`tools/ApiDiff/ApprovedDifferences.txt` and gated in CI; the ones that can break a
-compile are described under Deliberate divergences below, of which
-`IEventRecord.GetDateTime` is the one most likely to affect you.
+**Consumers should read `MIGRATION.md` instead.** It lists every public-surface difference
+and what to do about it. This file is the engineering record behind those decisions: where
+the two implementations deliberately differ and why, where they agree in a way that looks
+wrong, and defects still open on one side or both.
 
 The parity suite (`tests/ManagedETWTests`, compiled twice — once against each
-implementation) is the mechanical check. This file records the things that suite
-*cannot* tell you: where the two implementations deliberately differ, where they agree
-in a way that looks wrong, and known defects that are still open on one side or both.
+implementation) is the mechanical check for everything else.
 
-### Unit tests
-
-Tests that mock `IEventRecord` keep working. The interface is unchanged in shape, so an
-existing `Mock<IEventRecord>` and every `It.IsAny<IEventRecord>()` compile and run against
-the port as they did against the C++/CLI assembly.
-
-Tests covering a handler you move to `OnEventRef` do not. `EventRecordRef` is a `ref
-struct`, and a mocking framework cannot help with one at all:
-
-- it cannot be a generic type argument, so `Mock<EventRecordRef>` and
-  `It.IsAny<EventRecordRef>()` do not compile;
-- it cannot appear in an expression tree, so `Setup` on a member that takes or returns one
-  fails (CS8640, CS9244);
-- it cannot be boxed, stored in a field, captured in a lambda, or returned from an `async`
-  method or iterator.
-
-Build a real record instead. `Testing.RecordBuilder` lays a payload out and `Testing.Proxy`
-pushes it through the same dispatch path a live trace uses, so the handler sees exactly what
-it would in production:
-
-```csharp
-using (var builder = new RecordBuilder(providerId, id: 7937, version: 1))
-{
-    builder.AddUnicodeString("UserData", "user");
-    builder.AddUnicodeString("ContextInfo", "context");
-    builder.AddUnicodeString("Payload", @"C:\Windows\System32\cmd.exe");
-
-    var filter = new EventFilter(Filter.AnyEvent());
-    filter.OnEventRef += (in EventRecordRef record) =>
-    {
-        Assert.True(record.TryGetUnicodeString("Payload", out ReadOnlySpan<char> payload));
-        Assert.True(payload.EndsWith("cmd.exe".AsSpan(), StringComparison.Ordinal));
-    };
-
-    using (var proxy = new Proxy(filter))
-    using (var record = builder.Pack())
-    {
-        proxy.PushEvent(record);
-    }
-}
-```
-
-`Proxy` also takes a `UserTrace` or a `KernelTrace` if the code under test wires providers
-onto a trace rather than a bare filter.
-
-Three things about `RecordBuilder` that are easy to get wrong:
-
-- **It needs a real, registered TDH schema.** `Pack()` resolves the layout from the
-  provider's manifest on the machine running the test, so an invented provider GUID fails
-  with `CouldNotFindSchema` (status 1168). Use an in-box provider whose schema you can rely
-  on being present.
-- **Use `PackIncomplete()` when the schema varies by Windows build.** `Pack()` requires every
-  property in the schema to be supplied; events that gained properties in later releases will
-  otherwise fail with "Not all the properties of the event were filled" on some machines.
-- **There is no adder for binary or counted-string properties.** `AddValue<T>` covers the
-  integral types. A counted string is a length-prefixed value in a `UNICODESTRING` property
-  (`"\u0008abcd"` reads back as `"abcd"`), and `TryGetBinary` works against any property.
-
-Assertions inside a ref handler have one constraint worth knowing: the record cannot be
-captured, so `Assert.Throws(() => record.GetUnicodeString("Missing"))` does not compile.
-Use an inline `try`/`catch` instead.
-
-To pin that a handler really does not allocate, measure inside the callback. This works on
-.NET Framework as well as modern .NET, but warm the schema and property caches with an
-unmeasured pass first, and avoid accidentally boxing the value you keep alive:
-
-```csharp
-long before = GC.GetAllocatedBytesForCurrentThread();
-// ... exercise the accessors ...
-Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
-```
-
-`managed/tests/O365.Security.ETW.Managed.Tests/RefAccessorTests.cs` is a worked example of
-all of the above.
 ## Why the parity suite is not sufficient on its own
 
 The parity tests are written against behaviour krabs already has, so they only exercise
@@ -235,8 +138,8 @@ attributes by full name rather than by identity, so an `internal` declaration is
 external consumers compiling against net462/net48.
 
 Annotations are metadata only; they cannot break a compile that was not already opted into
-nullable analysis, and `tools/ApiDiff` deliberately ignores the `Nullable*` attributes for
-that reason.
+nullable analysis. The public-surface differ ignores the `Nullable*` attributes for that
+reason.
 
 ### The allocation-free surface is `EventRecordRef` only
 
@@ -286,13 +189,11 @@ because transcoding from the provider's ANSI code page is what forces the alloca
 (`TryGetAnsiStringBytes` returns the raw bytes instead, a suffix following
 `AsnDecoder.TryReadPrimitiveCharacterStringBytes`); and no `Properties` enumeration. A
 handler that needs those stays on `IEventRecord`.
+
 ### Public surface that was removed
 
-`managed/tools/ApiDiff` compares the public surface of two assemblies by reading metadata
-directly — one side is a mixed-mode C++/CLI binary that cannot be loaded for reflection on
-.NET. Run it against the C++/CLI net462 output and the port's to reproduce this list.
-
-Deliberately not restored, because nothing in the known consumer set uses them:
+`MIGRATION.md` lists what was removed and what replaces it. The rationale, in each case,
+is that nothing in the known consumer set used it:
 
 | Removed | Reason |
 | --- | --- |
@@ -308,8 +209,10 @@ Deliberately not restored, because nothing in the known consumer set uses them:
 `EventRecordErrorDelegate` is declared in terms of it and the interface is mocked by
 consumers.
 
-Note the differ does not currently compare custom attributes, so `[Obsolete]` differences
-are invisible to it.
+The public surface is differenced by reading metadata directly rather than by reflection,
+because one side is a mixed-mode C++/CLI binary that cannot be loaded on .NET. That differ
+is kept out of tree; it does not compare custom attributes, so `[Obsolete]` differences are
+invisible to it.
 
 ### Structs are not decoded
 

@@ -356,7 +356,7 @@ namespace Microsoft.O365.Security.ETW
         /// The C++/CLI implementation declared this as <c>DateTime^</c> — a boxed value type,
         /// which surfaces to C# as <see cref="ValueType"/>. Returning <see cref="DateTime"/>
         /// removes the boxing allocation, but is a breaking change for implementors of
-        /// <see cref="IEventRecord"/>. See PARITY.md.
+        /// <see cref="IEventRecord"/>. See MIGRATION.md.
         /// </remarks>
         public DateTime GetDateTime(string name)
         {

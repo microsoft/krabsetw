@@ -34,7 +34,7 @@
           assembly serves x64 and ARM64.
         - Targets net462, net48, net8.0-windows and net10.0-windows.
         - The namespace (Microsoft.O365.Security.ETW) is unchanged, but the public surface is
-          not identical. See managed/PARITY.md for every reviewed difference; the notable
+          not identical. See managed/MIGRATION.md for every difference; the notable
           source break is IEventRecord.GetDateTime, which now returns DateTime rather than a
           boxed DateTime.
     </PackageReleaseNotes>

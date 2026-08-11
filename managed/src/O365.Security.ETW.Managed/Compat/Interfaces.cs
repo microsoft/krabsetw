@@ -146,7 +146,7 @@ namespace Microsoft.O365.Security.ETW
         /// <remarks>
         /// The C++/CLI implementation used <c>DateTime^</c>, a boxed value type, which C# sees
         /// as <see cref="ValueType"/>. Returning <see cref="DateTime"/> drops that boxing
-        /// allocation and is an intentional breaking change. See PARITY.md.
+        /// allocation and is an intentional breaking change. See MIGRATION.md.
         /// </remarks>
         DateTime GetDateTime(string name);
 
