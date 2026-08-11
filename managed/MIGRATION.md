@@ -262,8 +262,10 @@ private static void OnProcessStart(in EventRecordRef record)
 }
 ```
 
-Note this is also the only form that works for an instance method on a class holding your
-state, since the handler itself cannot capture the record.
+Note the restriction is only on the *record*, not on your state. A handler can capture `this`,
+fields and locals as usual, and can pass the record on to another method that takes
+`in EventRecordRef`. What it cannot do is let the record outlive the callback — storing it in
+a field, capturing it in a nested lambda, or using it after an `await` will not compile.
 
 ### Comparing string properties without allocating
 
