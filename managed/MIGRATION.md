@@ -32,10 +32,7 @@ handlers without a live trace.
 
 ## Breaking changes
 
-**There are nine of them.** A metadata diff of the two assemblies reports 286 entries, which
-overstates the problem by a wide margin: 148 of those are *additions*, 77 are individual
-members of the two classes that were removed, and the rest are compiler-generated or
-non-public. What is actually left for you to fix is this:
+**There are nine.**
 
 | # | Breaking change | Affects |
 | --- | --- | --- |
@@ -55,8 +52,6 @@ Most consumers hit none of them. The realistic worst case is #1, and only if you
 Separately, there are five **behaviour** changes that compile silently — `TryGet*` on
 failure, case folding, `KernelProvider.GroupMask`, `TraceStats` and struct-typed properties.
 Those are the ones worth reading carefully, and they are listed after the nine.
-
-Each is detailed below, with the rest of the surface diff accounted for at the end.
 
 ### Compile breaks
 
@@ -196,26 +191,6 @@ You do not have to do anything about these, but they are why some call sites can
   `WPPEventProcessingEnabled`, `KernelTrace.Name`, `KernelProvider.Flags`/`GroupMask`.
 - `TraceException` with a `Status`, replacing bare failures.
 
-### Accounting for the rest of the surface diff
-
-For completeness, here is where all 286 metadata entries go. None of the remaining ones can
-affect consuming code:
-
-| Count | Entries | Why they don't matter |
-| --- | --- | --- |
-| 148 | Additions | New surface cannot break existing code. |
-| 77 | Members of `EventRecord` / `EventRecordMetadata` | The two classes are gone (#3); the differ lists their members individually. |
-| 9 | Finalizers and protected `Dispose(bool)` | C++/CLI generated `~Type()` and a protected `Dispose(bool)` for every disposable type. The port's disposable types are sealed and hold no unmanaged resource, so neither exists. Both are non-public; the `Dispose()` you call is unchanged. |
-| 4 | `BeginInvoke` / `EndInvoke` / `Invoke` on delegates, enum `value__`, implicit constructors | Artefacts of how each compiler emits types. |
-| 48 | The nine breaking changes above, plus type re-declarations | See below. |
-
-One nuance worth stating, because the raw diff misleads: a line like
-`- type class UserTrace : IUserTrace, IDisposable` paired with
-`+ type class UserTrace : ITrace, IUserTrace, IDisposable` is a **re-declaration**, not a
-removal — `UserTrace` gained `ITrace` and never lost `IDisposable`. The same shape appears for
-`KernelTrace` (gained `ITrace`), `Testing.Proxy` (gained `IDisposable`) and
-`EventHeaderProperty` / `TraceFlags` (gained `[Flags]`).
-
 ---
 
 ## Converting a handler to zero-allocation comparison
@@ -272,7 +247,23 @@ provider.OnEventRef += (in EventRecordRef record) => { ... };   // required
 provider.OnEventRef += record => { ... };                       // does not compile
 ```
 
-A method group works too, and is usually tidier for a real handler.
+A method group works too, and is usually tidier for a real handler — the `in` modifier lives
+on the method declaration, so there is nothing to get wrong at the subscription site:
+
+```csharp
+provider.OnEventRef += OnProcessStart;
+
+private static void OnProcessStart(in EventRecordRef record)
+{
+    if (!record.TryGetUnicodeString("ImageName", out var image)) return;
+    if (!image.EndsWith("\\cmd.exe".AsSpan(), StringComparison.OrdinalIgnoreCase)) return;
+
+    Report(record.ProcessId, image.ToString());
+}
+```
+
+Note this is also the only form that works for an instance method on a class holding your
+state, since the handler itself cannot capture the record.
 
 ### Comparing spans
 
