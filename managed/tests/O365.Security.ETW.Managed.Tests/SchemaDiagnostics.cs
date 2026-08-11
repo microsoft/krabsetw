@@ -28,7 +28,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             var signal = new ManualResetEventSlim();
 
             var filter = new EventFilter(Filter.EventNameIs("Interesting"));
-            filter.OnEventSpan += (in EventRecordRef record) =>
+            filter.OnEventRef += (in EventRecordRef record) =>
             {
                 if (signal.IsSet)
                 {

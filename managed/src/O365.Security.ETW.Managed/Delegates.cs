@@ -2,7 +2,14 @@ using System;
 
 namespace Microsoft.O365.Security.ETW
 {
-    /// <summary>Receives an event on the zero-copy path.</summary>
+    /// <summary>
+    /// Receives an event as a view into the payload, allocating nothing.
+    /// </summary>
+    /// <remarks>
+    /// A handler must declare its parameter explicitly
+    /// (<c>(in EventRecordRef record) =&gt; ...</c>). An implicitly typed lambda cannot be
+    /// converted to this delegate, because a lambda cannot infer the <c>in</c> modifier.
+    /// </remarks>
     public delegate void EventRecordDelegate(in EventRecordRef record);
 
     /// <summary>Receives an event through the compatibility interface.</summary>

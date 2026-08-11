@@ -54,14 +54,14 @@ namespace Microsoft.O365.Security.ETW.Tests
             var signal = new ManualResetEventSlim();
 
             var first = new EventFilter(1);
-            first.OnEventSpan += (in EventRecordRef record) =>
+            first.OnEventRef += (in EventRecordRef record) =>
             {
                 Assert.Equal(1, record.Id);
                 Interlocked.Increment(ref ones);
             };
 
             var second = new EventFilter(2);
-            second.OnEventSpan += (in EventRecordRef record) =>
+            second.OnEventRef += (in EventRecordRef record) =>
             {
                 Assert.Equal(2, record.Id);
                 if (Interlocked.Increment(ref twos) > 0)
@@ -89,7 +89,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             int hits = 0;
             var signal = new ManualResetEventSlim();
 
-            filter.OnEventSpan += (in EventRecordRef record) =>
+            filter.OnEventRef += (in EventRecordRef record) =>
             {
                 Interlocked.Increment(ref hits);
                 signal.Set();

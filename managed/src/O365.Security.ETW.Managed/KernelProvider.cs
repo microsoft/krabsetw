@@ -53,9 +53,10 @@ namespace Microsoft.O365.Security.ETW
         public event IEventRecordDelegate? OnEvent;
 
         /// <summary>
-        /// Zero-allocation counterpart to <see cref="OnEvent"/>. Not gated on a schema.
+        /// Allocation-free counterpart to <see cref="OnEvent"/>. Not gated on a schema.
         /// </summary>
-        public event EventRecordDelegate? OnEventSpan;
+        /// <inheritdoc cref="Provider.OnEventRef" path="/remarks"/>
+        public event EventRecordDelegate? OnEventRef;
 
         /// <summary>Fired when an event arrives but cannot be handled.</summary>
         public event EventRecordErrorDelegate? OnError;
@@ -74,12 +75,12 @@ namespace Microsoft.O365.Security.ETW
             // base_provider::on_event uses for both provider kinds.
             OnMetadata?.Invoke(adapter);
 
-            var span = OnEventSpan;
+            var handler = OnEventRef;
             var compat = OnEvent;
 
-            if (span != null || compat != null)
+            if (handler != null || compat != null)
             {
-                span?.Invoke(record);
+                handler?.Invoke(record);
 
                 if (compat != null)
                 {

@@ -85,11 +85,12 @@ namespace Microsoft.O365.Security.ETW
             set { _context.DefaultEvent = value; }
         }
 
-        /// <summary>Zero-allocation counterpart to <see cref="DefaultEvent"/>.</summary>
-        public EventRecordDelegate DefaultEventSpan
+        /// <summary>Allocation-free counterpart to <see cref="DefaultEvent"/>.</summary>
+        /// <inheritdoc cref="Provider.OnEventRef" path="/remarks"/>
+        public EventRecordDelegate DefaultEventRef
         {
-            get { return _context.DefaultEventSpan; }
-            set { _context.DefaultEventSpan = value; }
+            get { return _context.DefaultEventRef; }
+            set { _context.DefaultEventRef = value; }
         }
 
         /// <summary>Fired when <see cref="DefaultEvent"/> could not be raised.</summary>

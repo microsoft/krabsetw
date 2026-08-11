@@ -119,60 +119,17 @@ namespace Microsoft.O365.Security.ETW
 
         bool TryGetUnicodeString(string name, [MaybeNullWhen(false)] out string result);
 
-        /// <summary>
-        /// Returns a UTF-16 string property as a view into the payload. No allocation, no copy.
-        /// </summary>
-        /// <remarks>
-        /// Overloaded on the name parameter rather than given a distinct name, following
-        /// <c>Path.GetFileName(ReadOnlySpan&lt;char&gt;)</c> and
-        /// <c>int.Parse(ReadOnlySpan&lt;char&gt;, IFormatProvider)</c>: the return type
-        /// follows the argument type. A call passing a <see cref="string"/> literal still
-        /// binds to the allocating overload above, so existing source is unaffected.
-        ///
-        /// The signature is identical to <see cref="EventRecordRef.GetUnicodeString"/>, so a
-        /// caller that later moves off this interface onto the ref struct does not have to
-        /// touch the call site.
-        /// </remarks>
-        /// <exception cref="ParserException">The property is absent or is not a string.</exception>
-        ReadOnlySpan<char> GetUnicodeString(ReadOnlySpan<char> name);
-
-        /// <inheritdoc cref="GetUnicodeString(ReadOnlySpan{char})"/>
-        bool TryGetUnicodeString(ReadOnlySpan<char> name, out ReadOnlySpan<char> value);
-
         string GetAnsiString(string name);
 
         string GetAnsiString(string name, string defaultValue);
 
         bool TryGetAnsiString(string name, [MaybeNullWhen(false)] out string result);
 
-        /// <summary>
-        /// Returns an ANSI string property as raw bytes, without transcoding.
-        /// </summary>
-        /// <remarks>
-        /// Bytes rather than characters because transcoding from the provider's ANSI code page
-        /// to UTF-16 is what forces the allocation; there is no allocation-free
-        /// <see cref="ReadOnlySpan{T}"/> of <see cref="char"/> to hand back. Callers that only
-        /// need to compare should compare bytes. The <c>Bytes</c> suffix follows
-        /// <c>AsnDecoder.TryReadPrimitiveCharacterStringBytes</c>, which draws the same
-        /// raw-versus-decoded distinction.
-        /// </remarks>
-        bool TryGetAnsiStringBytes(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value);
-
         string GetCountedString(string name);
 
         string GetCountedString(string name, string defaultValue);
 
         bool TryGetCountedString(string name, [MaybeNullWhen(false)] out string result);
-
-        /// <summary>
-        /// Returns a counted UTF-16 string property as a view into the payload, past the
-        /// two-byte length prefix. No allocation, no copy.
-        /// </summary>
-        /// <exception cref="ParserException">The property is absent or is too short to carry a count.</exception>
-        ReadOnlySpan<char> GetCountedString(ReadOnlySpan<char> name);
-
-        /// <inheritdoc cref="GetCountedString(ReadOnlySpan{char})"/>
-        bool TryGetCountedString(ReadOnlySpan<char> name, out ReadOnlySpan<char> value);
 
         IPAddress GetIPAddress(string name);
 
@@ -250,12 +207,6 @@ namespace Microsoft.O365.Security.ETW
         byte[] GetBinary(string name);
 
         bool TryGetBinary(string name, [MaybeNullWhen(false)] out byte[] result);
-
-        /// <summary>
-        /// Returns a binary property as a view into the payload. No allocation, no copy.
-        /// </summary>
-        /// <inheritdoc cref="GetUnicodeString(ReadOnlySpan{char})" path="/remarks"/>
-        bool TryGetBinary(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value);
 
         /// <summary>
         /// Returns the call stack captured with the event, or an empty list when the session
