@@ -32,12 +32,35 @@ handlers without a live trace.
 
 ## Breaking changes
 
-Every difference between the C++/CLI public surface and the port is listed here. They are
-grouped by what you have to do about them.
+**There are nine of them.** A metadata diff of the two assemblies reports 286 entries, which
+overstates the problem by a wide margin: 148 of those are *additions*, 77 are individual
+members of the two classes that were removed, and the rest are compiler-generated or
+non-public. What is actually left for you to fix is this:
+
+| # | Breaking change | Affects |
+| --- | --- | --- |
+| 1 | `GetDateTime` returns `DateTime`, not a boxed one | implementors of `IEventRecord` |
+| 2 | `IDisposable` removed from `Predicate`, `Property`, `KernelProvider`, `RawProvider` | anyone `using`/disposing them |
+| 3 | `EventRecord` and `EventRecordMetadata` classes removed | anyone naming the concrete types |
+| 4 | `PropertyEnumerable` and `PropertyEnumerator` removed | anyone naming the iterator types |
+| 5 | `Property.Type` removed; `Property.OutType` is `uint`, not `int` | readers of `Property` |
+| 6 | `EventTraceProperties` fields are now properties | `ref`/`out` use only |
+| 7 | `EventHeaderProperty.LEGACY_EVENTLOG` / `FORWARDED_XML` renamed | users of those two members |
+| 8 | `IUserTrace.Enable(RawProvider)` removed from the interface | callers via the interface |
+| 9 | `Testing.EventHeader` is now `Testing.EventHeaderView` | test code using `RecordBuilder.Header` |
+
+Most consumers hit none of them. The realistic worst case is #1, and only if you implement
+`IEventRecord` yourself.
+
+Separately, there are five **behaviour** changes that compile silently — `TryGet*` on
+failure, case folding, `KernelProvider.GroupMask`, `TraceStats` and struct-typed properties.
+Those are the ones worth reading carefully, and they are listed after the nine.
+
+Each is detailed below, with the rest of the surface diff accounted for at the end.
 
 ### Compile breaks
 
-**`GetDateTime` returns `DateTime` instead of a boxed one.** C++/CLI declared it `DateTime^`,
+**1. `GetDateTime` returns `DateTime` instead of a boxed one.** C++/CLI declared it `DateTime^`,
 which surfaces to C# as `System.ValueType`. The port returns `DateTime`, dropping the boxing
 allocation.
 
@@ -58,16 +81,16 @@ The one capability genuinely lost is that `null` was a *distinguishable* "no val
 where `default(DateTime)` is a legal date. `GetUInt32` has always been in that position — `0`
 was never distinguishable either — so this makes `DateTime` consistent rather than an outlier.
 
-**`IDisposable` is gone from four types.** `Predicate`, `Property`, `KernelProvider` and
+**2. `IDisposable` is gone from four types.** `Predicate`, `Property`, `KernelProvider` and
 `RawProvider` held a `NativePtr<T>` in C++/CLI, so disposal freed C-runtime heap. The port's
 equivalents are plain managed objects with nothing to release, and an empty `Dispose` would
 imply an ownership that does not exist. Remove the `using` blocks and `Dispose` calls; a
 `using` statement on any of these no longer compiles.
 
 `UserTrace`, `KernelTrace`, `EventFilter`, `Testing.RecordBuilder` and `Testing.SynthRecord`
-remain disposable. `Testing.Proxy` gained `IDisposable`.
+are unaffected and remain disposable. `Testing.Proxy` *gained* `IDisposable`.
 
-**`Property` type members changed.**
+**5. `Property` type members changed.**
 
 | Removed | Replaced by |
 | --- | --- |
@@ -77,12 +100,12 @@ remain disposable. `Testing.Proxy` gained `IDisposable`.
 | | `Property.InType : uint` *(new)* |
 | | `Property.Length : uint` *(new)* |
 
-**`EventTraceProperties` fields became properties.** `BufferSize`, `FlushTimer`,
+**6. `EventTraceProperties` fields became properties.** `BufferSize`, `FlushTimer`,
 `LogFileMode`, `MaximumBuffers` and `MinimumBuffers` were public fields and are now
 get/set properties. Object-initializer syntax is unaffected — only passing one by `ref` or
 `out` breaks.
 
-**`EventHeaderProperty` members were renamed** to match .NET naming, and the enum is now
+**7. `EventHeaderProperty` members were renamed** to match .NET naming, and the enum is now
 `[Flags]`.
 
 | Removed | Replaced by |
@@ -92,19 +115,21 @@ get/set properties. Object-initializer syntax is unaffected — only passing one
 
 `None` and `Relogged` are new. `TraceFlags` likewise gained `None` and is now `[Flags]`.
 
-**`IUserTrace.Enable(RawProvider)` was removed** from the interface. `RawProvider` is
+**8. `IUserTrace.Enable(RawProvider)` was removed** from the interface. `RawProvider` is
 `[Obsolete]` in both implementations and the replacement is `Provider.OnMetadata`. The
 concrete `UserTrace.Enable(RawProvider)` is still there, still obsolete.
 
-**`Testing.EventHeader` is now `Testing.EventHeaderView`**, and `RecordBuilder.Header`
+**9. `Testing.EventHeader` is now `Testing.EventHeaderView`**, and `RecordBuilder.Header`
 returns the new type.
 
 ### Types that no longer exist
 
-| Removed | Why |
-| --- | --- |
-| `EventRecord`, `EventRecordMetadata` classes | The port's adapter is reused and mutated per event, so naming it publicly makes "hold it past the callback" look supported. C++/CLI also exposed public `_EVENT_HEADER*` / `_EVENT_RECORD*` fields that have no C# equivalent. Keep using `IEventRecord` / `IEventRecordMetadata`, which are unchanged. |
-| `PropertyEnumerable`, `PropertyEnumerator` | Allocated a `Property` per property. `IEventRecord.Properties` still works; only the concrete iterator types are gone. |
+Items 3 and 4.
+
+| # | Removed | Why |
+| --- | --- | --- |
+| 3 | `EventRecord`, `EventRecordMetadata` classes | The port's adapter is reused and mutated per event, so naming it publicly makes "hold it past the callback" look supported. C++/CLI also exposed public `_EVENT_HEADER*` / `_EVENT_RECORD*` fields that have no C# equivalent. Keep using `IEventRecord` / `IEventRecordMetadata`, which are unchanged. |
+| 4 | `PropertyEnumerable`, `PropertyEnumerator` | Allocated a `Property` per property. `IEventRecord.Properties` still works; only the concrete iterator types are gone. |
 
 `IEventRecordError` *was* kept — `EventRecordError` implements it — because
 `EventRecordErrorDelegate` is declared in terms of it and consumers mock it.
@@ -149,7 +174,7 @@ everything after it in the payload, is unreadable. krabs does not decode structs
 fails worse, so nothing that worked before stops working — but the failure mode changes from
 silent corruption to a visible failure.
 
-**Nullable reference annotations are present.** The public surface is annotated, so if you
+**Not a behaviour change: nullable reference annotations.** The public surface is annotated, so if you
 have opted into nullable reference types you will get accurate diagnostics where you
 previously got none. `TryGet*` carries `[MaybeNullWhen(false)]`, which is what lets
 `if (record.TryGetUnicodeString(name, out var s))` narrow `s` to non-null in the true branch.
@@ -171,19 +196,25 @@ You do not have to do anything about these, but they are why some call sites can
   `WPPEventProcessingEnabled`, `KernelTrace.Name`, `KernelProvider.Flags`/`GroupMask`.
 - `TraceException` with a `Status`, replacing bare failures.
 
-### Differences that need no action
+### Accounting for the rest of the surface diff
 
-For completeness, the remaining entries in the surface diff are mechanical and cannot affect
-consuming code:
+For completeness, here is where all 286 metadata entries go. None of the remaining ones can
+affect consuming code:
 
-- **Finalizers and `Dispose(bool)`.** C++/CLI generated `~Type()` and a protected
-  `Dispose(bool)` for every disposable type. The port's disposable types are sealed and hold
-  no unmanaged resource that outlives them, so neither member exists. Both are non-public or
-  non-callable, and the `Dispose()` you call is unchanged.
-- **Compiler-generated delegate members.** `BeginInvoke`, `EndInvoke` and `Invoke` on the
-  delegate types, which the port does not emit for the new delegates.
-- **Enum `value__` fields and implicit constructors**, which are artefacts of how each
-  compiler emits types.
+| Count | Entries | Why they don't matter |
+| --- | --- | --- |
+| 148 | Additions | New surface cannot break existing code. |
+| 77 | Members of `EventRecord` / `EventRecordMetadata` | The two classes are gone (#3); the differ lists their members individually. |
+| 9 | Finalizers and protected `Dispose(bool)` | C++/CLI generated `~Type()` and a protected `Dispose(bool)` for every disposable type. The port's disposable types are sealed and hold no unmanaged resource, so neither exists. Both are non-public; the `Dispose()` you call is unchanged. |
+| 4 | `BeginInvoke` / `EndInvoke` / `Invoke` on delegates, enum `value__`, implicit constructors | Artefacts of how each compiler emits types. |
+| 48 | The nine breaking changes above, plus type re-declarations | See below. |
+
+One nuance worth stating, because the raw diff misleads: a line like
+`- type class UserTrace : IUserTrace, IDisposable` paired with
+`+ type class UserTrace : ITrace, IUserTrace, IDisposable` is a **re-declaration**, not a
+removal — `UserTrace` gained `ITrace` and never lost `IDisposable`. The same shape appears for
+`KernelTrace` (gained `ITrace`), `Testing.Proxy` (gained `IDisposable`) and
+`EventHeaderProperty` / `TraceFlags` (gained `[Flags]`).
 
 ---
 
