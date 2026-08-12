@@ -21,25 +21,25 @@ namespace Microsoft.O365.Security.ETW.Tests
         [Fact]
         public void ForwardsEventsWithAMatchingId()
         {
-            Assert.True(Run(new EventFilter(1), () => TestEventSource.Log.Interesting("a", 1), EtwHarness.Timeout) > 0);
+            Assert.True(Run(new EventFilter(1, EtwHarness.ThisProcess), () => TestEventSource.Log.Interesting("a", 1), EtwHarness.Timeout) > 0);
         }
 
         [Fact]
         public void DoesNotForwardEventsWithADifferentId()
         {
-            Assert.Equal(0, Run(new EventFilter(2), () => TestEventSource.Log.Interesting("a", 1), EtwHarness.NegativeTimeout));
+            Assert.Equal(0, Run(new EventFilter(2, EtwHarness.ThisProcess), () => TestEventSource.Log.Interesting("a", 1), EtwHarness.NegativeTimeout));
         }
 
         [Fact]
         public void ForwardsEventsMatchingAnyIdInTheList()
         {
-            Assert.True(Run(new EventFilter(new List<ushort> { 2, 1 }), () => TestEventSource.Log.Interesting("a", 1), EtwHarness.Timeout) > 0);
+            Assert.True(Run(new EventFilter(new List<ushort> { 2, 1 }, EtwHarness.ThisProcess), () => TestEventSource.Log.Interesting("a", 1), EtwHarness.Timeout) > 0);
         }
 
         [Fact]
         public void StillAppliesThePredicate()
         {
-            Assert.Equal(0, Run(new EventFilter(1, Filter.NoEvent()), () => TestEventSource.Log.Interesting("a", 1), EtwHarness.NegativeTimeout));
+            Assert.Equal(0, Run(new EventFilter(1, Filter.NoEvent() && EtwHarness.ThisProcess), () => TestEventSource.Log.Interesting("a", 1), EtwHarness.NegativeTimeout));
         }
 
         /// <summary>
@@ -53,14 +53,14 @@ namespace Microsoft.O365.Security.ETW.Tests
             int twos = 0;
             var signal = new ManualResetEventSlim();
 
-            var first = new EventFilter(1);
+            var first = new EventFilter(1, EtwHarness.ThisProcess);
             first.OnEventRef += (in EventRecordRef record) =>
             {
                 Assert.Equal(1, record.Id);
                 Interlocked.Increment(ref ones);
             };
 
-            var second = new EventFilter(2);
+            var second = new EventFilter(2, EtwHarness.ThisProcess);
             second.OnEventRef += (in EventRecordRef record) =>
             {
                 Assert.Equal(2, record.Id);

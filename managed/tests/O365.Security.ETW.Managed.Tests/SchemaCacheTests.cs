@@ -73,6 +73,7 @@ namespace Microsoft.O365.Security.ETW.Tests
         [InlineData("level")]
         [InlineData("keyword")]
         [InlineData("provider")]
+        [InlineData("pointerSize")]
         public void EventsDifferingOnlyInOneIdentityFieldGetDifferentSchemas(string field)
         {
             using (SyntheticEvent a = Record())
@@ -99,6 +100,12 @@ namespace Microsoft.O365.Security.ETW.Tests
                 case "level": return Record(level: 9);
                 case "keyword": return Record(keyword: 0x99);
                 case "provider": return Record(provider: ProviderB);
+
+                // A schema's fixed property offsets are computed once, from the pointer width
+                // of the event that populated the entry. The same event emitted by a 32-bit
+                // and a 64-bit process therefore needs two entries, or whichever arrives
+                // second is decoded at the other's offsets.
+                case "pointerSize": return Record(pointerSize: 4);
                 default: throw new ArgumentOutOfRangeException(nameof(field));
             }
         }
@@ -109,9 +116,10 @@ namespace Microsoft.O365.Security.ETW.Tests
             byte version = 1,
             byte opcode = 1,
             byte level = 1,
-            ulong keyword = 0x1)
+            ulong keyword = 0x1,
+            int pointerSize = 8)
         {
-            return new SyntheticEvent(provider ?? ProviderA, id, version, opcode, level, keyword);
+            return new SyntheticEvent(provider ?? ProviderA, id, version, opcode, level, keyword, pointerSize);
         }
 
         public void Dispose()
@@ -123,14 +131,16 @@ namespace Microsoft.O365.Security.ETW.Tests
         {
             private IntPtr _record;
 
-            public SyntheticEvent(Guid provider, ushort id, byte version, byte opcode, byte level, ulong keyword)
+            public SyntheticEvent(Guid provider, ushort id, byte version, byte opcode, byte level, ulong keyword, int pointerSize)
             {
                 _record = Marshal.AllocHGlobal(sizeof(EVENT_RECORD));
 
                 var record = (EVENT_RECORD*)_record;
                 *record = default(EVENT_RECORD);
                 record->EventHeader.ProviderId = provider;
-                record->EventHeader.Flags = NativeConstants.EVENT_HEADER_FLAG_64_BIT_HEADER;
+                record->EventHeader.Flags = pointerSize == 4
+                    ? NativeConstants.EVENT_HEADER_FLAG_32_BIT_HEADER
+                    : NativeConstants.EVENT_HEADER_FLAG_64_BIT_HEADER;
                 record->EventHeader.EventDescriptor.Id = id;
                 record->EventHeader.EventDescriptor.Version = version;
                 record->EventHeader.EventDescriptor.Opcode = opcode;

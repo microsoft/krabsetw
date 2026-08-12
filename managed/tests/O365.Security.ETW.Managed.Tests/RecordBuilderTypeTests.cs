@@ -191,6 +191,99 @@ namespace Microsoft.O365.Security.ETW.Tests
             }
         }
 
+        /// <summary>
+        /// A trace resolves each schema once and reuses it, but a POINTER property's width --
+        /// and therefore the offset of everything after it -- comes from the emitting process.
+        /// The same event from a WoW64 and a native process must not share one set of offsets,
+        /// or whichever arrives second is decoded four bytes out with no error to show for it.
+        /// </summary>
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TheSameEventFromBothPointerWidthsDecodesWithItsOwnOffsets(bool thirtyTwoBitFirst)
+        {
+            var schema = EventSchema
+                .Create("Contoso-Pointer-Provider", PointerProviderId, id: 10, version: 0)
+                .Pointer("Handle")
+                .UInt32("Status");
+
+            using (EventSchema.Use(schema))
+            using (var proxy = new Proxy(AssertingFilter(out Func<Exception> failure, out Func<int> seen)))
+            {
+                if (thirtyTwoBitFirst)
+                {
+                    proxy.PushEvent(PointerRecord(pointerSize: 4, handle: 0x12345678, status: 7));
+                    proxy.PushEvent(PointerRecord(pointerSize: 8, handle: 0xFFFFAB0012345678, status: 9));
+                }
+                else
+                {
+                    proxy.PushEvent(PointerRecord(pointerSize: 8, handle: 0xFFFFAB0012345678, status: 9));
+                    proxy.PushEvent(PointerRecord(pointerSize: 4, handle: 0x12345678, status: 7));
+                }
+
+                Assert.Equal(2, seen());
+
+                if (failure() != null)
+                {
+                    throw failure();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Builds a record whose Status is derived from its Handle, so a Status read at the
+        /// wrong offset is detected rather than coincidentally matching.
+        /// </summary>
+        private static SynthRecord PointerRecord(int pointerSize, ulong handle, uint status)
+        {
+            using (var builder = new RecordBuilder(PointerProviderId, id: 10, version: 0))
+            {
+                if (pointerSize == 4)
+                {
+                    builder.Header.Flags = (ushort)EventHeaderFlags.HEADER_32_BIT;
+                }
+
+                builder.AddPointer("Handle", handle);
+                builder.AddValue("Status", status);
+                return builder.Pack();
+            }
+        }
+
+        /// <summary>
+        /// A filter asserting that every record it sees reports the Handle and Status it was
+        /// built with, whatever pointer width it came from.
+        /// </summary>
+        private static EventFilter AssertingFilter(out Func<Exception> failure, out Func<int> seen)
+        {
+            var filter = new EventFilter(Filter.AnyEvent());
+            Exception caught = null;
+            int count = 0;
+
+            filter.OnEventRef += (in EventRecordRef record) =>
+            {
+                try
+                {
+                    bool thirtyTwoBit = (record.Flags & (ushort)EventHeaderFlags.HEADER_32_BIT) != 0;
+
+                    Assert.True(record.TryGetPointer("Handle".AsSpan(), out ulong handle));
+                    Assert.Equal(thirtyTwoBit ? 0x12345678ul : 0xFFFFAB0012345678, handle);
+
+                    Assert.True(record.TryGetUInt32("Status".AsSpan(), out uint status));
+                    Assert.Equal(thirtyTwoBit ? 7u : 9u, status);
+
+                    count++;
+                }
+                catch (Exception ex)
+                {
+                    caught = caught ?? ex;
+                }
+            };
+
+            failure = () => caught;
+            seen = () => count;
+            return filter;
+        }
+
         private static void WithSmbRecord(Guid createGuid, ulong objectAddress, RefAssert refAssert)
         {
             using (var builder = new RecordBuilder(SmbClientProviderId, id: 30603, version: 0))

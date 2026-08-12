@@ -38,6 +38,20 @@ Tests covering port-only state live in `managed/tests/O365.Security.ETW.Managed.
 and should be validated by mutation — reintroduce the defect and confirm the test fails —
 rather than assumed to work.
 
+### Live-trace tests are scoped to the emitting process
+
+The tests that start a real session use an `EventSource` whose GUID is derived from its
+name, and the suite runs one test process per target framework concurrently. All of them
+register the same provider, so a session in one process receives the events of the others:
+a test asserting that no event of a given id arrives fails whenever a sibling process
+happens to emit one. This was the cause of a long-standing intermittent failure in
+`EndToEndTests` and, once the suite grew, a near-deterministic one in `EventIdFilterTests`.
+
+Every live-trace filter that counts or reads the test `EventSource`'s events is now composed
+with `EtwHarness.ThisProcess`. Suites that add such a test should do the same; without it a
+green run only means the sibling processes were quiet. Tests that deliberately observe
+system-wide activity — `RundownTests`, `KernelGroupMaskTests` — are the exception and say so.
+
 ## Deliberate divergences
 
 ### Testing surface beyond krabs
@@ -320,6 +334,87 @@ The port decodes the full property length. Only reachable for ANSI in-types that
 NUL-terminated, i.e. the counted and non-NUL-terminated variants.
 
 ## Resolved
+
+### A cached schema baked in the emitting process's pointer width
+
+`PropertyTable` precomputes the byte offset of every property whose size the schema
+already knows, which is what makes a hot-path read a subtraction rather than a walk. A
+`win:Pointer` property's size is not a property of the schema, though — it is four bytes
+or eight depending on the process that emitted the event. `SchemaKey` did not include the
+pointer width, so the first event to populate an entry fixed the offsets for every later
+event of that kind, and the same event emitted by a WoW64 and a native process shared one
+set. Everything after the pointer was then read four bytes out. Where the wrong offset
+still landed inside `UserDataLength` it produced a wrong value with no error at all.
+
+krabs is immune because it derives the pointer width per event
+(`size_provider::get_property_size`) and caches no offsets. This is port-only, and
+mixed-bitness providers are ordinary: any manifest provider used from both a 32-bit and a
+64-bit process on the same machine hits it.
+
+The pointer width is now part of the cache key, so the two bitnesses get separate entries.
+Covered by `SchemaCacheTests.EventsDifferingOnlyInOneIdentityFieldGetDifferentSchemas`
+(the `pointerSize` case) and, end to end,
+`RecordBuilderTypeTests.TheSameEventFromBothPointerWidthsDecodesWithItsOwnOffsets`, which
+pushes both widths through one trace in both orders.
+
+### Group-mask kernel providers used the wrong information class
+
+`EVENT_TRACE_INFORMATION_CLASS` is undocumented and absent from the SDK headers; krabs
+declares it in `perfinfo_groupmask.hpp`, where `EventTraceGroupMaskInformation` is the
+second member and so has the value 1. The port had transcribed it as 3, which is
+`EventTraceTimeProfileInformation`. Every kernel provider without an `EVENT_TRACE_FLAG_`
+bit — including the in-box `ObjectManagerProvider` — therefore failed to enable:
+`NtQuerySystemInformation` returns `0xC0000004` and `KernelTrace.Open` throws.
+
+Nothing else caught this. `LayoutFacts` and `layoutprobe` validate struct layouts, not
+enum values, and no test exercised a group-mask provider. Covered now by
+`KernelGroupMaskTests`, which asks the kernel rather than asserting the constant; it fails
+with the old value on a live machine.
+
+### Rundown was requested during `Open` rather than before `ProcessTrace`
+
+krabs issues `EVENT_CONTROL_CODE_CAPTURE_STATE` from `process_trace`, immediately before
+`ProcessTrace`, with a comment recording that the timing was found to matter. The port
+issued it from `EnableMerged`, i.e. during `Open`. Because `Open` and `Start` are separate
+public calls here — they are one call in krabs — the gap in front of `ProcessTrace` was
+unbounded rather than merely early.
+
+Now issued from `Start`, immediately before `ProcessTrace`, matching krabs. A provider
+enabled *after* `Start` has already passed that point gets its own `CAPTURE_STATE` from
+`Enable`, since there is no later one to wait for; krabs cannot reach that state at all,
+because it has no public `Enable`-while-running.
+
+An honest note on evidence: this change restores krabs' ordering, but the loss it is meant
+to prevent could not be reproduced on Windows 11 with Kernel-Process. `RundownTests`
+pauses two seconds between `Open` and `Start` and the rundown events still arrive; so do
+they with a 20-second pause, a 4 KB two-buffer session and continuous process churn to
+force the ring to wrap. `RundownTests` is therefore a regression test that rundown works
+at all — which nothing covered before — not a demonstration of the timing bug.
+
+### A zero FILETIME was reported as a missing property
+
+`TryGetDateTime` rejected any FILETIME `<= 0`. Zero is not an error value: providers use
+it to mean "no timestamp", and `DateTime.FromFileTimeUtc(0)` returns `1601-01-01T00:00:00Z`
+rather than throwing, which is exactly what C++/CLI's
+`DateTime::FromFileTimeUtc(largeInt->QuadPart)` returns. The port instead reported the
+property as unreadable, and `GetDateTime` raised `ParserException("Could not find property
+in event schema")` for a property that was present and well-formed.
+
+Now only genuinely negative values are refused — those are the ones `FromFileTimeUtc`
+rejects, and refusing them keeps `TryGetDateTime` non-throwing. Covered by
+`FileTimeBoundaryTests`.
+
+### `RecordBuilder` accepted a fixed-width binary of the wrong length
+
+A `win:Binary` property with a schema-declared length carries no length of its own: the
+reader takes the width from the schema and ignores the value. `Pack` validated the
+in-type but not the length, so a fixture supplying a different number of bytes produced a
+record no provider could emit, with every later property shifted. Strings were already
+validated this way (`RequireDeclaredLength`); binaries are now too. Covered by
+`FixedWidthBinaryTests`.
+
+krabs has the same gap in `record_builder.hpp`, and like the pointer padding defect it is
+only reachable through the testing surface.
 
 ### A synthetic record could be finalized while it was being read
 

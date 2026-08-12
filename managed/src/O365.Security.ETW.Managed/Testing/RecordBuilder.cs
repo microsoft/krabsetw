@@ -397,6 +397,14 @@ namespace Microsoft.O365.Security.ETW.Testing
                             bytesToTrim = terminator;
                         }
                     }
+                    else if (thunk.InType == TdhInType.Binary && SchemaDeclaresStringLength(table, i))
+                    {
+                        // A BINARY property carries no length of its own: the reader takes its
+                        // width from the schema and ignores the value. Supplying a different
+                        // number of bytes therefore misplaces every later property instead of
+                        // failing, so it is rejected here.
+                        RequireDeclaredLength(table, blob, i, name, bytes.Length);
+                    }
 
                     payload.AddRange(bytes);
                 }

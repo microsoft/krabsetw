@@ -31,8 +31,16 @@ namespace Microsoft.O365.Security.ETW.Interop
         /// <summary>SYSTEM_INFORMATION_CLASS::SystemPerformanceTraceInformation.</summary>
         public const int SystemPerformanceTraceInformation = 31;
 
-        /// <summary>EVENT_TRACE_INFORMATION_CLASS::EventTraceGroupMaskInformation.</summary>
-        public const uint EventTraceGroupMaskInformation = 3;
+        /// <summary>
+        /// EVENT_TRACE_INFORMATION_CLASS::EventTraceGroupMaskInformation.
+        /// </summary>
+        /// <remarks>
+        /// The enum is undocumented and absent from the SDK headers; krabs declares it in
+        /// perfinfo_groupmask.hpp, where the members are, in order:
+        /// EventTraceKernelVersionInformation = 0, EventTraceGroupMaskInformation = 1,
+        /// EventTracePerformanceInformation = 2, EventTraceTimeProfileInformation = 3.
+        /// </remarks>
+        public const uint EventTraceGroupMaskInformation = 1;
         public const uint EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING = 0x10000000;
 
         // Process trace modes

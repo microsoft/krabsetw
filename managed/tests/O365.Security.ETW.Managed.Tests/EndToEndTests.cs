@@ -123,7 +123,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             var received = new ConcurrentQueue<Tuple<string, int>>();
             var signal = new ManualResetEventSlim();
 
-            var filter = new EventFilter(Filter.EventNameIs("Interesting"));
+            var filter = new EventFilter(Filter.EventNameIs("Interesting") && EtwHarness.ThisProcess);
             filter.OnEventRef += (in EventRecordRef record) =>
             {
                 if (record.TryGetUnicodeString("message".AsSpan(), out ReadOnlySpan<char> message)
@@ -156,14 +156,14 @@ namespace Microsoft.O365.Security.ETW.Tests
 
             // Two filters on one provider, so event id pushdown keeps both ids but each
             // filter still has to reject the other's events.
-            var interesting = new EventFilter(Filter.EventIdIs(1));
+            var interesting = new EventFilter(Filter.EventIdIs(1) && EtwHarness.ThisProcess);
             interesting.OnEventRef += (in EventRecordRef record) =>
             {
                 Interlocked.Increment(ref matched);
                 signal.Set();
             };
 
-            var boring = new EventFilter(Filter.EventIdIs(2));
+            var boring = new EventFilter(Filter.EventIdIs(2) && EtwHarness.ThisProcess);
             boring.OnEventRef += (in EventRecordRef record) =>
             {
                 Interlocked.Increment(ref rejected);
@@ -193,7 +193,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             int number = 0;
             var signal = new ManualResetEventSlim();
 
-            var filter = new EventFilter(Filter.EventNameIs("Interesting"));
+            var filter = new EventFilter(Filter.EventNameIs("Interesting") && EtwHarness.ThisProcess);
             filter.OnEvent += record =>
             {
                 message = record.GetUnicodeString("message", null);
@@ -220,7 +220,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             int hits = 0;
 
             var filter = new EventFilter(
-                Filter.EventNameIs("Interesting").And(UnicodeString.Is("message", "needle")));
+                Filter.EventNameIs("Interesting").And(UnicodeString.Is("message", "needle")) && EtwHarness.ThisProcess);
 
             filter.OnEventRef += (in EventRecordRef record) =>
             {
@@ -249,7 +249,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             IEventRecord escaped = null;
             var signal = new ManualResetEventSlim();
 
-            var filter = new EventFilter(Filter.EventNameIs("Interesting"));
+            var filter = new EventFilter(Filter.EventNameIs("Interesting") && EtwHarness.ThisProcess);
             filter.OnEvent += record =>
             {
                 escaped = record;
@@ -282,7 +282,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             string error = null;
             var signal = new ManualResetEventSlim();
 
-            var filter = new EventFilter(Filter.EventIdIs(1));
+            var filter = new EventFilter(Filter.EventIdIs(1) && EtwHarness.ThisProcess);
             filter.OnEventRef += (in EventRecordRef record) => Interlocked.Increment(ref refHits);
             filter.OnEvent += record => Interlocked.Increment(ref compatHits);
             filter.OnError += e =>

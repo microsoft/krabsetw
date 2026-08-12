@@ -388,7 +388,11 @@ namespace Microsoft.O365.Security.ETW
                     fileTime |= (long)raw[i] << (i * 8);
                 }
 
-                if (fileTime <= 0)
+                // Zero is a legitimate value: providers use it to mean "no time", and
+                // FromFileTimeUtc renders it as the FILETIME epoch, which is what the
+                // C++/CLI implementation returns. Only values it rejects outright are
+                // reported as unreadable.
+                if (fileTime < 0)
                 {
                     return false;
                 }
