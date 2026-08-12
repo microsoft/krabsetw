@@ -493,15 +493,15 @@ their tests reach the handler by reflection while substituting a hand-written `I
 
 ```csharp
 // before: a fake record, and reflection to reach a private handler
-var record = new TestEventRecord { Id = 7937, ProcessId = 12345 };
-record.Data["ContextInfo"] = contextInfo;
-record.Data["Payload"] = payload;
+var record = new FakeEventRecord { Id = 1 };
+record.Data["ProcessID"] = 4321u;
+record.Data["ImageName"] = @"\Device\HarddiskVolume4\Windows\System32\cmd.exe";
 
 producer.GetType()
-    .GetMethod("OnPowerShellMethodInvocation", BindingFlags.NonPublic | BindingFlags.Instance)
+    .GetMethod("OnProcessStart", BindingFlags.NonPublic | BindingFlags.Instance)
     .Invoke(producer, new object[] { record });
 
-_invocations.Should().BeEquivalentTo(new[] { expected });
+Assert.Equal("cmd.exe", produced.Single().ImageName);
 ```
 
 Neither half of that survives the move to `OnEventRef`. The fake is an `IEventRecord`
@@ -513,43 +513,52 @@ Build the record and let the producer's own filter dispatch it. The producer nee
 the filter — or the trace it registers on — so a test can hand it to `Proxy`:
 
 ```csharp
-public class PowerShellMethodProducer : IDisposable
+using static Microsoft.O365.Security.ETW.Filter;
+
+public sealed class ProcessStarted
 {
-    public event Action<PowerShellMethodInvocationEvent> OnDataProduced;
+    public DateTime TimeStamp { get; set; }
+    public uint ProcessId { get; set; }
+    public string ImageName { get; set; }
+}
+
+public sealed class ProcessStartProducer
+{
+    private readonly string[] _ignoredImages;
+
+    public event Action<ProcessStarted> OnDataProduced;
 
     public EventFilter Filter { get; }
 
-    public PowerShellMethodProducer(params string[] ignoredMethodNames)
+    public ProcessStartProducer(params string[] ignoredImages)
     {
-        _ignoredMethodNames = ignoredMethodNames;
+        _ignoredImages = ignoredImages;
 
-        Filter = new EventFilter(PowerShellMethodInvocation);
-        Filter.OnEventRef += OnPowerShellMethodInvocation;
+        Filter = new EventFilter(EventIdIs(1));
+        Filter.OnEventRef += OnProcessStart;
     }
 
-    private void OnPowerShellMethodInvocation(in EventRecordRef record)
+    private void OnProcessStart(in EventRecordRef record)
     {
-        if (!record.TryGetUnicodeString("Payload".AsSpan(), out var payload)) return;
-        if (!payload.EndsWith("Started.\r\n".AsSpan(), StringComparison.Ordinal)) return;
+        if (!record.TryGetUnicodeString("ImageName".AsSpan(), out var imagePath)) return;
 
-        if (!record.TryGetUnicodeString("ContextInfo".AsSpan(), out var context)) return;
+        // \Device\HarddiskVolume4\Windows\System32\cmd.exe -> cmd.exe
+        var image = imagePath.Slice(imagePath.LastIndexOf('\\') + 1);
 
-        var commandName = ReadField(context, "Command Name = ".AsSpan());
-        var commandType = ReadField(context, "Command Type = ".AsSpan());
-
-        if (!commandType.Equals("Function".AsSpan(), StringComparison.Ordinal)) return;
-
-        foreach (var ignored in _ignoredMethodNames)
+        foreach (var ignored in _ignoredImages)
         {
-            if (commandName.Equals(ignored.AsSpan(), StringComparison.OrdinalIgnoreCase)) return;
+            if (image.Equals(ignored.AsSpan(), StringComparison.OrdinalIgnoreCase)) return;
         }
 
-        OnDataProduced?.Invoke(new PowerShellMethodInvocationEvent
+        // The started process is named by the payload. The header's ProcessId is the
+        // process that created it.
+        if (!record.TryGetUInt32("ProcessID".AsSpan(), out uint processId)) return;
+
+        OnDataProduced?.Invoke(new ProcessStarted
         {
-            ProcessId = record.ProcessId,
-            Timestamp = record.Timestamp,
-            MethodName = commandName.ToString(),
-            MethodType = commandType.ToString(),
+            TimeStamp = record.Timestamp,
+            ProcessId = processId,
+            ImageName = image.ToString(),
         });
     }
 }
@@ -559,33 +568,37 @@ The test then subscribes to the domain event and pushes a record through the pro
 reflection and no fake record type:
 
 ```csharp
-[TestMethod]
-public void emits_an_event_for_a_function_start()
+private static readonly Guid KernelProcess = new Guid("22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716");
+
+[Fact]
+public void EmitsAnEventWhenAProcessStarts()
 {
-    var produced = new List<PowerShellMethodInvocationEvent>();
+    var produced = new List<ProcessStarted>();
 
-    using (var producer = new PowerShellMethodProducer())
+    var producer = new ProcessStartProducer("conhost.exe");
+    producer.OnDataProduced += e => produced.Add(e);
+
+    using (var proxy = new Proxy(producer.Filter))
+    using (var record = Build(4321, @"\Device\HarddiskVolume4\Windows\System32\cmd.exe"))
     {
-        producer.OnDataProduced += e => produced.Add(e);
-
-        using (var proxy = new Proxy(producer.Filter))
-        using (var record = Build("Invoke-Thing", "Function", "Command Invoke-Thing is Started.\r\n"))
-        {
-            proxy.PushEvent(record);
-        }
+        proxy.PushEvent(record);
     }
 
-    Assert.AreEqual(1, produced.Count);
-    Assert.AreEqual("Invoke-Thing", produced[0].MethodName);
+    Assert.Equal(1, produced.Count);
+    Assert.Equal("cmd.exe", produced[0].ImageName);
+    Assert.Equal(4321u, produced[0].ProcessId);
 }
 
-private static SynthRecord Build(string name, string type, string payload)
+private static SynthRecord Build(uint processId, string imageName)
 {
-    using (var builder = new RecordBuilder(PowerShellProviderId, id: 7937, version: 1))
+    using (var builder = new RecordBuilder(KernelProcess, id: 1, version: 1))
     {
-        builder.AddUnicodeString("ContextInfo", string.Format(ContextTemplate, name, type));
-        builder.AddUnicodeString("UserData", string.Empty);
-        builder.AddUnicodeString("Payload", payload);
+        builder.AddValue("ProcessID", processId);
+        builder.AddFileTime("CreateTime", DateTime.UtcNow);
+        builder.AddValue("ParentProcessID", 4u);
+        builder.AddValue("SessionID", 0u);
+        builder.AddValue("Flags", 0u);
+        builder.AddUnicodeString("ImageName", imageName);
 
         return builder.Pack();
     }
@@ -606,22 +619,31 @@ production pipeline would in fact reject before the handler ran. Pushing through
 the same predicate chain a live trace runs, which makes the negative cases meaningful:
 
 ```csharp
-Push("Invoke-Thing", "Function", "Command Invoke-Thing is Ended.\r\n");   // wrong payload suffix
-Push("Start-Process", "Cmdlet", "Command Start-Process is Started.\r\n"); // wrong command type
+// filtered out by the handler
+proxy.PushEvent(Build(4321, @"\Device\HarddiskVolume4\Windows\System32\conhost.exe"));
+
+// rejected by the filter before the handler runs: ProcessStop, not ProcessStart.
+// PackIncomplete builds a record for the rejected path without restating the template.
+using (var stop = new RecordBuilder(KernelProcess, id: 2, version: 1))
+{
+    proxy.PushEvent(stop.PackIncomplete());
+}
+
+Assert.Empty(produced);
 ```
 
 The same harness pins the allocation behaviour, because the rejected path is the one that
 matters — it runs for every event:
 
 ```csharp
-using (var record = Build("Start-Process", "Cmdlet", "Command Start-Process is Started.\r\n"))
+using (var record = Build(4321, @"\Device\HarddiskVolume4\Windows\System32\conhost.exe"))
 {
     for (int i = 0; i < 200; i++) proxy.PushEvent(record);   // warm the schema and property caches
 
     long before = GC.GetAllocatedBytesForCurrentThread();
     for (int i = 0; i < 1000; i++) proxy.PushEvent(record);
 
-    Assert.AreEqual(0, GC.GetAllocatedBytesForCurrentThread() - before);
+    Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
 }
 ```
 
