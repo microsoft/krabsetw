@@ -224,18 +224,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         O365::Security::ETW::NativePtr<krabs::user_trace> trace_;
         CallbackBridge^ bridge_ = gcnew CallbackBridge();
 
-        /// <summary>
-        /// Roots the managed providers enabled on this trace.
-        /// </summary>
-        /// <remarks>
-        /// Enabling hands the native trace a copy of the provider's native representation,
-        /// whose callback points back at managed state owned by the managed Provider.
-        /// Without this list the managed Provider becomes unreachable as soon as the caller
-        /// drops it, and the next collection silently stops event delivery.
-        /// </remarks>
-        System::Collections::Generic::List<System::Object^>^ providers_ =
-            gcnew System::Collections::Generic::List<System::Object^>();
-
         void RegisterCallbacks();
     };
 
@@ -268,7 +256,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void UserTrace::Enable(O365::Security::ETW::Provider ^provider)
     {
-        providers_->Add(provider);
         return trace_->enable(*provider->provider_);
     }
 
@@ -276,7 +263,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 #pragma warning(disable: 4947) // Deprecated warning
     inline void UserTrace::Enable(O365::Security::ETW::RawProvider ^provider)
     {
-        providers_->Add(provider);
         return trace_->enable(*provider->provider_);
     }
 #pragma warning(pop)

@@ -334,9 +334,13 @@ which incurs the allocation being avoided — so it belongs after the guards, no
 
 A handler that needs any of these stays on `IEventRecord`:
 
-- **`GetAnsiString`.** Transcoding from the provider's ANSI code page is what forces the
+- **`GetAnsiString`.** Transcoding from the provider's code page is what forces the
   allocation. `TryGetAnsiStringBytes` returns the raw `ReadOnlySpan<byte>` instead. Note there
-  is currently no built-in way to compare those bytes against a `string` literal.
+  is currently no built-in way to compare those bytes against a `string` literal. The code
+  page is the machine's ANSI one unless the property's out-type says otherwise: `win:UTF8`
+  and `win:Json` properties are decoded, compared and built as UTF-8. Raw bytes are returned
+  untranscoded either way, so a caller comparing them itself has to encode its comparison
+  value to match.
 - **IP-address and socket-address accessors**, because `IPAddress` and `SocketAddress` are
   classes.
 - **`Properties` enumeration.**
@@ -471,8 +475,10 @@ public void ReadsThePath()
 
 There is a fluent method per in-type — `UInt32`, `Pointer`, `Guid`, `FileTime`, `Sid`,
 `Binary` and the rest — and `lengthFrom` declares a string or binary property sized by an
-earlier one, as `length="PathLength"` does in a manifest. `Named` supplies the value
-`EventRecordRef.Name` reports; the provider name passed to `Create` supplies `ProviderName`.
+earlier one, as `length="PathLength"` does in a manifest. `Utf8String` and `JsonString`
+declare an 8-bit string carrying UTF-8, which is `win:AnsiString` with an out-type of
+`win:UTF8` or `win:Json` in a manifest. `Named` supplies the value `EventRecordRef.Name`
+reports; the provider name passed to `Create` supplies `ProviderName`.
 
 Two points are worth keeping in mind:
 

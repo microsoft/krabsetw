@@ -156,6 +156,25 @@ namespace Microsoft.O365.Security.ETW.Testing
         }
 
         /// <summary>
+        /// Declares an 8-bit string property carrying UTF-8 rather than the machine's ANSI
+        /// code page, which in a manifest is <c>win:AnsiString</c> with an out-type of
+        /// <c>win:UTF8</c>.
+        /// </summary>
+        public EventSchema Utf8String(string name, string? lengthFrom = null)
+        {
+            return AddString(name, TdhInType.AnsiString, lengthFrom, TdhOutType.Utf8);
+        }
+
+        /// <summary>
+        /// Declares an 8-bit string property carrying UTF-8 encoded JSON, which in a manifest
+        /// is <c>win:AnsiString</c> with an out-type of <c>win:Json</c>.
+        /// </summary>
+        public EventSchema JsonString(string name, string? lengthFrom = null)
+        {
+            return AddString(name, TdhInType.AnsiString, lengthFrom, TdhOutType.Json);
+        }
+
+        /// <summary>
         /// Declares a binary property of a fixed width, or one sized by an earlier property
         /// when <paramref name="lengthFrom"/> is given.
         /// </summary>
@@ -188,11 +207,11 @@ namespace Microsoft.O365.Security.ETW.Testing
             return _blob ?? (_blob = Render());
         }
 
-        private EventSchema AddString(string name, TdhInType inType, string? lengthFrom)
+        private EventSchema AddString(string name, TdhInType inType, string? lengthFrom, TdhOutType outType = TdhOutType.Null)
         {
             if (lengthFrom == null)
             {
-                return Add(name, inType);
+                return Add(name, inType, 0, 0, outType);
             }
 
             int index = IndexOf(lengthFrom);
@@ -204,10 +223,10 @@ namespace Microsoft.O365.Security.ETW.Testing
                     ", which must be declared before it.", nameof(lengthFrom));
             }
 
-            return Add(name, inType, (ushort)index, NativeConstants.PropertyParamLength);
+            return Add(name, inType, (ushort)index, NativeConstants.PropertyParamLength, outType);
         }
 
-        private EventSchema Add(string name, TdhInType inType, ushort length = 0, uint flags = 0)
+        private EventSchema Add(string name, TdhInType inType, ushort length = 0, uint flags = 0, TdhOutType outType = TdhOutType.Null)
         {
             if (string.IsNullOrEmpty(name))
             {
@@ -219,7 +238,7 @@ namespace Microsoft.O365.Security.ETW.Testing
                 throw new ArgumentException("Property " + name + " is declared twice.", nameof(name));
             }
 
-            _properties.Add(new Property(name, inType, length, flags));
+            _properties.Add(new Property(name, inType, length, flags, outType));
             _blob = null;
             return this;
         }
@@ -291,7 +310,7 @@ namespace Microsoft.O365.Security.ETW.Testing
                     props[i].Flags = property.Flags;
                     props[i].NameOffset = (uint)propertyNameOffsets[i];
                     props[i].InTypeOrStructStartIndex = (ushort)property.InType;
-                    props[i].OutTypeOrNumOfStructMembers = 0;
+                    props[i].OutTypeOrNumOfStructMembers = (ushort)property.OutType;
                     props[i].LengthOrLengthPropertyIndex = property.Length;
                     props[i].CountOrCountPropertyIndex = 0;
                 }
@@ -317,13 +336,15 @@ namespace Microsoft.O365.Security.ETW.Testing
         {
             public readonly string Name;
             public readonly TdhInType InType;
+            public readonly TdhOutType OutType;
             public readonly ushort Length;
             public readonly uint Flags;
 
-            public Property(string name, TdhInType inType, ushort length, uint flags)
+            public Property(string name, TdhInType inType, ushort length, uint flags, TdhOutType outType)
             {
                 Name = name;
                 InType = inType;
+                OutType = outType;
                 Length = length;
                 Flags = flags;
             }

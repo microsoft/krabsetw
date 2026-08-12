@@ -51,7 +51,17 @@ namespace Microsoft.O365.Security.ETW
         /// </summary>
         public bool TryGetAnsiStringBytes(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value)
         {
+            return TryGetAnsiStringBytes(name, out value, out _);
+        }
+
+        /// <summary>
+        /// As <see cref="TryGetAnsiStringBytes(ReadOnlySpan{char}, out ReadOnlySpan{byte})"/>,
+        /// also reporting the property's out-type, which decides how the bytes are encoded.
+        /// </summary>
+        internal bool TryGetAnsiStringBytes(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value, out ushort outType)
+        {
             value = default;
+            outType = 0;
 
             int index = IndexOf(name);
             if (index < 0 || !TryGetRaw(index, out ReadOnlySpan<byte> raw))
@@ -60,6 +70,7 @@ namespace Microsoft.O365.Security.ETW
             }
 
             value = DecodeAnsi(raw, InTypeAt(index));
+            outType = OutTypeAt(index);
             return true;
         }
 

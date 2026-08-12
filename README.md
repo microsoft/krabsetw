@@ -8,6 +8,11 @@ Overview
 
 **Microsoft.O365.Security.Native.ETW** is a C++ CLI (.NET) wrapper around **krabsetw**. It provides the same functionality as **krabsetw** to .NET applications and is used in production by the Office 365 Security team. It's affectionately referred to as **Lobsters**.
 
+**Microsoft.O365.Security.ETW** is a pure .NET reimplementation of that wrapper, in `managed`. It talks to ETW and TDH directly rather than through **krabsetw**, so it needs no C++ toolchain to build and no mixed-mode assembly to deploy. It keeps the C++/CLI public surface, and adds an allocation-free reading surface (`EventRecordRef`, a `ref struct`) for callers that want to filter events without putting anything on the GC heap. It targets .NET Framework 4.6.2 and 4.8 as well as modern .NET.
+
+* [managed/MIGRATION.md](managed/MIGRATION.md) — what changes when moving from the C++/CLI assembly, and how to use the allocation-free surface.
+* [managed/PARITY.md](managed/PARITY.md) — where the two implementations deliberately differ, and defects open on either side.
+
 Examples & Documentation
 ========
 
@@ -23,7 +28,7 @@ Important Notes
 * `krabsetw` and `Microsoft.O365.Security.Native.ETW` are only supported on Windows 7 or Windows 2008R2 machines and above.
 * Throwing exceptions in the event handler callback or krabsetw or Microsoft.O365.Security.Native.ETW will cause the trace to stop processing events.
 * The call to "start" on the trace object is blocking so thread management may be necessary.
-* The Visual Studio solution is krabs\krabs.sln.
+* The Visual Studio solution is krabs\krabs.sln. The pure .NET library builds on its own with `dotnet build managed\Krabs.Managed.slnx`.
 * When building a native code binary using the `krabsetw` package, please refer to the [compilation readme](krabs/README.md) for notes about the `TYPEASSERT` and `NDEBUG` compilation flags.
 
 NuGet Packages
@@ -32,6 +37,8 @@ NuGet packages are available both for the krabsetw C++ headers and the Microsoft
 * https://www.nuget.org/packages/Microsoft.O365.Security.Native.ETW/
 * https://www.nuget.org/packages/Microsoft.O365.Security.Native.ETW.Debug/ (for development - provides type asserts)
 * https://www.nuget.org/packages/Microsoft.O365.Security.Krabsetw/
+
+The pure .NET library packs as `Microsoft.O365.Security.ETW` (`dotnet pack managed\Krabs.Managed.slnx`). It is not published yet.
 
 For verifying the .NET binaries, you can use the following command:
 `sn -T Microsoft.O365.Security.Native.ETW.dll`

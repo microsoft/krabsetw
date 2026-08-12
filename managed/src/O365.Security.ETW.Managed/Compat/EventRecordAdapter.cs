@@ -198,9 +198,9 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetAnsiString(string name, [MaybeNullWhen(false)] out string result)
         {
-            if (Ref.TryGetAnsiStringBytes(name.AsSpan(), out ReadOnlySpan<byte> value))
+            if (Ref.TryGetAnsiStringBytes(name.AsSpan(), out ReadOnlySpan<byte> value, out ushort outType))
             {
-                result = value.Length == 0 ? string.Empty : Decode(value);
+                result = value.Length == 0 ? string.Empty : Decode(value, outType);
                 return true;
             }
 
@@ -209,14 +209,15 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <summary>
-        /// ANSI string properties carry the provider's ANSI code page, not UTF-8 -- see
-        /// <see cref="Interop.AnsiEncoding"/> for the citation and the provider survey.
+        /// An 8-bit string property carries the provider's ANSI code page unless its out-type
+        /// says otherwise -- see <see cref="Interop.AnsiEncoding"/> for the citation, the
+        /// out-types that mean UTF-8, and the provider survey.
         /// </summary>
-        private static string Decode(ReadOnlySpan<byte> value)
+        private static string Decode(ReadOnlySpan<byte> value, ushort outType)
         {
             fixed (byte* p = value)
             {
-                return Interop.AnsiEncoding.Current.GetString(p, value.Length);
+                return Interop.AnsiEncoding.ForOutType(outType).GetString(p, value.Length);
             }
         }
 

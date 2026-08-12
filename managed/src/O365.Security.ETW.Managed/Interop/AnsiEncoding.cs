@@ -10,8 +10,9 @@ namespace Microsoft.O365.Security.ETW.Interop
     /// <remarks>
     /// tdh.h, TDH_OUTTYPE_STRING: "For INT8, UINT8, and ANSISTRING InTypes, the data is decoded
     /// using the ANSI code page of the event provider." UTF-8 applies only when the property
-    /// carries TDH_OUTTYPE_UTF8 or TDH_OUTTYPE_JSON, which a sweep of 1503 registered providers
-    /// (4163 ANSI properties) found zero instances of -- every one was TDH_OUTTYPE_STRING.
+    /// carries TDH_OUTTYPE_UTF8 or TDH_OUTTYPE_JSON -- see <see cref="ForOutType"/> -- which a
+    /// sweep of 1503 registered providers (4163 ANSI properties) found zero instances of; every
+    /// one was TDH_OUTTYPE_STRING.
     ///
     /// This also matches the C++/CLI wrapper, which builds these strings with
     /// gcnew String(str.c_str()) and so converts through CP_ACP.
@@ -24,9 +25,45 @@ namespace Microsoft.O365.Security.ETW.Interop
     {
         private static readonly Encoding Instance = Resolve();
 
+        /// <summary>
+        /// UTF-8 without a byte order mark and without exceptions on malformed input, so a
+        /// corrupt payload decodes to replacement characters rather than throwing inside a
+        /// trace callback.
+        /// </summary>
+        private static readonly Encoding Utf8 = new UTF8Encoding(false);
+
         public static Encoding Current
         {
             get { return Instance; }
+        }
+
+        /// <summary>
+        /// The encoding an 8-bit string property carries, which its out-type decides.
+        /// </summary>
+        /// <remarks>
+        /// TDH_OUTTYPE_UTF8 and TDH_OUTTYPE_JSON are UTF-8. TDH_OUTTYPE_XML defers to the
+        /// document's own encoding declaration, which cannot be honoured without parsing the
+        /// value, so it is left on the ANSI code page -- the encoding an XML document without
+        /// a declaration would have had on the machine that wrote it.
+        /// </remarks>
+        public static Encoding ForOutType(ushort outType)
+        {
+            return IsUtf8(outType) ? Utf8 : Instance;
+        }
+
+        /// <summary>
+        /// Whether an out-type means the property is UTF-8 rather than ANSI.
+        /// </summary>
+        public static bool IsUtf8(ushort outType)
+        {
+            switch ((TdhOutType)outType)
+            {
+                case TdhOutType.Utf8:
+                case TdhOutType.Json:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         [DllImport("kernel32.dll")]
