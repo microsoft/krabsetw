@@ -228,7 +228,7 @@ provider.OnEvent += record =>
 // allocates nothing until the event is one of interest
 provider.OnEventRef += (in EventRecordRef record) =>
 {
-    if (!record.TryGetUnicodeString("TargetUserName", out var user)) return;
+    if (!record.TryGetUnicodeString("TargetUserName".AsSpan(), out var user)) return;
     if (!user.StartsWith("svc-".AsSpan(), StringComparison.OrdinalIgnoreCase)) return;
     ...
 };
@@ -237,6 +237,21 @@ provider.OnEventRef += (in EventRecordRef record) =>
 The same applies to any guard that precedes the work: emptiness checks, allow-list tests and
 prefix/suffix dispatch. Ordering also matters — test `record.Id` and integer properties, which
 never allocate, before reading any string.
+
+### Property names are passed as spans
+
+Every accessor on `EventRecordRef` takes the property name as a `ReadOnlySpan<char>`. C# 14
+converts a string literal implicitly, so the name can be written bare; **C# 13 and earlier do
+not**, and require an explicit `.AsSpan()`:
+
+```csharp
+record.TryGetUnicodeString("ImageName".AsSpan(), out var image);  // every language version
+record.TryGetUnicodeString("ImageName", out var image);           // C# 14 and later only
+```
+
+Omitting `.AsSpan()` on an older compiler produces CS1503 (`cannot convert from 'string' to
+'System.ReadOnlySpan<char>'`). The `.AsSpan()` form costs nothing at run time and compiles
+everywhere, so it is the form used throughout this document.
 
 ### Handlers must declare their parameter explicitly
 
@@ -257,7 +272,7 @@ provider.OnEventRef += OnProcessStart;
 
 private static void OnProcessStart(in EventRecordRef record)
 {
-    if (!record.TryGetUnicodeString("ImageName", out var image)) return;
+    if (!record.TryGetUnicodeString("ImageName".AsSpan(), out var image)) return;
     if (!image.EndsWith("\\cmd.exe".AsSpan(), StringComparison.OrdinalIgnoreCase)) return;
 
     Report(record.ProcessId, image.ToString());
@@ -276,7 +291,7 @@ Every comparison below allocates nothing, on .NET Framework as well as modern .N
 ```csharp
 provider.OnEventRef += (in EventRecordRef record) =>
 {
-    if (!record.TryGetUnicodeString("ImageName", out var image)) return;
+    if (!record.TryGetUnicodeString("ImageName".AsSpan(), out var image)) return;
 
     // equality
     if (image.Equals("cmd.exe".AsSpan(), StringComparison.OrdinalIgnoreCase)) { }
@@ -293,7 +308,7 @@ provider.OnEventRef += (in EventRecordRef record) =>
     if (image.IsWhiteSpace()) return;
 
     // a counted string works exactly the same way
-    if (record.TryGetCountedString("CommandLine", out var cmdline)
+    if (record.TryGetCountedString("CommandLine".AsSpan(), out var cmdline)
         && cmdline.Contains("-enc".AsSpan(), StringComparison.OrdinalIgnoreCase))
     {
         // pay for a string only now, and only for the events that were retained
@@ -358,7 +373,7 @@ using (var builder = new RecordBuilder(providerId, id: 7937, version: 1))
     var filter = new EventFilter(Filter.AnyEvent());
     filter.OnEventRef += (in EventRecordRef record) =>
     {
-        Assert.True(record.TryGetUnicodeString("Payload", out ReadOnlySpan<char> payload));
+        Assert.True(record.TryGetUnicodeString("Payload".AsSpan(), out ReadOnlySpan<char> payload));
         Assert.True(payload.EndsWith("cmd.exe".AsSpan(), StringComparison.Ordinal));
     };
 
@@ -381,13 +396,19 @@ Three constraints on `RecordBuilder` are easily overlooked:
 - **Use `PackIncomplete()` when the schema varies by Windows build.** `Pack()` requires every
   property in the schema to be supplied; events that gained properties in later releases
   otherwise fail with "Not all the properties of the event were filled" on some machines.
-- **There is no adder for binary or counted-string properties.** `AddValue<T>` covers the
-  integral types. A counted string is a length-prefixed value in a `UNICODESTRING` property
+- **`AddValue<T>` covers the integral types only, and the in-type is validated.** There is no
+  adder for binary, counted-string, pointer, GUID, FILETIME or SID properties, and supplying a
+  `ulong` for a property the schema declares as `win:Pointer` is rejected with
+  `Invalid property type given for property <name> Expected: Pointer Received: UInt64`. Since
+  properties are laid out sequentially, a property of an unsupported type part-way through a
+  schema cannot simply be skipped — it prevents everything after it from being addressed. Check
+  the event's template (`(Get-WinEvent -ListProvider <name>).Events`) before choosing a fixture
+  event. A counted string is a length-prefixed value in a `UNICODESTRING` property
   (`"\u0008abcd"` reads back as `"abcd"`), and `TryGetBinary` works against any property.
 
 Assertions inside a ref handler carry one further constraint: the record cannot be captured,
-so `Assert.Throws(() => record.GetUnicodeString("Missing"))` does not compile. Use an inline
-`try`/`catch` instead.
+so `Assert.Throws(() => record.GetUnicodeString("Missing".AsSpan()))` does not compile. Use an
+inline `try`/`catch` instead.
 
 To verify that a handler does not allocate, measure inside the callback. This works on .NET
 Framework as well as modern .NET, provided the schema and property caches are warmed by an
@@ -401,6 +422,146 @@ Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
 
 `tests/O365.Security.ETW.Managed.Tests/RefAccessorTests.cs` is a worked example of all of the
 above.
+
+### Converting a producer test
+
+The example above asserts inside the handler, which suits a handler defined inline. Production
+handlers are more often private methods on a producer class that raises a domain event, and
+their tests reach the handler by reflection while substituting a hand-written `IEventRecord`:
+
+```csharp
+// before: a fake record, and reflection to reach a private handler
+var record = new TestEventRecord { Id = 7937, ProcessId = 12345 };
+record.Data["ContextInfo"] = contextInfo;
+record.Data["Payload"] = payload;
+
+producer.GetType()
+    .GetMethod("OnPowerShellMethodInvocation", BindingFlags.NonPublic | BindingFlags.Instance)
+    .Invoke(producer, new object[] { record });
+
+_invocations.Should().BeEquivalentTo(new[] { expected });
+```
+
+Neither half of that survives the move to `OnEventRef`. The fake is an `IEventRecord`
+implementation, which `EventRecordRef` is not, and the reflection call cannot be repaired:
+`new object[] { record }` fails to compile with CS0029, because a `ref struct` cannot be boxed.
+`MethodInfo.Invoke` passes arguments as `object`, so no amount of reflection can deliver one.
+
+Build the record and let the producer's own filter dispatch it. The producer needs to expose
+the filter — or the trace it registers on — so a test can hand it to `Proxy`:
+
+```csharp
+public class PowerShellMethodProducer : IDisposable
+{
+    public event Action<PowerShellMethodInvocationEvent> OnDataProduced;
+
+    public EventFilter Filter { get; }
+
+    public PowerShellMethodProducer(params string[] ignoredMethodNames)
+    {
+        _ignoredMethodNames = ignoredMethodNames;
+
+        Filter = new EventFilter(PowerShellMethodInvocation);
+        Filter.OnEventRef += OnPowerShellMethodInvocation;
+    }
+
+    private void OnPowerShellMethodInvocation(in EventRecordRef record)
+    {
+        if (!record.TryGetUnicodeString("Payload".AsSpan(), out var payload)) return;
+        if (!payload.EndsWith("Started.\r\n".AsSpan(), StringComparison.Ordinal)) return;
+
+        if (!record.TryGetUnicodeString("ContextInfo".AsSpan(), out var context)) return;
+
+        var commandName = ReadField(context, "Command Name = ".AsSpan());
+        var commandType = ReadField(context, "Command Type = ".AsSpan());
+
+        if (!commandType.Equals("Function".AsSpan(), StringComparison.Ordinal)) return;
+
+        foreach (var ignored in _ignoredMethodNames)
+        {
+            if (commandName.Equals(ignored.AsSpan(), StringComparison.OrdinalIgnoreCase)) return;
+        }
+
+        OnDataProduced?.Invoke(new PowerShellMethodInvocationEvent
+        {
+            ProcessId = record.ProcessId,
+            Timestamp = record.Timestamp,
+            MethodName = commandName.ToString(),
+            MethodType = commandType.ToString(),
+        });
+    }
+}
+```
+
+The test then subscribes to the domain event and pushes a record through the producer, with no
+reflection and no fake record type:
+
+```csharp
+[TestMethod]
+public void emits_an_event_for_a_function_start()
+{
+    var produced = new List<PowerShellMethodInvocationEvent>();
+
+    using (var producer = new PowerShellMethodProducer())
+    {
+        producer.OnDataProduced += e => produced.Add(e);
+
+        using (var proxy = new Proxy(producer.Filter))
+        using (var record = Build("Invoke-Thing", "Function", "Command Invoke-Thing is Started.\r\n"))
+        {
+            proxy.PushEvent(record);
+        }
+    }
+
+    Assert.AreEqual(1, produced.Count);
+    Assert.AreEqual("Invoke-Thing", produced[0].MethodName);
+}
+
+private static SynthRecord Build(string name, string type, string payload)
+{
+    using (var builder = new RecordBuilder(PowerShellProviderId, id: 7937, version: 1))
+    {
+        builder.AddUnicodeString("ContextInfo", string.Format(ContextTemplate, name, type));
+        builder.AddUnicodeString("UserData", string.Empty);
+        builder.AddUnicodeString("Payload", payload);
+
+        return builder.Pack();
+    }
+}
+```
+
+Two properties of this conversion are worth noting.
+
+The fake record disappears entirely. A hand-written `IEventRecord` is a substantial fixture —
+every accessor, backed by a dictionary — and one that answers from a dictionary rather than
+from a payload, so it cannot reproduce a decoding failure, a missing property in a particular
+schema version, or a length that disagrees with its declared type. `RecordBuilder` lays out
+real bytes and TDH decodes them.
+
+Coverage also increases. Invoking the handler by reflection bypasses the `EventFilter`, so the
+event ID and every predicate were never exercised; a test could assert an event that the
+production pipeline would in fact reject before the handler ran. Pushing through `Proxy` runs
+the same predicate chain a live trace runs, which makes the negative cases meaningful:
+
+```csharp
+Push("Invoke-Thing", "Function", "Command Invoke-Thing is Ended.\r\n");   // wrong payload suffix
+Push("Start-Process", "Cmdlet", "Command Start-Process is Started.\r\n"); // wrong command type
+```
+
+The same harness pins the allocation behaviour, because the rejected path is the one that
+matters — it runs for every event:
+
+```csharp
+using (var record = Build("Start-Process", "Cmdlet", "Command Start-Process is Started.\r\n"))
+{
+    for (int i = 0; i < 200; i++) proxy.PushEvent(record);   // warm the schema and property caches
+
+    long before = GC.GetAllocatedBytesForCurrentThread();
+    for (int i = 0; i < 1000; i++) proxy.PushEvent(record);
+
+    Assert.AreEqual(0, GC.GetAllocatedBytesForCurrentThread() - before);
+}
+```
 
 ---
 
