@@ -114,7 +114,8 @@ namespace Microsoft.O365.Security.ETW
     internal sealed class AnsiStringPredicate : Predicate
     {
         private readonly string _name;
-        private readonly byte[] _value;
+        private readonly byte[] _ansi;
+        private readonly byte[] _utf8;
         private readonly StringMatch _match;
         private readonly bool _ignoreCase;
 
@@ -126,20 +127,23 @@ namespace Microsoft.O365.Security.ETW
 
             // The ANSI code page, matching how these properties are decoded and how the
             // C++/CLI wrapper marshals the value it compares against
-            // (msclr::interop::marshal_as<std::string>, which is also CP_ACP).
-            _value = AnsiEncoding.Current.GetBytes(value);
+            // (msclr::interop::marshal_as<std::string>, which is also CP_ACP). A property
+            // whose out-type says UTF-8 is compared against the UTF-8 bytes instead, so both
+            // are transcoded once here and the match itself stays a byte compare.
+            _ansi = AnsiEncoding.Current.GetBytes(value);
+            _utf8 = Encoding.UTF8.GetBytes(value);
             _match = match;
             _ignoreCase = ignoreCase;
         }
 
         public override bool Test(in EventRecordRef record)
         {
-            if (!record.TryGetAnsiStringBytes(_name.AsSpan(), out ReadOnlySpan<byte> actual))
+            if (!record.TryGetAnsiStringBytes(_name.AsSpan(), out ReadOnlySpan<byte> actual, out ushort outType))
             {
                 return false;
             }
 
-            var expected = new ReadOnlySpan<byte>(_value);
+            var expected = new ReadOnlySpan<byte>(AnsiEncoding.IsUtf8(outType) ? _utf8 : _ansi);
 
             switch (_match)
             {

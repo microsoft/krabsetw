@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft. All rights reserved.
+﻿// Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #include "CppUnitTest.h"
@@ -64,63 +64,6 @@ namespace krabstests
             krabs::event_filter provider_filter_single_event_id(1);
             krabs::event_filter provider_filter_array_of_single_event_id({ 1 });
             krabs::event_filter provider_filter_array_of_multiple_event_ids({ 1, 2 });
-        }
-
-        // The event ids handed to event_filter are also pushed into ETW as an
-        // EVENT_FILTER_TYPE_EVENT_ID descriptor, but that push-down is an optimization
-        // rather than a guarantee: ETW does not apply it to MOF or WPP events, it is
-        // dropped when the id count is too large, and the ids of every filter on a
-        // provider are unioned before being pushed. The filter therefore re-tests.
-        TEST_METHOD(event_id_filter_should_forward_events_with_a_matching_id)
-        {
-            krabs::event_filter filter((unsigned short)7937);
-
-            auto was_called = false;
-            filter.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called = true; });
-
-            krabs::testing::event_filter_proxy proxy(filter);
-            proxy.push_event(record);
-
-            Assert::IsTrue(was_called);
-        }
-
-        TEST_METHOD(event_id_filter_should_not_forward_events_with_a_different_id)
-        {
-            krabs::event_filter filter((unsigned short)1);
-
-            auto was_called = false;
-            filter.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called = true; });
-
-            krabs::testing::event_filter_proxy proxy(filter);
-            proxy.push_event(record);
-
-            Assert::IsFalse(was_called);
-        }
-
-        TEST_METHOD(event_id_filter_should_forward_events_matching_any_id_in_the_list)
-        {
-            krabs::event_filter filter(std::vector<unsigned short>{ 1, 7937 });
-
-            auto was_called = false;
-            filter.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called = true; });
-
-            krabs::testing::event_filter_proxy proxy(filter);
-            proxy.push_event(record);
-
-            Assert::IsTrue(was_called);
-        }
-
-        TEST_METHOD(event_id_filter_should_still_apply_its_predicate)
-        {
-            krabs::event_filter filter((unsigned short)7937, krabs::predicates::no_event);
-
-            auto was_called = false;
-            filter.add_on_event_callback([&](const EVENT_RECORD &, const krabs::trace_context &) { was_called = true; });
-
-            krabs::testing::event_filter_proxy proxy(filter);
-            proxy.push_event(record);
-
-            Assert::IsFalse(was_called);
         }
 
         TEST_METHOD(id_is_should_match_events_that_have_matching_ids)

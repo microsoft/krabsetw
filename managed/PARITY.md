@@ -283,18 +283,31 @@ BITS-Client, Hyper-V-Compute). That does not by itself establish
 impact — a read only breaks if it targets a property at or after the struct in the same
 event — but it does rule out "no provider does this".
 
-### ANSI decoding ignores the out-type (open, both sides)
+### ANSI decoding ignores the out-type (fixed in the port, open in C++/CLI)
 
 Tracked internally.
 
 `TDH_OUTTYPE_STRING` means the ANSI code page, but `TDH_OUTTYPE_UTF8` (35) and
 `TDH_OUTTYPE_JSON` (34) mean UTF-8, and `TDH_OUTTYPE_XML` (28) defers to the document's
-own encoding declaration. Neither implementation branches on the out-type; both decode
+own encoding declaration. Neither implementation branched on the out-type; both decoded
 ANSI string in-types using the ANSI code page unconditionally.
 
+The port now selects the encoding from the out-type (`AnsiEncoding.ForOutType`), on the
+decoding path (`IEventRecord.GetAnsiString`), in the comparison path (`AnsiString`
+predicates transcode their comparison value both ways once, so matching stays a byte
+compare), and in `RecordBuilder`, which encodes an ANSI value when the record is packed
+rather than when it is supplied. `TDH_OUTTYPE_XML` is left on the ANSI code page:
+honouring the document's declaration means parsing the value, and TDH does not re-encode
+it either.
+
+This is a divergence from C++/CLI until the same fix lands there, and the parity suite
+cannot cover it in the meantime — the coverage is
+`managed/tests/O365.Security.ETW.Managed.Tests/AnsiOutTypeTests.cs`, which declares an
+`EventSchema` carrying `win:UTF8` and `win:Json` out-types.
+
 A sweep of the 1503 providers registered on a build machine found 4163 ANSI-typed string
-properties: 4162 `TDH_OUTTYPE_STRING`, one `win:Xml`, and zero UTF-8 or JSON. So this is
-currently theoretical. Tracked separately for both implementations.
+properties: 4162 `TDH_OUTTYPE_STRING`, one `win:Xml`, and zero UTF-8 or JSON. So the
+exposure is currently theoretical.
 
 Note that `TdhOutType` in the port had these two values numbered three too high until
 recently; the enum in `tdh.h` is implicitly numbered and the transcription had drifted.
@@ -307,6 +320,32 @@ The port decodes the full property length. Only reachable for ANSI in-types that
 NUL-terminated, i.e. the counted and non-NUL-terminated variants.
 
 ## Resolved
+
+### A synthetic record could be finalized while it was being read
+
+`SynthRecord` owns its `EVENT_RECORD`, user data and extended data in unmanaged memory and
+releases them from a finalizer. `Proxy.PushEvent` and `Predicate.Test` took the raw pointer
+out of the record and dispatched through it, and in the shape every example uses —
+`proxy.PushEvent(builder.Pack())` — nothing else referenced the record for the duration of
+the callback. A collection landing inside a handler was therefore free to finalize the
+record and free the payload while it was being read, which surfaced as an
+`AccessViolationException` from a handler that had done nothing wrong.
+
+Both call sites now keep the record alive across dispatch. Covered by
+`SynthRecordLifetimeTests`, which collects from inside the ref handler, the compat handler
+and a predicate; two of the three faulted reliably on net48 before the fix.
+
+This has no analogue in krabs, whose records are not garbage collected.
+
+### `RecordBuilder` padded unfilled pointers to the wrong width
+
+A filled `win:Pointer` property is emitted at the width the record's header flags declare,
+but an unfilled one padded `IntPtr.Size` bytes — the width of a pointer in the process
+running the test. Building a 32-bit-source record with an unfilled pointer therefore
+misplaced every property after it. Both now use the record's own width.
+
+krabs has the same defect (`how_many_bytes_to_fill` pads `sizeof(void*)`), and it is only
+reachable through the testing surface.
 
 ### ANSI string decoding used UTF-8
 

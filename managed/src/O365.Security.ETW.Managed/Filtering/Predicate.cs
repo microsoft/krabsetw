@@ -64,6 +64,11 @@ namespace Microsoft.O365.Security.ETW
         /// <summary>
         /// Tests a synthetic record. For testing scenarios only.
         /// </summary>
+        /// <remarks>
+        /// The record is kept alive across the test: the predicate reads through a raw
+        /// pointer taken from it, and a collection in between would otherwise be free to
+        /// finalize the record and release the memory being read.
+        /// </remarks>
         public unsafe bool Test(Testing.SynthRecord record)
         {
             if (record == null) throw new ArgumentNullException(nameof(record));
@@ -79,6 +84,7 @@ namespace Microsoft.O365.Security.ETW
             finally
             {
                 scratch.Dispose();
+                GC.KeepAlive(record);
             }
         }
 

@@ -39,6 +39,13 @@ namespace Microsoft.O365.Security.ETW.Testing
         /// <summary>
         /// Pushes an event through the proxied trace or filter, exactly as ProcessTrace would.
         /// </summary>
+        /// <remarks>
+        /// The record is kept alive across dispatch. Everything downstream reads through a
+        /// raw pointer taken from it, and once that pointer has been read the caller's
+        /// <c>PushEvent(builder.Pack())</c> holds no other reference, so a collection landing
+        /// inside a handler would otherwise run the record's finalizer and free the payload
+        /// while it is being read.
+        /// </remarks>
         public void PushEvent(SynthRecord record)
         {
             if (record == null)
@@ -46,39 +53,46 @@ namespace Microsoft.O365.Security.ETW.Testing
                 throw new ArgumentNullException(nameof(record));
             }
 
-            if (_userTrace != null)
-            {
-                _userTrace.PushEvent(record.Record);
-                return;
-            }
-
-            if (_kernelTrace != null)
-            {
-                _kernelTrace.PushEvent(record.Record);
-                return;
-            }
-
-            // A filter is normally driven by its owning trace's scratch and adapter. Standing
-            // in for that trace means supplying our own, reused across pushes for the same
-            // reason the trace reuses its own.
-            if (_scratch == null)
-            {
-                _scratch = new EventScratch();
-                _adapter = new EventRecordAdapter();
-            }
-
-            EVENT_RECORD* raw = record.Record;
-
-            _scratch!.Begin(raw);
-            _adapter!.Begin(raw, _scratch);
-
             try
             {
-                _filter!.Dispatch(new EventRecordRef(raw, _scratch), _adapter);
+                if (_userTrace != null)
+                {
+                    _userTrace.PushEvent(record.Record);
+                    return;
+                }
+
+                if (_kernelTrace != null)
+                {
+                    _kernelTrace.PushEvent(record.Record);
+                    return;
+                }
+
+                // A filter is normally driven by its owning trace's scratch and adapter.
+                // Standing in for that trace means supplying our own, reused across pushes for
+                // the same reason the trace reuses its own.
+                if (_scratch == null)
+                {
+                    _scratch = new EventScratch();
+                    _adapter = new EventRecordAdapter();
+                }
+
+                EVENT_RECORD* raw = record.Record;
+
+                _scratch!.Begin(raw);
+                _adapter!.Begin(raw, _scratch);
+
+                try
+                {
+                    _filter!.Dispatch(new EventRecordRef(raw, _scratch), _adapter);
+                }
+                finally
+                {
+                    _adapter!.End();
+                }
             }
             finally
             {
-                _adapter!.End();
+                GC.KeepAlive(record);
             }
         }
 

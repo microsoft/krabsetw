@@ -23,6 +23,12 @@ namespace Microsoft.O365.Security.ETW.Tests
         private static readonly Guid SmbClientProviderId = Guid.Parse("988C59C5-0A1C-45B6-A555-0C62276E327D");
         private static readonly Guid KernelProcessProviderId = Guid.Parse("22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716");
 
+        /// <summary>
+        /// Declared rather than in-box: no registered provider is known to place a POINTER
+        /// ahead of another property in an event a 32-bit process emits.
+        /// </summary>
+        private static readonly Guid PointerProviderId = Guid.Parse("4a1a7d2c-5f9e-4a2b-8d3c-1e6f7b8c9d02");
+
         private delegate void RefAssert(in EventRecordRef record);
 
         [Fact]
@@ -148,6 +154,40 @@ namespace Microsoft.O365.Security.ETW.Tests
 
                 var error = Assert.Throws<ArgumentException>(() => builder.PackIncomplete());
                 Assert.Contains("Expected: Pointer", error.Message);
+            }
+        }
+
+        /// <summary>
+        /// An unfilled property pads to the width the reader will consume. For a POINTER
+        /// that width comes from the record's header flags, not from the width of a pointer
+        /// in the process running the test, so a record built from a 32-bit source must pad
+        /// four bytes even on x64.
+        /// </summary>
+        [Fact]
+        public void AnUnfilledPointerPadsToTheRecordsPointerWidth()
+        {
+            var schema = EventSchema
+                .Create("Contoso-Pointer-Provider", PointerProviderId, id: 9, version: 0)
+                .Pointer("Handle")
+                .UInt32("Status");
+
+            using (EventSchema.Use(schema))
+            using (var builder = new RecordBuilder(PointerProviderId, id: 9, version: 0))
+            {
+                builder.Header.Flags = (ushort)EventHeaderFlags.HEADER_32_BIT;
+                builder.AddValue("Status", 7u);
+
+                Push(
+                    builder.PackIncomplete(),
+                    (in EventRecordRef record) =>
+                    {
+                        Assert.True(record.TryGetPointer("Handle".AsSpan(), out ulong handle));
+                        Assert.Equal(0ul, handle);
+
+                        Assert.True(record.TryGetUInt32("Status".AsSpan(), out uint status));
+                        Assert.Equal(7u, status);
+                    },
+                    null);
             }
         }
 

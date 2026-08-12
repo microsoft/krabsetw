@@ -96,13 +96,14 @@ namespace Microsoft.O365.Security.ETW.Testing
         }
 
         /// <summary>Adds a property with an ANSI string to the record.</summary>
+        /// <remarks>
+        /// The encoding is decided when the record is packed, from the property's out-type:
+        /// the machine's ANSI code page normally, UTF-8 where the schema says <c>win:UTF8</c>
+        /// or <c>win:Json</c>.
+        /// </remarks>
         public void AddAnsiString(string name, string value)
         {
-            byte[] text = AnsiEncoding.Current.GetBytes(value ?? string.Empty);
-            var bytes = new byte[text.Length + 1];
-            text.CopyTo(bytes, 0);
-
-            _properties.Add(new PropertyThunk(name, bytes, TdhInType.AnsiString));
+            _properties.Add(PropertyThunk.AnsiString(name, value ?? string.Empty));
         }
 
         /// <summary>Adds a property with a unicode string to the record.</summary>
@@ -356,7 +357,7 @@ namespace Microsoft.O365.Security.ETW.Testing
                     if (found < 0)
                     {
                         unfilled.Add(name);
-                        payload.AddRange(new byte[FillWidth((TdhInType)table.InTypes[i], name)]);
+                        payload.AddRange(new byte[FillWidth((TdhInType)table.InTypes[i], name, pointerSize)]);
                         continue;
                     }
 
@@ -370,7 +371,7 @@ namespace Microsoft.O365.Security.ETW.Testing
                             " Received: " + thunk.InType);
                     }
 
-                    byte[] bytes = thunk.BytesFor(pointerSize);
+                    byte[] bytes = thunk.BytesFor(pointerSize, table.OutTypes[i]);
                     int terminator = TerminatorWidth(thunk.InType);
 
                     if (terminator > 0)
@@ -534,7 +535,12 @@ namespace Microsoft.O365.Security.ETW.Testing
         /// krabs::testing::details::how_many_bytes_to_fill, which pads by the in-type's
         /// natural width rather than by the schema's declared length.
         /// </summary>
-        private static int FillWidth(TdhInType inType, string name)
+        /// <remarks>
+        /// A POINTER is as wide as the record says it is, not as wide as a pointer in the
+        /// process running the test: padding by the latter would leave a 32-bit record four
+        /// bytes long at every unfilled pointer and misplace every property after it.
+        /// </remarks>
+        private static int FillWidth(TdhInType inType, string name, int pointerSize)
         {
             switch (inType)
             {
@@ -553,10 +559,10 @@ namespace Microsoft.O365.Security.ETW.Testing
                 case TdhInType.Boolean: return 4;
                 case TdhInType.Binary: return 1;
                 case TdhInType.Guid: return 16;
-                case TdhInType.Pointer: return IntPtr.Size;
+                case TdhInType.Pointer: return pointerSize;
                 case TdhInType.FileTime: return 8;
                 case TdhInType.SystemTime: return 16;
-                case TdhInType.Sid: return IntPtr.Size;
+                case TdhInType.Sid: return pointerSize;
                 case TdhInType.HexInt32: return 4;
                 case TdhInType.HexInt64: return 8;
                 default:
@@ -576,27 +582,49 @@ namespace Microsoft.O365.Security.ETW.Testing
             /// </summary>
             public readonly ulong? PointerValue;
 
+            /// <summary>
+            /// Text of an ANSI string property, whose encoding is not known until the record
+            /// is packed. Null for every other in-type.
+            /// </summary>
+            public readonly string? AnsiText;
+
             public PropertyThunk(string name, byte[] bytes, TdhInType inType)
-                : this(name, bytes, inType, null)
+                : this(name, bytes, inType, null, null)
             {
             }
 
-            private PropertyThunk(string name, byte[] bytes, TdhInType inType, ulong? pointerValue)
+            private PropertyThunk(string name, byte[] bytes, TdhInType inType, ulong? pointerValue, string? ansiText)
             {
                 Name = name;
                 Bytes = bytes;
                 InType = inType;
                 PointerValue = pointerValue;
+                AnsiText = ansiText;
             }
 
             public static PropertyThunk Pointer(string name, ulong value)
             {
-                return new PropertyThunk(name, Array.Empty<byte>(), TdhInType.Pointer, value);
+                return new PropertyThunk(name, Array.Empty<byte>(), TdhInType.Pointer, value, null);
             }
 
-            /// <summary>Bytes to emit for this property at the given pointer width.</summary>
-            public byte[] BytesFor(int pointerSize)
+            public static PropertyThunk AnsiString(string name, string value)
             {
+                return new PropertyThunk(name, Array.Empty<byte>(), TdhInType.AnsiString, null, value);
+            }
+
+            /// <summary>
+            /// Bytes to emit for this property at the given pointer width and out-type.
+            /// </summary>
+            public byte[] BytesFor(int pointerSize, ushort outType)
+            {
+                if (AnsiText != null)
+                {
+                    byte[] text = AnsiEncoding.ForOutType(outType).GetBytes(AnsiText);
+                    var terminated = new byte[text.Length + 1];
+                    text.CopyTo(terminated, 0);
+                    return terminated;
+                }
+
                 if (PointerValue == null)
                 {
                     return Bytes;
