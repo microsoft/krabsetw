@@ -390,9 +390,11 @@ onto a trace rather than a bare filter.
 
 Four constraints on `RecordBuilder` are easily overlooked:
 
-- **It requires a real, registered TDH schema.** `Pack()` resolves the layout from the
-  provider's manifest on the machine running the test, so an invented provider GUID fails with
-  `CouldNotFindSchema` (status 1168). Use an in-box provider whose schema is reliably present.
+- **It resolves the layout from a schema, which by default must be registered on the machine.**
+  `Pack()` asks TDH for the provider's manifest, so an invented provider GUID fails with
+  `CouldNotFindSchema` (status 1168). Either use an in-box provider whose schema is reliably
+  present, or declare the schema in the test — see
+  [Testing without the provider installed](#testing-without-the-provider-installed).
 - **Use `PackIncomplete()` when the schema varies by Windows build.** `Pack()` requires every
   property in the schema to be supplied; events that gained properties in later releases
   otherwise fail with "Not all the properties of the event were filled" on some machines.
@@ -427,6 +429,61 @@ Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
 
 `tests/O365.Security.ETW.Managed.Tests/RefAccessorTests.cs` is a worked example of all of the
 above.
+
+### Testing without the provider installed
+
+Both building and reading a record normally require the provider's manifest to be registered
+on the machine running the test, because the layout comes from TDH. That is a problem for
+providers absent from build agents, for events whose template changed between Windows
+releases, and for tests that would rather not depend on a real provider at all.
+
+A test may instead declare the schema. While the declaration is in scope it answers for the
+events it describes, and nothing downstream can tell the difference — `RecordBuilder`
+validates and lays out against it, and the accessors resolve reads from it:
+
+```csharp
+static readonly Guid ProviderId = Guid.Parse("6f2b1d64-1f4e-4d0a-9f1c-2b7e9a3c5d81");
+
+static EventSchema FileOpened() => EventSchema
+    .Create("Contoso-Test-Provider", ProviderId, id: 42, version: 1)
+    .Named("FileOpened")
+    .UInt32("ProcessId")
+    .Pointer("Handle")
+    .UInt16("PathLength")
+    .UnicodeString("Path", lengthFrom: "PathLength")
+    .UnicodeString("Comment");
+
+[Fact]
+public void ReadsThePath()
+{
+    using var declaration = EventSchema.Use(FileOpened());
+    using var builder = new RecordBuilder(ProviderId, id: 42, version: 1);
+
+    builder.AddValue("ProcessId", 4321u);
+    builder.AddPointer("Handle", 0xFFFFAB0012345678);
+    builder.AddValue("PathLength", (ushort)@"C:\Windows\notepad.exe".Length);
+    builder.AddUnicodeString("Path", @"C:\Windows\notepad.exe");
+    builder.AddUnicodeString("Comment", "opened for read");
+
+    // ... push through a Proxy and assert as usual ...
+}
+```
+
+There is a fluent method per in-type — `UInt32`, `Pointer`, `Guid`, `FileTime`, `Sid`,
+`Binary` and the rest — and `lengthFrom` declares a string or binary property sized by an
+earlier one, as `length="PathLength"` does in a manifest. `Named` supplies the value
+`EventRecordRef.Name` reports; the provider name passed to `Create` supplies `ProviderName`.
+
+Two points are worth keeping in mind:
+
+- **A declaration is only as accurate as whoever wrote it.** It records what the test believes
+  the event looks like, so a declaration that has drifted from the real manifest yields a
+  passing test against an event shape that is never emitted. Prefer a real in-box provider
+  where one exists, and keep the declaration next to the template it mirrors.
+- **The scope is the execution context, not the process.** Tests running in parallel do not
+  see one another's declarations, and disposing the value returned by `Use` restores whatever
+  was in scope before. Declarations do not reach a live trace's processing thread, which needs
+  none: events delivered by ETW come from providers that are registered by definition.
 
 ### Converting a producer test
 
