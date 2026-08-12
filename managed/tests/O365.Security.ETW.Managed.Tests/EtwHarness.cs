@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,6 +12,19 @@ namespace Microsoft.O365.Security.ETW.Tests
     internal static class EtwHarness
     {
         public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// Matches only events emitted by the process running the test.
+        /// </summary>
+        /// <remarks>
+        /// The test provider is an EventSource whose GUID is derived from its name, so every
+        /// test process -- one per target framework, run concurrently -- registers the same
+        /// provider. A session in one of them therefore receives the others' events, which
+        /// makes any assertion that counts events or reads their payload depend on what a
+        /// sibling process happens to be doing. Scoping to this process removes that.
+        /// </remarks>
+        public static readonly Predicate ThisProcess =
+            Filter.ProcessIdIs(Process.GetCurrentProcess().Id);
 
         /// <summary>
         /// How long to keep emitting when the signal is never expected to fire. Long enough

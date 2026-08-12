@@ -416,6 +416,9 @@ Four constraints on `RecordBuilder` are easily overlooked:
   declares `length="ShareNameLength"`, the reader consumes exactly that many characters, so
   the value passed to `AddUnicodeString` and the value passed to the length property have to
   agree. A mismatch is reported by `Pack()` rather than left to decode as truncated text.
+  The same applies to `AddBinary` where the template fixes the width: a `win:Binary` value
+  carries no length of its own, so the reader takes the width from the schema and ignores
+  the bytes, and supplying a different number of them would shift every later property.
 
 Assertions inside a ref handler carry one further constraint: the record cannot be captured,
 so `Assert.Throws(() => record.GetUnicodeString("Missing".AsSpan()))` does not compile. Use an

@@ -124,6 +124,20 @@ namespace Microsoft.O365.Security.ETW
     {
         private readonly object _gate = new object();
         private readonly List<Provider> _providers = new List<Provider>();
+
+        /// <summary>
+        /// Providers that asked for rundown events, in the order they were enabled. Held until
+        /// <see cref="Start"/> can issue CAPTURE_STATE for them.
+        /// </summary>
+        private readonly List<Guid> _rundownProviders = new List<Guid>();
+
+        /// <summary>
+        /// Whether <see cref="Start"/> has already issued CAPTURE_STATE for
+        /// <see cref="_rundownProviders"/>. A provider enabled after that point has missed the
+        /// one issue, so it gets its own.
+        /// </summary>
+        private bool _rundownIssued;
+
         private readonly string _name;
         private readonly ManualResetEventSlim _processingStopped = new ManualResetEventSlim(true);
 
@@ -235,6 +249,13 @@ namespace Microsoft.O365.Security.ETW
                     EnableProviders();
                     _context.SetProviders(_providers);
                     _providersPublished = true;
+
+                    // Start has already been past its one CAPTURE_STATE, so this provider
+                    // would otherwise wait for the next Open/Start cycle for its rundown.
+                    if (_rundownIssued && provider.RundownEnabled)
+                    {
+                        CaptureState(provider.Id);
+                    }
                 }
             }
         }
@@ -286,6 +307,7 @@ namespace Microsoft.O365.Security.ETW
                 }
 
                 StartSession();
+                _rundownIssued = false;
                 EnableProviders();
 
                 _context.SetProviders(_providers);
@@ -306,6 +328,13 @@ namespace Microsoft.O365.Security.ETW
             Open();
 
             ulong handle = _traceHandle;
+
+            // Immediately before ProcessTrace, per krabs: any later and the rundown events
+            // are emitted while nothing is consuming them.
+            lock (_gate)
+            {
+                EnableRundown();
+            }
 
             _processingThread = Thread.CurrentThread;
             _processingStopped.Reset();
@@ -522,6 +551,7 @@ namespace Microsoft.O365.Security.ETW
         private void EnableProviders()
         {
             var merged = new List<MergedProvider>();
+            _rundownProviders.Clear();
 
             foreach (Provider provider in _providers)
             {
@@ -664,20 +694,48 @@ namespace Microsoft.O365.Security.ETW
 
             if (provider.Rundown)
             {
-                status = NativeMethods.EnableTraceEx2(
-                    _sessionHandle,
-                    &id,
-                    NativeConstants.EVENT_CONTROL_CODE_CAPTURE_STATE,
-                    0,
-                    0,
-                    0,
-                    0,
-                    null);
+                _rundownProviders.Add(provider.Id);
+            }
+        }
 
-                if (status != NativeConstants.ERROR_SUCCESS)
-                {
-                    throw new TraceException("EnableTraceEx2(CAPTURE_STATE) failed for provider " + provider.Id + ".", status);
-                }
+        /// <summary>
+        /// Asks each provider that opted in to log its state, immediately before ProcessTrace.
+        /// Port of krabs::details::ut::enable_rundown.
+        /// </summary>
+        /// <remarks>
+        /// The timing is load-bearing, and krabs says so: CAPTURE_STATE has to be issued very
+        /// shortly before ProcessTrace or the rundown events are not generated. Issuing it
+        /// from <see cref="Open"/> instead would put an unbounded gap in front of it, because
+        /// <see cref="Open"/> and <see cref="Start"/> are separate public calls.
+        /// </remarks>
+        private void EnableRundown()
+        {
+            for (int i = 0; i < _rundownProviders.Count; i++)
+            {
+                CaptureState(_rundownProviders[i]);
+            }
+
+            _rundownIssued = true;
+        }
+
+        /// <summary>Asks one provider to log its current state.</summary>
+        private void CaptureState(Guid provider)
+        {
+            Guid id = provider;
+
+            int status = NativeMethods.EnableTraceEx2(
+                _sessionHandle,
+                &id,
+                NativeConstants.EVENT_CONTROL_CODE_CAPTURE_STATE,
+                0,
+                0,
+                0,
+                0,
+                null);
+
+            if (status != NativeConstants.ERROR_SUCCESS)
+            {
+                throw new TraceException("EnableTraceEx2(CAPTURE_STATE) failed for provider " + id + ".", status);
             }
         }
 

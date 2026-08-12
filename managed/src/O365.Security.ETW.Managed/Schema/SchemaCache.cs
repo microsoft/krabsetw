@@ -64,6 +64,12 @@ namespace Microsoft.O365.Security.ETW.Schema
     /// name reduced to a hash so lookups never allocate; collisions are resolved by comparing
     /// the stored name.
     /// </summary>
+    /// <remarks>
+    /// Carries the emitting process's pointer width, which krabs::schema_key does not.
+    /// krabs sizes every property afresh for each event, so one cached blob serves both
+    /// widths; this cache precomputes the fixed property offsets once per entry, and a
+    /// POINTER shifts everything after it, so the two widths need separate entries.
+    /// </remarks>
     internal readonly struct SchemaKey : IEquatable<SchemaKey>
     {
         public readonly Guid Provider;
@@ -73,8 +79,9 @@ namespace Microsoft.O365.Security.ETW.Schema
         public readonly byte Version;
         public readonly byte Opcode;
         public readonly byte Level;
+        public readonly byte PointerSize;
 
-        public SchemaKey(Guid provider, ulong keyword, ulong nameHash, ushort id, byte version, byte opcode, byte level)
+        public SchemaKey(Guid provider, ulong keyword, ulong nameHash, ushort id, byte version, byte opcode, byte level, int pointerSize)
         {
             Provider = provider;
             Keyword = keyword;
@@ -83,6 +90,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             Version = version;
             Opcode = opcode;
             Level = level;
+            PointerSize = (byte)pointerSize;
         }
 
         /// <summary>
@@ -90,12 +98,13 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// buckets. Callers that already hold the name confirm it separately.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool MatchesEvent(Guid provider, ulong keyword, ushort id, byte version, byte opcode, byte level)
+        public bool MatchesEvent(Guid provider, ulong keyword, ushort id, byte version, byte opcode, byte level, int pointerSize)
         {
             return Id == id
                 && Version == version
                 && Opcode == opcode
                 && Level == level
+                && PointerSize == pointerSize
                 && Keyword == keyword
                 && Provider == provider;
         }
@@ -106,6 +115,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 && Version == other.Version
                 && Opcode == other.Opcode
                 && Level == other.Level
+                && PointerSize == other.PointerSize
                 && Keyword == other.Keyword
                 && NameHash == other.NameHash
                 && Provider == other.Provider;
@@ -124,7 +134,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 h = (h * 397) ^ (int)(Keyword ^ (Keyword >> 32));
                 h = (h * 397) ^ (int)(NameHash ^ (NameHash >> 32));
                 h = (h * 397) ^ Id;
-                h = (h * 397) ^ (Version | (Opcode << 8) | (Level << 16));
+                h = (h * 397) ^ (Version | (Opcode << 8) | (Level << 16) | (PointerSize << 24));
                 return h;
             }
         }
@@ -157,6 +167,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             ReadOnlySpan<byte> tlName = TraceLoggingMetadata.GetEventName(record);
 
             ref EVENT_DESCRIPTOR descriptor = ref record->EventHeader.EventDescriptor;
+            int pointerSize = PointerSizeFor(record);
 
             // Events arrive in bursts from the same provider, so the previous event's schema
             // is overwhelmingly the right answer. Confirming it structurally is cheaper than
@@ -168,7 +179,8 @@ namespace Microsoft.O365.Security.ETW.Schema
                     descriptor.Id,
                     descriptor.Version,
                     descriptor.Opcode,
-                    descriptor.Level)
+                    descriptor.Level,
+                    pointerSize)
                 && _lastEntry.NameMatches(tlName))
             {
                 return _lastEntry;
@@ -183,7 +195,8 @@ namespace Microsoft.O365.Security.ETW.Schema
                 descriptor.Id,
                 descriptor.Version,
                 descriptor.Opcode,
-                descriptor.Level);
+                descriptor.Level,
+                pointerSize);
 
             if (_cache.TryGetValue(key, out SchemaEntry? entry) && entry.NameMatches(tlName))
             {
