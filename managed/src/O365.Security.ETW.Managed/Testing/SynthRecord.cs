@@ -33,6 +33,20 @@ namespace Microsoft.O365.Security.ETW.Testing
 
             if (userData != null && userData.Length > 0)
             {
+                // UserDataLength is a USHORT. Casting a longer payload into it wraps, and the
+                // record then decodes as a much shorter one, with every property past the
+                // wrapped length reported absent for no visible reason.
+                if (userData.Length > ushort.MaxValue)
+                {
+                    Marshal.FreeHGlobal(_record);
+                    _record = IntPtr.Zero;
+
+                    throw new ArgumentException(
+                        "The event payload is " + userData.Length +
+                        " bytes, and EVENT_RECORD.UserDataLength cannot describe more than " +
+                        ushort.MaxValue + ".");
+                }
+
                 _userData = Marshal.AllocHGlobal(userData.Length);
                 Marshal.Copy(userData, 0, _userData, userData.Length);
                 record->UserData = _userData;
