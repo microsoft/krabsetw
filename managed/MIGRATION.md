@@ -388,7 +388,7 @@ using (var builder = new RecordBuilder(providerId, id: 7937, version: 1))
 `Proxy` also takes a `UserTrace` or a `KernelTrace` if the code under test wires providers
 onto a trace rather than a bare filter.
 
-Three constraints on `RecordBuilder` are easily overlooked:
+Four constraints on `RecordBuilder` are easily overlooked:
 
 - **It requires a real, registered TDH schema.** `Pack()` resolves the layout from the
   provider's manifest on the machine running the test, so an invented provider GUID fails with
@@ -396,15 +396,20 @@ Three constraints on `RecordBuilder` are easily overlooked:
 - **Use `PackIncomplete()` when the schema varies by Windows build.** `Pack()` requires every
   property in the schema to be supplied; events that gained properties in later releases
   otherwise fail with "Not all the properties of the event were filled" on some machines.
-- **`AddValue<T>` covers the integral types only, and the in-type is validated.** There is no
-  adder for binary, counted-string, pointer, GUID, FILETIME or SID properties, and supplying a
-  `ulong` for a property the schema declares as `win:Pointer` is rejected with
-  `Invalid property type given for property <name> Expected: Pointer Received: UInt64`. Since
-  properties are laid out sequentially, a property of an unsupported type part-way through a
-  schema cannot simply be skipped — it prevents everything after it from being addressed. Check
-  the event's template (`(Get-WinEvent -ListProvider <name>).Events`) before choosing a fixture
-  event. A counted string is a length-prefixed value in a `UNICODESTRING` property
-  (`"\u0008abcd"` reads back as `"abcd"`), and `TryGetBinary` works against any property.
+- **`AddValue<T>` infers the in-type from the CLR type, and the in-type is validated.** It
+  covers the integral and floating-point types plus `Guid`; the in-types that share a CLR
+  representation with an integer have dedicated adders — `AddPointer`, `AddFileTime`,
+  `AddHexInt32`, `AddHexInt64` — alongside `AddGuid`, `AddBoolean`, `AddSystemTime`, `AddSid`
+  and `AddBinary`. Supplying a `ulong` for a property the schema declares as `win:Pointer` is
+  rejected with
+  `Invalid property type given for property <name> Expected: Pointer Received: UInt64`, so
+  check the event's template (`(Get-WinEvent -ListProvider <name>).Events`) when a type is in
+  doubt. Counted strings have no adder: use a length-prefixed value in a `UNICODESTRING`
+  property (`"\u0008abcd"` reads back as `"abcd"`).
+- **A string the schema sizes must match the size the schema is given.** Where a template
+  declares `length="ShareNameLength"`, the reader consumes exactly that many characters, so
+  the value passed to `AddUnicodeString` and the value passed to the length property have to
+  agree. A mismatch is reported by `Pack()` rather than left to decode as truncated text.
 
 Assertions inside a ref handler carry one further constraint: the record cannot be captured,
 so `Assert.Throws(() => record.GetUnicodeString("Missing".AsSpan()))` does not compile. Use an
