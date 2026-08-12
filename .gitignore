@@ -48,9 +48,6 @@ githooks/*.dll
 *.swp
 *.swo
 
-# Internal public-surface differ. Kept out of tree; MIGRATION.md carries the reviewed list.
-managed/tools/ApiDiff/
-
 # Build output of the struct-layout probe. The source is tracked; the binary is not.
 managed/tools/layoutprobe/*.exe
 managed/tools/layoutprobe/*.obj
