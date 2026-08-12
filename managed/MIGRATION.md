@@ -5,7 +5,7 @@ shipped as `Microsoft.O365.Security.Native.ETW`, which was itself a thin layer o
 native `krabs` headers.
 
 It ships as a **different package** starting at **5.0.0**. The C++/CLI package continues on
-the 4.4.x line, so the two can be installed side by side while you migrate. The old id kept
+the 4.4.x line, so the two can be installed side by side during migration. The old id retained
 "Native" in the name, which no longer describes anything about this implementation.
 
 | | `Microsoft.O365.Security.Native.ETW` | `Microsoft.O365.Security.ETW` |
@@ -16,16 +16,16 @@ the 4.4.x line, so the two can be installed side by side while you migrate. The 
 | Target frameworks | net462, net8.0 | net462, net48, net8.0-windows, net10.0-windows |
 | Architecture | x64 and ARM64 mixed-mode, under `runtimes/` | one AnyCPU assembly under `lib/` |
 
-Because the namespace is unchanged, most source compiles untouched — swapping the
-`PackageReference` is usually the whole migration.
+Because the namespace is unchanged, most source compiles untouched; replacing the
+`PackageReference` is typically the entire migration.
 
 **Nothing is binary-compatible.** The assembly name changes, so every consumer must be
 recompiled; anything still bound to the old name will throw `MissingMethodException` or fail
 to load. `Assembly.Load` calls and binding redirects naming
 `Microsoft.O365.Security.Native.ETW` need updating.
 
-The rest of this document lists every public-surface difference, then covers the two things
-you are most likely to want after the swap: moving a hot handler off allocation, and testing
+The rest of this document lists every public-surface difference, followed by the two topics
+most relevant after the swap: converting a hot handler to allocation-free access, and testing
 handlers without a live trace.
 
 ---
@@ -46,12 +46,12 @@ handlers without a live trace.
 | 8 | `IUserTrace.Enable(RawProvider)` removed from the interface | callers via the interface |
 | 9 | `Testing.EventHeader` is now `Testing.EventHeaderView` | test code using `RecordBuilder.Header` |
 
-Most consumers hit none of them. The realistic worst case is #1, and only if you implement
-`IEventRecord` yourself.
+Most consumers encounter none of them. The most likely to apply is #1, and only to code that
+implements `IEventRecord` directly.
 
-Separately, there are five **behaviour** changes that compile silently — `TryGet*` on
-failure, case folding, `KernelProvider.GroupMask`, `TraceStats` and struct-typed properties.
-Those are the ones worth reading carefully, and they are listed after the nine.
+Separately, five **behaviour** changes compile silently — `TryGet*` on failure, case folding,
+`KernelProvider.GroupMask`, `TraceStats` and struct-typed properties. These warrant the
+closest reading, and are listed after the nine.
 
 ### Compile breaks
 
@@ -68,12 +68,12 @@ allocation.
 Implementors of `IEventRecord` break: C# requires an exact signature match to implement an
 interface member — there is no return-type covariance — so a class declaring
 `public ValueType GetDateTime(string)` no longer implements it. `out` parameters require exact
-type identity, so `TryGetDateTime` breaks the same way. **Callers** are mostly fine;
+type identity, so `TryGetDateTime` breaks the same way. **Callers** are largely unaffected;
 `ValueType x = record.GetDateTime(…)` still compiles via implicit boxing, and only `var`
-inference shifts.
+inference changes.
 
-The one capability genuinely lost is that `null` was a *distinguishable* "no value" sentinel,
-where `default(DateTime)` is a legal date. `GetUInt32` has always been in that position — `0`
+The one capability lost is that `null` was a *distinguishable* "no value" sentinel, whereas
+`default(DateTime)` is a legal date. `GetUInt32` has always been in the same position — `0`
 was never distinguishable either — so this makes `DateTime` consistent rather than an outlier.
 
 **2. `IDisposable` is gone from four types.** `Predicate`, `Property`, `KernelProvider` and
@@ -131,20 +131,20 @@ Items 3 and 4.
 
 ### Behaviour changes that still compile
 
-These are the dangerous ones: nothing tells you at build time.
+These are the changes that produce no build-time diagnostic.
 
 **`TryGet*` now zeroes the out parameter on failure.** krabs assigns the out parameter only
 on success, and `[Out]` in C++/CLI is metadata only — the CLR does not enforce assignment —
-so a failed lookup left your variable holding whatever it held before the call. The port
-writes the default first.
+so a failed lookup left the caller's variable holding whatever it held before the call. The
+port writes the default first.
 
 ```csharp
 uint v = 42;
 if (!record.TryGetUInt32("missing", out v)) { /* C++/CLI: 42    port: 0 */ }
 ```
 
-This applies to every `TryGet*`. If you relied on the old behaviour to keep a previous value,
-that code silently changes meaning.
+This applies to every `TryGet*`. Code that relied on the old behaviour to retain a previous
+value changes meaning silently.
 
 **Case-insensitive matching now folds above U+007F.** krabs uses the CRT's `towupper`, and
 because nothing ever calls `setlocale` the CRT stays in the `"C"` locale and folds ASCII only.
@@ -169,15 +169,16 @@ everything after it in the payload, is unreadable. krabs does not decode structs
 fails worse, so nothing that worked before stops working — but the failure mode changes from
 silent corruption to a visible failure.
 
-**Not a behaviour change: nullable reference annotations.** The public surface is annotated, so if you
-have opted into nullable reference types you will get accurate diagnostics where you
-previously got none. `TryGet*` carries `[MaybeNullWhen(false)]`, which is what lets
-`if (record.TryGetUnicodeString(name, out var s))` narrow `s` to non-null in the true branch.
-Annotations are metadata only and cannot break a compile that was not already opted in.
+**Not a behaviour change: nullable reference annotations.** The public surface is annotated,
+so a project that has opted into nullable reference types now receives accurate diagnostics
+where it previously received none. `TryGet*` carries `[MaybeNullWhen(false)]`, which is what
+allows `if (record.TryGetUnicodeString(name, out var s))` to narrow `s` to non-null in the
+true branch. Annotations are metadata only and cannot break a compile that was not already
+opted in.
 
 ### New surface
 
-You do not have to do anything about these, but they are why some call sites can get faster.
+These require no action, but they explain why some call sites can be made faster.
 
 - `EventRecordRef` — the allocation-free record, plus `OnEventRef` / `DefaultEventRef` on
   `Provider`, `EventFilter`, `KernelProvider`, `UserTrace` and `KernelTrace`, and the
@@ -209,14 +210,14 @@ the return types.
 | Compat | `OnEvent` / `DefaultEvent` | `IEventRecord` | yes |
 | Allocation-free | `OnEventRef` / `DefaultEventRef` | `EventRecordRef` | no |
 
-### Where the wins actually are
+### Where the conversions pay off
 
-A string that is stored on an object outliving the callback has to be allocated — moving to
-`EventRecordRef` cannot help it. The conversions worth doing are the ones where a value is
+A string stored on an object that outlives the callback must be allocated; moving to
+`EventRecordRef` cannot avoid it. The conversions worth making are those where a value is
 read, **tested, and discarded**:
 
 ```csharp
-// allocates a string for every event, to reject almost all of them
+// allocates a string for every event, in order to reject almost all of them
 provider.OnEvent += record =>
 {
     var user = record.GetUnicodeString("TargetUserName", string.Empty);
@@ -224,7 +225,7 @@ provider.OnEvent += record =>
     ...
 };
 
-// allocates nothing until the event is one you want
+// allocates nothing until the event is one of interest
 provider.OnEventRef += (in EventRecordRef record) =>
 {
     if (!record.TryGetUnicodeString("TargetUserName", out var user)) return;
@@ -233,8 +234,8 @@ provider.OnEventRef += (in EventRecordRef record) =>
 };
 ```
 
-The same applies to any guard that runs before the work: emptiness checks, allow-list tests,
-prefix/suffix dispatch. Reordering helps too — test `record.Id` and integer properties, which
+The same applies to any guard that precedes the work: emptiness checks, allow-list tests and
+prefix/suffix dispatch. Ordering also matters — test `record.Id` and integer properties, which
 never allocate, before reading any string.
 
 ### Handlers must declare their parameter explicitly
@@ -247,9 +248,9 @@ provider.OnEventRef += (in EventRecordRef record) => { ... };   // required
 provider.OnEventRef += record => { ... };                       // does not compile
 ```
 
-You can also subscribe a named method directly, which is usually tidier for a real handler —
-the `in` modifier lives on the method declaration, so there is nothing to get wrong at the
-subscription site:
+A named method may also be subscribed directly, which is generally clearer for a non-trivial
+handler: the `in` modifier is declared on the method itself, so the subscription site carries
+no modifier at all:
 
 ```csharp
 provider.OnEventRef += OnProcessStart;
@@ -263,10 +264,10 @@ private static void OnProcessStart(in EventRecordRef record)
 }
 ```
 
-Note the restriction is only on the *record*, not on your state. A handler can capture `this`,
-fields and locals as usual, and can pass the record on to another method that takes
-`in EventRecordRef`. What it cannot do is let the record outlive the callback — storing it in
-a field, capturing it in a nested lambda, or using it after an `await` will not compile.
+The restriction applies to the *record* only, not to handler state. A handler may capture
+`this`, fields and locals as usual, and may pass the record to another method that takes
+`in EventRecordRef`. It may not allow the record to outlive the callback: storing it in a
+field, capturing it in a nested lambda, or using it after an `await` does not compile.
 
 ### Comparing string properties without allocating
 
@@ -295,24 +296,24 @@ provider.OnEventRef += (in EventRecordRef record) =>
     if (record.TryGetCountedString("CommandLine", out var cmdline)
         && cmdline.Contains("-enc".AsSpan(), StringComparison.OrdinalIgnoreCase))
     {
-        // only now pay for a string, and only for the events you kept
+        // pay for a string only now, and only for the events that were retained
         Report(image.ToString(), cmdline.ToString());
     }
 };
 ```
 
-Those are ordinary `MemoryExtensions` methods, not something this library adds —
-`TryGetUnicodeString` and `TryGetCountedString` hand back a `ReadOnlySpan<char>`, and the BCL
-takes it from there. On .NET Framework they come from the `System.Memory` package the library
-already brings in.
+These are ordinary `MemoryExtensions` methods rather than additions made by this library.
+`TryGetUnicodeString` and `TryGetCountedString` return a `ReadOnlySpan<char>`, and the BCL
+provides the comparisons. On .NET Framework they are supplied by the `System.Memory` package
+the library already references.
 
 **Always pass a `StringComparison` explicitly.** The overloads that omit it are ordinal for
-spans, but being explicit is what stops the call from silently meaning something else if it is
-ever refactored into a `string` comparison, where the default is the current culture.
+spans, but stating it prevents the call from changing meaning if it is later refactored into a
+`string` comparison, where the default is the current culture.
 
 The spans are views into the ETW buffer and are valid **only for the duration of the
-callback**, exactly like the record itself. To keep a value, call `.ToString()` on it — which
-is the allocation you were avoiding, so do it after the guards, not before.
+callback**, as is the record itself. Retaining a value requires calling `.ToString()` on it,
+which incurs the allocation being avoided — so it belongs after the guards, not before.
 
 ### What `EventRecordRef` deliberately does not have
 
@@ -325,23 +326,6 @@ A handler that needs any of these stays on `IEventRecord`:
   classes.
 - **`Properties` enumeration.**
 
-### Why there are no span accessors on `IEventRecord`
-
-An earlier revision added six span-returning members to `IEventRecord` so a consumer could
-migrate one call site at a time. They were removed before release.
-
-Overloading on the *name* parameter meant
-`ReadOnlySpan<char> v = record.GetUnicodeString("Path")` bound to the **`string`** overload —
-a `string` argument wins by identity conversion over the implicit span conversion — allocated,
-and then converted implicitly to the span. It compiled with no warning and no diagnostic, so
-the spelling that looked allocation-free was not. Overloading on the *out* parameter instead
-was also measured and rejected: it makes every existing
-`TryGetUnicodeString(name, out var v)` call site ambiguous (CS0121).
-
-Keeping the two surfaces disjoint removes the question. If a handler needs to avoid
-allocating, it moves to `OnEventRef`; there is no half-migrated state in which a call site
-looks allocation-free but is not.
-
 ---
 
 ## Testing handlers
@@ -350,8 +334,8 @@ Tests that mock `IEventRecord` keep working. The interface is unchanged in shape
 existing `Mock<IEventRecord>` and every `It.IsAny<IEventRecord>()` compile and run against the
 port as they did against the C++/CLI assembly.
 
-Tests covering a handler you move to `OnEventRef` do not. `EventRecordRef` is a `ref struct`,
-and a mocking framework cannot help with one at all:
+Tests covering a handler moved to `OnEventRef` do not. `EventRecordRef` is a `ref struct`, and
+a mocking framework cannot represent one:
 
 - it cannot be a generic type argument, so `Mock<EventRecordRef>` and
   `It.IsAny<EventRecordRef>()` do not compile;
@@ -360,9 +344,9 @@ and a mocking framework cannot help with one at all:
 - it cannot be boxed, stored in a field, captured in a lambda, or returned from an `async`
   method or iterator.
 
-Build a real record instead. `Testing.RecordBuilder` lays a payload out and `Testing.Proxy`
-pushes it through the same dispatch path a live trace uses, so the handler sees exactly what
-it would in production:
+Construct a real record instead. `Testing.RecordBuilder` lays out a payload and `Testing.Proxy`
+pushes it through the same dispatch path a live trace uses, so the handler observes exactly
+what it would in production:
 
 ```csharp
 using (var builder = new RecordBuilder(providerId, id: 7937, version: 1))
@@ -389,26 +373,25 @@ using (var builder = new RecordBuilder(providerId, id: 7937, version: 1))
 `Proxy` also takes a `UserTrace` or a `KernelTrace` if the code under test wires providers
 onto a trace rather than a bare filter.
 
-Three things about `RecordBuilder` that are easy to get wrong:
+Three constraints on `RecordBuilder` are easily overlooked:
 
-- **It needs a real, registered TDH schema.** `Pack()` resolves the layout from the provider's
-  manifest on the machine running the test, so an invented provider GUID fails with
-  `CouldNotFindSchema` (status 1168). Use an in-box provider whose schema you can rely on
-  being present.
+- **It requires a real, registered TDH schema.** `Pack()` resolves the layout from the
+  provider's manifest on the machine running the test, so an invented provider GUID fails with
+  `CouldNotFindSchema` (status 1168). Use an in-box provider whose schema is reliably present.
 - **Use `PackIncomplete()` when the schema varies by Windows build.** `Pack()` requires every
-  property in the schema to be supplied; events that gained properties in later releases will
+  property in the schema to be supplied; events that gained properties in later releases
   otherwise fail with "Not all the properties of the event were filled" on some machines.
 - **There is no adder for binary or counted-string properties.** `AddValue<T>` covers the
   integral types. A counted string is a length-prefixed value in a `UNICODESTRING` property
   (`"\u0008abcd"` reads back as `"abcd"`), and `TryGetBinary` works against any property.
 
-Assertions inside a ref handler have one constraint worth knowing: the record cannot be
-captured, so `Assert.Throws(() => record.GetUnicodeString("Missing"))` does not compile. Use
-an inline `try`/`catch` instead.
+Assertions inside a ref handler carry one further constraint: the record cannot be captured,
+so `Assert.Throws(() => record.GetUnicodeString("Missing"))` does not compile. Use an inline
+`try`/`catch` instead.
 
-To pin that a handler really does not allocate, measure inside the callback. This works on
-.NET Framework as well as modern .NET, but warm the schema and property caches with an
-unmeasured pass first, and avoid accidentally boxing the value you keep alive:
+To verify that a handler does not allocate, measure inside the callback. This works on .NET
+Framework as well as modern .NET, provided the schema and property caches are warmed by an
+unmeasured pass first and the value kept alive is not inadvertently boxed:
 
 ```csharp
 long before = GC.GetAllocatedBytesForCurrentThread();
