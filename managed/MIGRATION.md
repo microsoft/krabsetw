@@ -419,6 +419,10 @@ Four constraints on `RecordBuilder` are easily overlooked:
   The same applies to `AddBinary` where the template fixes the width: a `win:Binary` value
   carries no length of its own, so the reader takes the width from the schema and ignores
   the bytes, and supplying a different number of them would shift every later property.
+- **A record's payload has to fit in 64 KiB.** `EVENT_RECORD.UserDataLength` is a `USHORT`,
+  so `Pack()` rejects anything larger rather than letting the length wrap. Real events are
+  bounded the same way; a fixture that hits this is usually padding a string far past what
+  the provider would emit.
 
 Assertions inside a ref handler carry one further constraint: the record cannot be captured,
 so `Assert.Throws(() => record.GetUnicodeString("Missing".AsSpan()))` does not compile. Use an

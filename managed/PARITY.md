@@ -335,6 +335,26 @@ NUL-terminated, i.e. the counted and non-NUL-terminated variants.
 
 ## Resolved
 
+### `RecordBuilder` mis-padded an unfilled `Sid`
+
+An unfilled property is padded so that the properties after it stay where the schema says
+they are. A SID's width is not fixed, but a *zeroed* one is: the reader takes the size from
+the SubAuthorityCount byte, and zero sub-authorities leaves the fixed
+Revision(1) SubAuthorityCount(1) IdentifierAuthority(6) header, so it is always eight bytes.
+The port padded the record's pointer width instead — correct on a 64-bit record by
+coincidence, four bytes short on a 32-bit one, where the reader then swallowed the first
+half of the next property. Now always eight. Covered by `UnfilledPropertyTests`.
+
+krabs pads `sizeof(PSID)` and has the same defect, with the same coincidence hiding it.
+
+### A synthetic payload of 64 KiB or more wrapped silently
+
+`EVENT_RECORD.UserDataLength` is a `USHORT`, and `SynthRecord` cast the payload length into
+it. A larger payload wrapped, so the record decoded as a much shorter one and every property
+past the wrapped length was reported absent — a fixture failing for a reason nowhere near
+the code under test. `Pack` now refuses to build it. Covered by `OversizedRecordTests`,
+which also pins the largest payload that still fits.
+
 ### A cached schema baked in the emitting process's pointer width
 
 `PropertyTable` precomputes the byte offset of every property whose size the schema

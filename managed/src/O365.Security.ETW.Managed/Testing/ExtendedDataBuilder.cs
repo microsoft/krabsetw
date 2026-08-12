@@ -56,6 +56,11 @@ namespace Microsoft.O365.Security.ETW.Testing
         /// Allocates and fills the buffer. The caller owns it and must free it with
         /// <see cref="Marshal.FreeHGlobal"/>.
         /// </summary>
+        /// <remarks>
+        /// Nothing between the allocation and the return can throw today -- both adders
+        /// produce a payload of a fixed, small size -- so the guard is there to keep that
+        /// true for the next adder rather than to fix a reachable leak.
+        /// </remarks>
         public IntPtr Pack()
         {
             if (_items.Count == 0)
@@ -72,29 +77,38 @@ namespace Microsoft.O365.Security.ETW.Testing
             }
 
             IntPtr buffer = Marshal.AllocHGlobal(arraySize + dataSize);
-            var bytes = (byte*)buffer;
 
-            for (int i = 0; i < arraySize + dataSize; i++)
+            try
             {
-                bytes[i] = 0;
+                var bytes = (byte*)buffer;
+
+                for (int i = 0; i < arraySize + dataSize; i++)
+                {
+                    bytes[i] = 0;
+                }
+
+                var items = (EVENT_HEADER_EXTENDED_DATA_ITEM*)buffer;
+                byte* data = bytes + arraySize;
+
+                for (int i = 0; i < _items.Count; i++)
+                {
+                    byte[] payload = _items[i].Value;
+
+                    items[i].ExtType = _items[i].Key;
+                    items[i].DataSize = (ushort)payload.Length;
+                    items[i].DataPtr = (ulong)data;
+
+                    Marshal.Copy(payload, 0, (IntPtr)data, payload.Length);
+                    data += payload.Length;
+                }
+
+                return buffer;
             }
-
-            var items = (EVENT_HEADER_EXTENDED_DATA_ITEM*)buffer;
-            byte* data = bytes + arraySize;
-
-            for (int i = 0; i < _items.Count; i++)
+            catch
             {
-                byte[] payload = _items[i].Value;
-
-                items[i].ExtType = _items[i].Key;
-                items[i].DataSize = (ushort)payload.Length;
-                items[i].DataPtr = (ulong)data;
-
-                Marshal.Copy(payload, 0, (IntPtr)data, payload.Length);
-                data += payload.Length;
+                Marshal.FreeHGlobal(buffer);
+                throw;
             }
-
-            return buffer;
         }
     }
 }

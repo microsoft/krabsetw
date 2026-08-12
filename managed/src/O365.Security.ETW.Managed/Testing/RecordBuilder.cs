@@ -570,7 +570,12 @@ namespace Microsoft.O365.Security.ETW.Testing
                 case TdhInType.Pointer: return pointerSize;
                 case TdhInType.FileTime: return 8;
                 case TdhInType.SystemTime: return 16;
-                case TdhInType.Sid: return pointerSize;
+
+                // A zeroed SID declares no sub-authorities, so the reader sizes it at the
+                // fixed Revision(1) SubAuthorityCount(1) IdentifierAuthority(6) header
+                // whatever the record's pointer width. krabs pads sizeof(PSID) here, which
+                // is right on x64 by coincidence and four bytes short of a 32-bit record.
+                case TdhInType.Sid: return 8;
                 case TdhInType.HexInt32: return 4;
                 case TdhInType.HexInt64: return 8;
                 default:
