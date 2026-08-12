@@ -40,6 +40,27 @@ rather than assumed to work.
 
 ## Deliberate divergences
 
+### Testing surface beyond krabs
+
+The `Testing` namespace gained surface the C++/CLI implementation never had, so a parity
+diff shows it as additions.
+
+`RecordBuilder` in krabs supplies integral properties only, which makes any event whose
+template contains a pointer, GUID, FILETIME or SID unusable as a fixture — properties are
+laid out sequentially, so an unsupported type part-way through a schema prevents everything
+after it from being addressed. The port adds an adder for every in-type
+`how_many_bytes_to_fill` already knew how to pad. It also drops the terminator on a string
+the schema sizes, which krabs emits unconditionally; TDH consumes exactly the declared
+number of characters, so the extra terminator displaced every later property.
+
+`EventSchema` is new. It lets a test declare an event's layout rather than read it from the
+machine's registered providers, which removes the requirement that a fixture's provider be
+installed. The declaration is scoped to the execution context and is consulted by
+`SchemaCache` on a miss, before TDH — so the hot path is untouched, and a trace that
+declares nothing pays a single null check per distinct event. The risk it carries is that a
+declaration can drift from the manifest it mirrors; `MIGRATION.md` says so where the feature
+is documented.
+
 ### Case folding above U+007F
 
 `SpanCompare.ToUpper(char)` folds ASCII inline and falls back to

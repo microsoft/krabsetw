@@ -204,6 +204,16 @@ namespace Microsoft.O365.Security.ETW.Schema
         {
             byte[]? nameCopy = tlName.Length == 0 ? null : tlName.ToArray();
 
+            if (Testing.DeclaredSchemas.Any)
+            {
+                SchemaEntry? declared = LoadDeclared(record, nameCopy);
+
+                if (declared != null)
+                {
+                    return declared;
+                }
+            }
+
             uint size = 0;
             int status = NativeMethods.TdhGetEventInformation(record, 0, IntPtr.Zero, null, &size);
 
@@ -229,6 +239,33 @@ namespace Microsoft.O365.Security.ETW.Schema
             var table = new PropertyTable((TRACE_EVENT_INFO*)blob, pointerSize);
 
             return new SchemaEntry(blob, (int)size, table, nameCopy);
+        }
+
+        /// <summary>
+        /// Renders a schema declared by a test into the same unmanaged form TDH returns, so
+        /// nothing downstream can tell the difference. Returns null when no declaration
+        /// covers the event, leaving TDH to answer.
+        /// </summary>
+        private SchemaEntry? LoadDeclared(EVENT_RECORD* record, byte[]? nameCopy)
+        {
+            ref EVENT_DESCRIPTOR descriptor = ref record->EventHeader.EventDescriptor;
+
+            Testing.EventSchema? declaration = Testing.DeclaredSchemas.Find(
+                record->EventHeader.ProviderId, descriptor.Id, descriptor.Version);
+
+            if (declaration == null)
+            {
+                return null;
+            }
+
+            byte[] source = declaration.Blob();
+            IntPtr blob = Marshal.AllocHGlobal(source.Length);
+            Marshal.Copy(source, 0, blob, source.Length);
+            _blobs.Add(blob);
+
+            var table = new PropertyTable((TRACE_EVENT_INFO*)blob, PointerSizeFor(record));
+
+            return new SchemaEntry(blob, source.Length, table, nameCopy);
         }
 
         /// <summary>
