@@ -247,8 +247,9 @@ provider.OnEventRef += (in EventRecordRef record) => { ... };   // required
 provider.OnEventRef += record => { ... };                       // does not compile
 ```
 
-A method group works too, and is usually tidier for a real handler — the `in` modifier lives
-on the method declaration, so there is nothing to get wrong at the subscription site:
+You can also subscribe a named method directly, which is usually tidier for a real handler —
+the `in` modifier lives on the method declaration, so there is nothing to get wrong at the
+subscription site:
 
 ```csharp
 provider.OnEventRef += OnProcessStart;
