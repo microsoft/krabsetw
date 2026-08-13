@@ -368,6 +368,12 @@ namespace Microsoft.O365.Security.ETW
             {
                 _processingThread = null;
                 _processingStopped.Set();
+
+                // ETW holds the logger name and the callback context for the whole call, and
+                // both die with this object. Keeping it reachable here means a trace cannot
+                // be finalized while it is still processing, so the finalizer never has to
+                // race ProcessTrace.
+                GC.KeepAlive(this);
             }
 
             if (status != NativeConstants.ERROR_SUCCESS && status != NativeConstants.ERROR_CANCELLED)
@@ -404,19 +410,7 @@ namespace Microsoft.O365.Security.ETW
                     return;
                 }
 
-                if (_sessionHandle != 0)
-                {
-                    ControlSession(NativeConstants.EVENT_TRACE_CONTROL_STOP);
-                    _sessionHandle = 0;
-                }
-
-                if (_traceHandle != 0)
-                {
-                    NativeMethods.CloseTrace(_traceHandle);
-                    _traceHandle = 0;
-                }
-
-                _opened = false;
+                StopSession();
             }
         }
 
@@ -851,21 +845,68 @@ namespace Microsoft.O365.Security.ETW
 
             lock (_gate)
             {
-                if (_contextIndex >= 0)
-                {
-                    TraceRegistry.Unregister(_contextIndex);
-                    _contextIndex = -1;
-                }
-
-                if (_loggerName != IntPtr.Zero)
-                {
-                    Marshal.FreeHGlobal(_loggerName);
-                    _loggerName = IntPtr.Zero;
-                }
+                ReleaseUnmanaged();
             }
 
             _processingStopped.Dispose();
             _context.Dispose();
+
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Releases this trace's own native state if it was abandoned without being disposed.
+        /// </summary>
+        /// <remarks>
+        /// Only this object's native state is touched. The schema cache behind
+        /// <see cref="_context"/> has its own finalizer, and a finalizer must not reach into
+        /// managed objects whose finalizers may already have run. Nothing is locked either: a
+        /// finalizer that blocks on a lock some other thread is holding stalls every other
+        /// finalizer in the process.
+        ///
+        /// Reaching here means nothing references the trace, and <see cref="Start"/> keeps it
+        /// reachable across ProcessTrace, so processing cannot still be running.
+        /// </remarks>
+        ~UserTrace()
+        {
+            StopSession();
+            ReleaseUnmanaged();
+        }
+
+        /// <summary>
+        /// Stops the ETW session and closes the consumer handle. Native calls only, so it is
+        /// safe from a finalizer.
+        /// </summary>
+        private void StopSession()
+        {
+            if (_sessionHandle != 0)
+            {
+                ControlSession(NativeConstants.EVENT_TRACE_CONTROL_STOP);
+                _sessionHandle = 0;
+            }
+
+            if (_traceHandle != 0)
+            {
+                NativeMethods.CloseTrace(_traceHandle);
+                _traceHandle = 0;
+            }
+
+            _opened = false;
+        }
+
+        private void ReleaseUnmanaged()
+        {
+            if (_contextIndex >= 0)
+            {
+                TraceRegistry.Unregister(_contextIndex);
+                _contextIndex = -1;
+            }
+
+            if (_loggerName != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(_loggerName);
+                _loggerName = IntPtr.Zero;
+            }
         }
     }
 

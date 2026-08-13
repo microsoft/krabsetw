@@ -177,11 +177,16 @@ holds them until `Dispose`, because `ProcessTrace` goes on draining buffered eve
 `CloseTrace` and is still reading through both. `Dispose` waits for that to finish (30
 seconds) and then releases.
 
-Two consequences. A caller that needs "no handler will run again" — before tearing down
-whatever its handlers touch — must wait for its `Start` call to return; `Stop` alone does not
-promise it, and never did in C++/CLI either. And a caller that stops a trace but never
-disposes it now leaks a registration and its schema cache: C++/CLI had a finalizer that
-eventually freed the native trace, and the port has none. Dispose your traces.
+The consequence is that a caller who needs "no handler will run again" — before tearing down
+whatever its handlers touch — must wait for its `Start` call to return. `Stop` alone does not
+promise it, and never did in C++/CLI either.
+
+Disposing is still the right thing to do, but it is no longer the only thing standing between
+a consumer and a leak: every type that owns unmanaged memory has a finalizer as a last
+resort. `UserTrace` and `KernelTrace` stop their session and release their registration and
+logger name; `SchemaCache` frees its schema blobs; `SynthRecord` frees its record and payload.
+A finalizer runs at a time nobody chose, so an ETW session can outlive its owner by a while —
+dispose your traces — but an abandoned one no longer leaks for the life of the process.
 
 **Not a behaviour change: nullable reference annotations.** The public surface is annotated,
 so a project that has opted into nullable reference types now receives accurate diagnostics

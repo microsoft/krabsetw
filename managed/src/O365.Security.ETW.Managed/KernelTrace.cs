@@ -211,6 +211,10 @@ namespace Microsoft.O365.Security.ETW
             {
                 _processingThread = null;
                 _processingStopped.Set();
+
+                // Keeps the trace reachable across ProcessTrace, so it cannot be finalized
+                // while ETW still holds its logger name and callback context.
+                GC.KeepAlive(this);
             }
 
             if (status != NativeConstants.ERROR_SUCCESS && status != NativeConstants.ERROR_CANCELLED)
@@ -233,19 +237,43 @@ namespace Microsoft.O365.Security.ETW
                     return;
                 }
 
-                if (_sessionHandle != 0)
-                {
-                    ControlSession(NativeConstants.EVENT_TRACE_CONTROL_STOP);
-                    _sessionHandle = 0;
-                }
+                StopSession();
+            }
+        }
 
-                if (_traceHandle != 0)
-                {
-                    NativeMethods.CloseTrace(_traceHandle);
-                    _traceHandle = 0;
-                }
+        /// <summary>
+        /// Stops the ETW session and closes the consumer handle. Native calls only, so it is
+        /// safe from a finalizer.
+        /// </summary>
+        private void StopSession()
+        {
+            if (_sessionHandle != 0)
+            {
+                ControlSession(NativeConstants.EVENT_TRACE_CONTROL_STOP);
+                _sessionHandle = 0;
+            }
 
-                _opened = false;
+            if (_traceHandle != 0)
+            {
+                NativeMethods.CloseTrace(_traceHandle);
+                _traceHandle = 0;
+            }
+
+            _opened = false;
+        }
+
+        private void ReleaseUnmanaged()
+        {
+            if (_contextIndex >= 0)
+            {
+                TraceRegistry.Unregister(_contextIndex);
+                _contextIndex = -1;
+            }
+
+            if (_loggerName != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(_loggerName);
+                _loggerName = IntPtr.Zero;
             }
         }
 
@@ -507,21 +535,24 @@ namespace Microsoft.O365.Security.ETW
 
             lock (_gate)
             {
-                if (_contextIndex >= 0)
-                {
-                    TraceRegistry.Unregister(_contextIndex);
-                    _contextIndex = -1;
-                }
-
-                if (_loggerName != IntPtr.Zero)
-                {
-                    Marshal.FreeHGlobal(_loggerName);
-                    _loggerName = IntPtr.Zero;
-                }
+                ReleaseUnmanaged();
             }
 
             _context.Dispose();
             _processingStopped.Dispose();
+
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Releases this trace's own native state if it was abandoned without being disposed.
+        /// See <see cref="UserTrace"/>'s finalizer for why it touches nothing else and takes
+        /// no lock.
+        /// </summary>
+        ~KernelTrace()
+        {
+            StopSession();
+            ReleaseUnmanaged();
         }
     }
 }
