@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.O365.Security.ETW.Interop;
@@ -132,6 +133,13 @@ namespace Microsoft.O365.Security.ETW
         private readonly List<Guid> _rundownProviders = new List<Guid>();
 
         /// <summary>
+        /// How long <see cref="Stop"/> waits for ProcessTrace to return. Long enough for a
+        /// large backlog to drain, short enough that a hung trace is reported rather than
+        /// hanging the caller forever.
+        /// </summary>
+        private static readonly TimeSpan ProcessingStopTimeout = TimeSpan.FromSeconds(30);
+
+        /// <summary>
         /// Whether <see cref="Start"/> has already issued CAPTURE_STATE for
         /// <see cref="_rundownProviders"/>. A provider enabled after that point has missed the
         /// one issue, so it gets its own.
@@ -143,7 +151,12 @@ namespace Microsoft.O365.Security.ETW
 
         private TraceContext _context;
         private int _contextIndex = -1;
-        private Thread? _processingThread;
+        /// <remarks>
+        /// Written by the processing thread and read by whichever thread calls
+        /// <see cref="Stop"/>, so it is volatile: a stale read would make Stop believe it is
+        /// the processing thread, skip the wait, and free the context out from under it.
+        /// </remarks>
+        private volatile Thread? _processingThread;
 
         private ulong _sessionHandle;
         private ulong _traceHandle;
@@ -381,7 +394,21 @@ namespace Microsoft.O365.Security.ETW
                 // buffered events for a while afterwards. Unregistering the context or
                 // freeing the cached schema blobs before it returns would leave the callback
                 // thread reading freed memory.
-                WaitForProcessingToStop();
+                bool stopped = WaitForProcessingToStop();
+
+                if (!stopped)
+                {
+                    // The processing thread is still inside ProcessTrace. Releasing anything
+                    // it can reach would turn a hung trace into an access violation on a
+                    // thread the caller does not control, so the registration and the logger
+                    // name are deliberately leaked and the caller is told.
+                    throw new TraceException(
+                        "The trace did not stop processing within " +
+                        ProcessingStopTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture) +
+                        " seconds. Its context has been left registered, because freeing it " +
+                        "while the processing thread is still running would crash the process.",
+                        NativeConstants.ERROR_SUCCESS);
+                }
 
                 if (_contextIndex >= 0)
                 {
@@ -399,16 +426,22 @@ namespace Microsoft.O365.Security.ETW
             }
         }
 
-        private void WaitForProcessingToStop()
+        /// <summary>
+        /// Waits for the processing thread to leave ProcessTrace.
+        /// </summary>
+        /// <returns>
+        /// False when the wait timed out and the processing thread may still be running.
+        /// </returns>
+        private bool WaitForProcessingToStop()
         {
             // Stopping from inside a handler is legal; the processing thread cannot wait for
             // itself, and the callback frames below it still need the context alive.
             if (_processingThread == Thread.CurrentThread)
             {
-                return;
+                return true;
             }
 
-            _processingStopped.Wait(TimeSpan.FromSeconds(30));
+            return _processingStopped.Wait(ProcessingStopTimeout);
         }
 
         public TraceStats QueryStats()

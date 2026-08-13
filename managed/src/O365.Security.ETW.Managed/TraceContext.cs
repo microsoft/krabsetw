@@ -15,17 +15,19 @@ namespace Microsoft.O365.Security.ETW
     /// here is single threaded and needs no locking. Each trace owns its own scratch, schema
     /// cache and adapter for exactly that reason: sharing them per provider would break as soon
     /// as one provider were enabled on two traces.
+    ///
+    /// The one exception is the provider list, which a caller may replace from another thread
+    /// by enabling a provider on a running trace. It is therefore held as an immutable
+    /// snapshot and swapped in a single reference write, so the processing thread either sees
+    /// the whole of the old set or the whole of the new one.
     /// </remarks>
     internal sealed unsafe class TraceContext
     {
         private readonly EventScratch _scratch = new EventScratch();
         private readonly EventRecordAdapter _adapter = new EventRecordAdapter();
 
-        private Provider[] _providers = Array.Empty<Provider>();
-        private Guid[] _providerIds = Array.Empty<Guid>();
-
-        private KernelProvider[] _kernelProviders = Array.Empty<KernelProvider>();
-        private Guid[] _kernelProviderIds = Array.Empty<Guid>();
+        private Routes<Provider> _providers = Routes<Provider>.Empty;
+        private Routes<KernelProvider> _kernelProviders = Routes<KernelProvider>.Empty;
 
         public ulong EventsTotal;
         public ulong EventsHandled;
@@ -44,23 +46,48 @@ namespace Microsoft.O365.Security.ETW
 
         public void SetProviders(List<Provider> providers)
         {
-            _providers = providers.ToArray();
-            _providerIds = new Guid[_providers.Length];
-
-            for (int i = 0; i < _providers.Length; i++)
-            {
-                _providerIds[i] = _providers[i].Id;
-            }
+            Volatile.Write(ref _providers, new Routes<Provider>(providers, p => p.Id));
         }
 
         public void SetKernelProviders(List<KernelProvider> providers)
         {
-            _kernelProviders = providers.ToArray();
-            _kernelProviderIds = new Guid[_kernelProviders.Length];
+            Volatile.Write(ref _kernelProviders, new Routes<KernelProvider>(providers, p => p.Id));
+        }
 
-            for (int i = 0; i < _kernelProviders.Length; i++)
+        /// <summary>
+        /// An immutable provider set: the providers and their GUIDs, indexed alike.
+        /// </summary>
+        /// <remarks>
+        /// The GUIDs are kept in their own array so that the routing loop scans them without
+        /// touching a Provider, which keeps the common "not this provider" case to a linear
+        /// scan of contiguous memory.
+        ///
+        /// The pairing is what makes this a type rather than two fields. Published separately,
+        /// the processing thread could see a new GUID array against the old provider array and
+        /// index past its end; one reference write cannot be seen half-applied.
+        /// </remarks>
+        private sealed class Routes<T>
+        {
+            public static readonly Routes<T> Empty = new Routes<T>();
+
+            public readonly T[] Handlers;
+            public readonly Guid[] Ids;
+
+            private Routes()
             {
-                _kernelProviderIds[i] = _kernelProviders[i].Id;
+                Handlers = Array.Empty<T>();
+                Ids = Array.Empty<Guid>();
+            }
+
+            public Routes(List<T> handlers, Func<T, Guid> id)
+            {
+                Handlers = handlers.ToArray();
+                Ids = new Guid[Handlers.Length];
+
+                for (int i = 0; i < Handlers.Length; i++)
+                {
+                    Ids[i] = id(Handlers[i]);
+                }
             }
         }
 
@@ -103,18 +130,22 @@ namespace Microsoft.O365.Security.ETW
         /// </remarks>
         private bool Route(in EventRecordRef view, EVENT_RECORD* record)
         {
-            if (_kernelProviderIds.Length != 0)
+            // Read each set once: enabling a provider on a running trace replaces it, and a
+            // second read could return a different set from the one already scanned.
+            Routes<KernelProvider> kernel = Volatile.Read(ref _kernelProviders);
+
+            if (kernel.Ids.Length != 0)
             {
                 // krabs::details::kt::forward_events matches on the header GUID alone: the
                 // kernel logger stamps the real provider GUID there even though its events
                 // are classic MOF, so no schema lookup is needed to route them.
                 Guid kernelId = record->EventHeader.ProviderId;
 
-                for (int i = 0; i < _kernelProviderIds.Length; i++)
+                for (int i = 0; i < kernel.Ids.Length; i++)
                 {
-                    if (_kernelProviderIds[i] == kernelId)
+                    if (kernel.Ids[i] == kernelId)
                     {
-                        _kernelProviders[i].Dispatch(view, _adapter);
+                        kernel.Handlers[i].Dispatch(view, _adapter);
                         return true;
                     }
                 }
@@ -122,17 +153,19 @@ namespace Microsoft.O365.Security.ETW
                 return false;
             }
 
+            Routes<Provider> providers = Volatile.Read(ref _providers);
+
             DecodingSource type = EventRecordRef.GetEventType(record);
 
             if (type == DecodingSource.XMLFile || type == DecodingSource.Tlg)
             {
                 Guid providerId = record->EventHeader.ProviderId;
 
-                for (int i = 0; i < _providerIds.Length; i++)
+                for (int i = 0; i < providers.Ids.Length; i++)
                 {
-                    if (_providerIds[i] == providerId)
+                    if (providers.Ids[i] == providerId)
                     {
-                        _providers[i].Dispatch(view, _adapter);
+                        providers.Handlers[i].Dispatch(view, _adapter);
                         return true;
                     }
                 }
@@ -146,11 +179,11 @@ namespace Microsoft.O365.Security.ETW
                 {
                     Guid providerId = schema.Info->ProviderGuid;
 
-                    for (int i = 0; i < _providerIds.Length; i++)
+                    for (int i = 0; i < providers.Ids.Length; i++)
                     {
-                        if (_providerIds[i] == providerId)
+                        if (providers.Ids[i] == providerId)
                         {
-                            _providers[i].Dispatch(view, _adapter);
+                            providers.Handlers[i].Dispatch(view, _adapter);
                             return true;
                         }
                     }

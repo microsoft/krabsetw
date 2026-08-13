@@ -49,9 +49,9 @@ handlers without a live trace.
 Most consumers encounter none of them. The most likely to apply is #1, and only to code that
 implements `IEventRecord` directly.
 
-Separately, five **behaviour** changes compile silently — `TryGet*` on failure, case folding,
-`KernelProvider.GroupMask`, `TraceStats` and struct-typed properties. These warrant the
-closest reading, and are listed after the nine.
+Separately, six **behaviour** changes compile silently — `TryGet*` on failure, case folding,
+`KernelProvider.GroupMask`, `TraceStats`, struct-typed properties and a `Stop` that cannot
+stop. These warrant the closest reading, and are listed after the nine.
 
 ### Compile breaks
 
@@ -168,6 +168,15 @@ the type is only ever produced by `UserTrace.QueryStats` / `KernelTrace.QuerySta
 everything after it in the payload, is unreadable. krabs does not decode structs either and
 fails worse, so nothing that worked before stops working — but the failure mode changes from
 silent corruption to a visible failure.
+
+**`Stop` throws if the trace will not stop.** `Stop` waits for `ProcessTrace` to return
+before releasing the state the callback thread reads through. That wait has always had a
+30-second limit; its result is no longer ignored. If it expires, `Stop` leaves the trace
+registered — releasing it is exactly what would crash — and throws a `TraceException` saying
+so. Previously it returned normally and the process could fault later, on the processing
+thread, with no connection to the call that caused it. A `Stop` that was working is
+unaffected: reaching this needs `ProcessTrace` not to return for 30 seconds after
+`CloseTrace`.
 
 **Not a behaviour change: nullable reference annotations.** The public surface is annotated,
 so a project that has opted into nullable reference types now receives accurate diagnostics
