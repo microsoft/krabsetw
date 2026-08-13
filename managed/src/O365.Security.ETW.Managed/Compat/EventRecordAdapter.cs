@@ -34,7 +34,16 @@ namespace Microsoft.O365.Security.ETW
             _record = null;
         }
 
-        private EventRecordRef Ref
+        /// <summary>
+        /// The record, or a diagnostic if it is no longer valid.
+        /// </summary>
+        /// <remarks>
+        /// Every accessor goes through this, including the extended-data ones. Reading
+        /// <c>_record</c> directly would make a stale read *quietly* return "no container id"
+        /// or an empty stack rather than failing, and a consumer cannot tell that apart from
+        /// an event that genuinely carried neither.
+        /// </remarks>
+        private EVENT_RECORD* ValidRecord
         {
             get
             {
@@ -46,8 +55,13 @@ namespace Microsoft.O365.Security.ETW
                         "before returning, or use EventRecordRef.");
                 }
 
-                return new EventRecordRef(_record, _scratch);
+                return _record;
             }
+        }
+
+        private EventRecordRef Ref
+        {
+            get { return new EventRecordRef(ValidRecord, _scratch); }
         }
 
         #region Metadata
@@ -85,7 +99,7 @@ namespace Microsoft.O365.Security.ETW
 
         public List<ulong> GetStackTrace()
         {
-            return ExtendedData.GetStackTrace(_record);
+            return ExtendedData.GetStackTrace(ValidRecord);
         }
 
         public byte[] CopyUserData()
@@ -95,12 +109,12 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetContainerId(out Guid result)
         {
-            return ExtendedData.TryGetContainerId(_record, out result);
+            return ExtendedData.TryGetContainerId(ValidRecord, out result);
         }
 
         public bool TryGetProcessStartKey(out ulong result)
         {
-            return ExtendedData.TryGetProcessStartKey(_record, out result);
+            return ExtendedData.TryGetProcessStartKey(ValidRecord, out result);
         }
 
         #endregion

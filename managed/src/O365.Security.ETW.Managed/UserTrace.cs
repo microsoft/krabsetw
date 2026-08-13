@@ -163,7 +163,7 @@ namespace Microsoft.O365.Security.ETW
         private SafeHGlobalHandle? _loggerName;
         private bool _opened;
         private volatile bool _providersPublished;
-        private bool _disposed;
+        private int _disposed;
         private uint _processTraceMode;
 
         private EventTraceProperties _properties = new EventTraceProperties
@@ -347,14 +347,23 @@ namespace Microsoft.O365.Security.ETW
         {
             Open();
 
-            // Read once, outside the call: Stop closes this handle while ProcessTrace is
-            // still running, which is how ETW is told to stop.
-            ulong handle = _traceHandle!.Value;
+            ulong handle;
 
-            // Immediately before ProcessTrace, per krabs: any later and the rundown events
-            // are emitted while nothing is consuming them.
+            // Read under the lock alongside the rundown, so a Stop racing this cannot null
+            // the handle between the two. Read *once*: Stop closes it while ProcessTrace is
+            // still running, which is how ETW is told to stop.
             lock (_gate)
             {
+                if (_traceHandle == null)
+                {
+                    // Stopped before processing began. Nothing to drain.
+                    return;
+                }
+
+                handle = _traceHandle.Value;
+
+                // Immediately before ProcessTrace, per krabs: any later and the rundown
+                // events are emitted while nothing is consuming them.
                 EnableRundown();
             }
 
@@ -407,11 +416,11 @@ namespace Microsoft.O365.Security.ETW
         {
             lock (_gate)
             {
-                if (!_opened)
-                {
-                    return;
-                }
-
+                // Keyed off what exists, not off _opened. Open creates the session before it
+                // can fail -- EnableTraceEx2 and OpenTrace both throw -- so a trace can hold a
+                // live session while never having finished opening. Returning early there
+                // leaks an ETW session, which is machine-wide and outlives the process, and
+                // Dispose would then suppress the finalizer that was the last safety net.
                 StopSession();
             }
         }
@@ -828,12 +837,11 @@ namespace Microsoft.O365.Security.ETW
         /// </remarks>
         public void Dispose()
         {
-            if (_disposed)
+            // Interlocked so two threads racing Dispose cannot both run the teardown.
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
             {
                 return;
             }
-
-            _disposed = true;
 
             Stop();
 
@@ -855,14 +863,17 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <summary>
-        /// Releases this trace's own native state if it was abandoned without being disposed.
+        /// Stops the session if the trace was abandoned without being disposed.
         /// </summary>
         /// <remarks>
-        /// Only this object's own state is touched. The schema cache behind
-        /// <see cref="_context"/> and the logger name allocation both clean themselves up,
-        /// and a finalizer must not reach into managed objects whose finalizers may already
-        /// have run. Nothing is locked either: a finalizer that blocks on a lock some other
-        /// thread is holding stalls every other finalizer in the process.
+        /// Stops the ETW session and closes the consumer handle, and does nothing else. Both
+        /// are native calls that take no lock, which matters: a finalizer that blocks on a
+        /// lock another thread happens to hold stalls every other finalizer in the process,
+        /// including the critical ones that free native memory.
+        ///
+        /// The callback registration is deliberately *not* released here. It is a weak
+        /// reference, so its slot is reclaimed by the next registration that needs one, and
+        /// unregistering would mean taking the registry's lock from a finalizer.
         ///
         /// Reaching here means nothing references the trace, and <see cref="Start"/> keeps it
         /// reachable across ProcessTrace, so processing cannot still be running.
@@ -870,7 +881,6 @@ namespace Microsoft.O365.Security.ETW
         ~UserTrace()
         {
             StopSession();
-            ReleaseUnmanaged();
         }
 
         /// <summary>
