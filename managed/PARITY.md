@@ -415,8 +415,28 @@ explicit `Stop`.
 `_processingThread` is volatile now: it is written by the processing thread and read by
 whichever thread disposes, and a stale read would skip the wait entirely.
 
-The consequence for consumers is that `Dispose` is no longer optional — see `MIGRATION.md`.
-C++/CLI leaves its native trace to a finalizer, and the port has no equivalent backstop.
+### Unmanaged memory had no finalizer behind it
+
+`Marshal.AllocHGlobal` is not reclaimed by the collector, so every type holding it needed a
+finalizer as well as `IDisposable` — otherwise abandoning one leaked for the life of the
+process, and `Dispose` was load-bearing rather than merely correct. Only `SynthRecord` had
+one. `SchemaCache` (the schema blobs), `UserTrace` and `KernelTrace` (the logger name, the
+session, and the callback registration) now do too.
+
+The trace finalizers are deliberately narrow. They touch only their own native state: the
+schema cache behind the trace context has its own finalizer, and a finalizer must not reach
+into managed objects whose finalizers may already have run. They take no lock either — a
+finalizer blocking on a lock another thread holds would stall every other finalizer in the
+process — which is safe because reaching one means nothing references the trace. `Start` also
+keeps the trace reachable across `ProcessTrace` with `GC.KeepAlive`, so a trace cannot be
+finalized while ETW still holds its logger name and context.
+
+Covered by `FinalizerTests`, which abandons each type inside a non-inlined helper, collects,
+and checks the count of live allocations returns to its baseline. Mutation-verified:
+emptying either finalizer fails it.
+
+krabs needs none of this — its allocations are `std::unique_ptr` and `std::vector` members,
+released by the destructor when the trace object dies.
 
 ### `RecordBuilder` mis-padded an unfilled `Sid`
 

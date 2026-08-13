@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.O365.Security.ETW.Interop;
 
 namespace Microsoft.O365.Security.ETW.Schema
@@ -247,6 +248,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             }
 
             _blobs.Add(blob);
+            Interlocked.Increment(ref LiveBlobs);
 
             int pointerSize = PointerSizeFor(record);
             var table = new PropertyTable((TRACE_EVENT_INFO*)blob, pointerSize);
@@ -275,6 +277,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             IntPtr blob = Marshal.AllocHGlobal(source.Length);
             Marshal.Copy(source, 0, blob, source.Length);
             _blobs.Add(blob);
+            Interlocked.Increment(ref LiveBlobs);
 
             var table = new PropertyTable((TRACE_EVENT_INFO*)blob, PointerSizeFor(record));
 
@@ -323,7 +326,35 @@ namespace Microsoft.O365.Security.ETW.Schema
             return hash;
         }
 
+        /// <summary>
+        /// Releases the cached schema blobs if the cache was abandoned without being disposed.
+        /// </summary>
+        /// <remarks>
+        /// The blobs are unmanaged, so the collector does not reclaim them on its own, and
+        /// this type is the only thing that knows where they are. Reading <c>_blobs</c> here
+        /// is safe: a <c>List&lt;IntPtr&gt;</c> has no finalizer of its own, so it cannot
+        /// already have been finalized, and nothing else can be mutating it -- reaching this
+        /// point means the cache is unreachable.
+        /// </remarks>
+        ~SchemaCache()
+        {
+            Free();
+        }
+
         public void Dispose()
+        {
+            Free();
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>Number of schema blobs allocated and not yet freed, across all caches.</summary>
+        /// <remarks>
+        /// Kept so a test can prove the finalizer actually releases them; a schema is loaded
+        /// once per event type, so this is nowhere near the hot path.
+        /// </remarks>
+        internal static int LiveBlobs;
+
+        private void Free()
         {
             if (_disposed)
             {
@@ -337,6 +368,8 @@ namespace Microsoft.O365.Security.ETW.Schema
             {
                 Marshal.FreeHGlobal(_blobs[i]);
             }
+
+            Interlocked.Add(ref LiveBlobs, -_blobs.Count);
 
             _blobs.Clear();
             _cache.Clear();
