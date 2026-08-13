@@ -262,6 +262,33 @@ failure. Tracked internally.
 
 ## Things that look like divergences and are not
 
+### The schema cache is unbounded in both implementations
+
+Neither cache evicts. `krabs::schema_locator::cache_` and this port's `SchemaCache` are both
+members of the trace, live as long as it does, and grow by one entry per distinct
+`(provider, id, version, opcode, level, keyword, TraceLogging metadata, pointer width)`.
+Failures are cached too, so an event with no schema also takes a slot.
+
+Deliberately left that way, on measurement. For a manifest provider the entry count is
+bounded by the manifest: the largest on a reference machine is Microsoft-Windows-Hyper-V-VMMS
+at 3,332 events averaging 2.97 properties, which comes to roughly **1.6 MB** — and only for a
+consumer that resolves every schema in it. Entries are also resolved lazily: a filter that
+rejects on event id never touches the schema, because `EventIdIs` reads the header. Only a
+filter that needs the schema — `EventNameIs`, a property predicate, or MOF/WPP routing —
+populates the cache for events it is about to discard.
+
+The genuinely unbounded case is a provider that generates event names or field layouts
+dynamically, since a TraceLogging entry is keyed by its metadata. Compiled call sites are
+finite, so this needs something like `EventSource.Write(userSuppliedName, …)`.
+
+Eviction is not free here either: `SchemaEntry.Blob` is handed out as a raw pointer and read
+throughout an event's dispatch, so evicting an in-use entry would be a use-after-free rather
+than a cache miss.
+
+The port's entries are larger than krabs' — about 386 bytes against 226 for a median
+two-property event, because it also carries the precomputed `PropertyTable`. That was 626
+bytes until the nine parallel arrays became one struct.
+
 ### `TDH_INTYPE_MANIFEST_COUNTEDBINARY` length prefix
 
 Both implementations include the two-byte length prefix in the returned buffer. krabs
