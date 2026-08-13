@@ -162,7 +162,6 @@ namespace Microsoft.O365.Security.ETW.Schema
             if ((flags & NativeConstants.PropertyParamCount) != 0)
             {
                 int countIndex = _table.Counts[index];
-
                 if (countIndex >= index)
                 {
                     return -1;
@@ -174,6 +173,12 @@ namespace Microsoft.O365.Security.ETW.Schema
                 }
 
                 count = (int)dynamicCount;
+            }
+            else if (count == 0)
+            {
+                // A schema count of zero means the property is a scalar, not an empty array;
+                // only a payload-derived count of zero means no elements at all.
+                count = 1;
             }
 
             int remaining = _dataLength - offset;

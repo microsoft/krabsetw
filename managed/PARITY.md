@@ -335,6 +335,54 @@ NUL-terminated, i.e. the counted and non-NUL-terminated variants.
 
 ## Resolved
 
+### An empty array was sized as one element
+
+A property whose element count comes from the payload (`PropertyParamCount`) can legitimately
+have no elements, in which case it occupies no bytes. The sizer collapsed a count of zero to
+one element, which is right for a *schema* count — TDH uses zero there to mean "scalar" — and
+wrong for a payload-derived one, so an empty array consumed one element's worth and moved
+every property after it.
+
+The two cases are now distinguished by the caller, which is the only place that knows which
+kind of count it read. Covered by `DynamicArrayCountTests`, which logs a real TraceLogging
+event with a 0-, 1- and 3-element array and reads back the scalar that follows it; the
+zero-element case fails without the fix.
+
+krabs cannot have this bug: it does not walk arrays itself, it asks
+`TdhGetPropertySize` for every property whose size is not immediately available.
+
+### The provider set was published as two separate arrays
+
+Enabling a provider on a running trace is the one thing a trace does from two threads at
+once: the caller replaces the provider set while the processing thread is scanning it. The
+set was two fields — the providers and their GUIDs, indexed alike — assigned one after the
+other with no barrier, and the routing loop bounded its scan by the GUID array's length
+while indexing the provider array. A processing thread that saw the new GUID array against
+the old provider array would index past its end.
+
+Both are now held in one immutable `Routes<T>` swapped with a single `Volatile.Write`, and
+the routing loop takes one `Volatile.Read` per event, so it sees either the whole of the old
+set or the whole of the new one. This costs nothing on the hot path: a volatile reference
+read is a plain load on x86/x64, and the allocation-free tests are unchanged.
+
+The race itself is not directly testable — it needs the two threads to interleave inside a
+window a few instructions wide. `EnableWhileRunningTests` covers the functional half:
+a provider enabled mid-run receives events, and the one enabled before `Start` keeps
+receiving them afterwards. Nothing covered enable-while-running before.
+
+### `Stop` could free the context while the processing thread was still in it
+
+`Stop` waits for `ProcessTrace` to return before unregistering the trace context, because
+the callback thread reads through it — the code says so. It then discarded the wait's
+result, so a wait that timed out fell through to the teardown it was there to prevent and
+turned a hung trace into an access violation on a thread the caller does not control.
+
+A timeout now leaves the registration and the logger name allocated — deliberately leaked,
+because releasing them is precisely what is unsafe — and throws. `_processingThread` is also
+volatile now: it is written by the processing thread and read by whichever thread calls
+`Stop`, and a stale read would make `Stop` believe it *is* the processing thread and skip
+the wait altogether.
+
 ### `RecordBuilder` mis-padded an unfilled `Sid`
 
 An unfilled property is padded so that the properties after it stay where the schema says

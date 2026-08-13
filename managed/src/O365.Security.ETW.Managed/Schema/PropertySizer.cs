@@ -131,6 +131,11 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// Computes the size of a property from the payload. <paramref name="data"/> must start
         /// at the property. Returns -1 when the property cannot be decoded.
         /// </summary>
+        /// <remarks>
+        /// A count of zero is an empty array, which occupies no bytes; a scalar is one element.
+        /// Which of those a schema count of zero means depends on whether the count came from
+        /// the payload, so the caller resolves it rather than this method guessing.
+        /// </remarks>
         public static int GetRuntimeSize(
             ushort inType,
             ushort outType,
@@ -145,7 +150,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 return -1;
             }
 
-            int elements = count == 0 ? 1 : count;
+            int elements = count;
             int total = 0;
 
             for (int e = 0; e < elements; e++)
