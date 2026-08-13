@@ -15,14 +15,14 @@ namespace Microsoft.O365.Security.ETW.Testing
     /// </remarks>
     public sealed unsafe class SynthRecord : IDisposable
     {
-        private IntPtr _record;
-        private IntPtr _userData;
-        private IntPtr _extendedData;
+        private SafeHGlobalHandle? _record;
+        private SafeHGlobalHandle? _userData;
+        private SafeHGlobalHandle? _extendedData;
 
         internal SynthRecord(EVENT_HEADER header, byte[] userData, ExtendedDataBuilder extendedData)
         {
-            _record = Marshal.AllocHGlobal(sizeof(EVENT_RECORD));
-            var record = (EVENT_RECORD*)_record;
+            _record = new SafeHGlobalHandle(sizeof(EVENT_RECORD));
+            var record = (EVENT_RECORD*)_record.Pointer;
             *record = default(EVENT_RECORD);
             record->EventHeader = header;
 
@@ -38,8 +38,8 @@ namespace Microsoft.O365.Security.ETW.Testing
                 // wrapped length reported absent for no visible reason.
                 if (userData.Length > ushort.MaxValue)
                 {
-                    Marshal.FreeHGlobal(_record);
-                    _record = IntPtr.Zero;
+                    _record.Dispose();
+                    _record = null;
 
                     throw new ArgumentException(
                         "The event payload is " + userData.Length +
@@ -47,35 +47,31 @@ namespace Microsoft.O365.Security.ETW.Testing
                         ushort.MaxValue + ".");
                 }
 
-                _userData = Marshal.AllocHGlobal(userData.Length);
-                Marshal.Copy(userData, 0, _userData, userData.Length);
-                record->UserData = _userData;
+                _userData = new SafeHGlobalHandle(userData.Length);
+                Marshal.Copy(userData, 0, _userData.Pointer, userData.Length);
+                record->UserData = _userData.Pointer;
                 record->UserDataLength = (ushort)userData.Length;
             }
 
             if (extendedData != null && extendedData.Count > 0)
             {
-                _extendedData = extendedData.Pack();
-                record->ExtendedData = _extendedData;
+                // Pack returns null only for an empty builder, which Count has just excluded.
+                _extendedData = extendedData.Pack()!;
+                record->ExtendedData = _extendedData.Pointer;
                 record->ExtendedDataCount = (ushort)extendedData.Count;
             }
-        }
-
-        ~SynthRecord()
-        {
-            Free();
         }
 
         internal EVENT_RECORD* Record
         {
             get
             {
-                if (_record == IntPtr.Zero)
+                if (_record == null)
                 {
                     throw new ObjectDisposedException(nameof(SynthRecord));
                 }
 
-                return (EVENT_RECORD*)_record;
+                return (EVENT_RECORD*)_record.Pointer;
             }
         }
 
@@ -114,31 +110,25 @@ namespace Microsoft.O365.Security.ETW.Testing
             set { Record->EventHeader.Flags = value; }
         }
 
+        /// <summary>
+        /// Releases the record's unmanaged memory.
+        /// </summary>
+        /// <remarks>
+        /// No finalizer: each allocation is a <see cref="SafeHGlobalHandle"/> and releases
+        /// itself through its own critical finalizer if the record is abandoned. Disposing
+        /// here just makes it deterministic, which matters because a record is usually built
+        /// and read inside one test.
+        /// </remarks>
         public void Dispose()
         {
-            Free();
-            GC.SuppressFinalize(this);
-        }
+            _userData?.Dispose();
+            _userData = null;
 
-        private void Free()
-        {
-            if (_userData != IntPtr.Zero)
-            {
-                Marshal.FreeHGlobal(_userData);
-                _userData = IntPtr.Zero;
-            }
+            _extendedData?.Dispose();
+            _extendedData = null;
 
-            if (_extendedData != IntPtr.Zero)
-            {
-                Marshal.FreeHGlobal(_extendedData);
-                _extendedData = IntPtr.Zero;
-            }
-
-            if (_record != IntPtr.Zero)
-            {
-                Marshal.FreeHGlobal(_record);
-                _record = IntPtr.Zero;
-            }
+            _record?.Dispose();
+            _record = null;
         }
     }
 }

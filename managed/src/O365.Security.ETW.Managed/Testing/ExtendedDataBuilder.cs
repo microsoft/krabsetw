@@ -53,19 +53,13 @@ namespace Microsoft.O365.Security.ETW.Testing
         }
 
         /// <summary>
-        /// Allocates and fills the buffer. The caller owns it and must free it with
-        /// <see cref="Marshal.FreeHGlobal"/>.
+        /// Allocates and fills the buffer. Ownership passes to the caller, which disposes it.
         /// </summary>
-        /// <remarks>
-        /// Nothing between the allocation and the return can throw today -- both adders
-        /// produce a payload of a fixed, small size -- so the guard is there to keep that
-        /// true for the next adder rather than to fix a reachable leak.
-        /// </remarks>
-        public IntPtr Pack()
+        public SafeHGlobalHandle? Pack()
         {
             if (_items.Count == 0)
             {
-                return IntPtr.Zero;
+                return null;
             }
 
             int arraySize = sizeof(EVENT_HEADER_EXTENDED_DATA_ITEM) * _items.Count;
@@ -76,10 +70,11 @@ namespace Microsoft.O365.Security.ETW.Testing
                 dataSize += _items[i].Value.Length;
             }
 
-            IntPtr buffer = Marshal.AllocHGlobal(arraySize + dataSize);
+            var allocation = new SafeHGlobalHandle(arraySize + dataSize);
 
             try
             {
+                IntPtr buffer = allocation.Pointer;
                 var bytes = (byte*)buffer;
 
                 for (int i = 0; i < arraySize + dataSize; i++)
@@ -102,11 +97,11 @@ namespace Microsoft.O365.Security.ETW.Testing
                     data += payload.Length;
                 }
 
-                return buffer;
+                return allocation;
             }
             catch
             {
-                Marshal.FreeHGlobal(buffer);
+                allocation.Dispose();
                 throw;
             }
         }

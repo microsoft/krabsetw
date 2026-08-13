@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using Microsoft.O365.Security.ETW.Interop;
 using Microsoft.O365.Security.ETW.Schema;
 using Microsoft.O365.Security.ETW.Testing;
 using Xunit;
@@ -66,20 +67,19 @@ namespace Microsoft.O365.Security.ETW.Tests
         public void AnAbandonedSchemaCacheFreesItsBlobs()
         {
             Collect();
-            int before = SchemaCache.LiveBlobs;
+            int before = SafeHGlobalHandle.LiveAllocations;
 
             AbandonSchemaCache();
 
             Collect();
 
-            Assert.Equal(before, SchemaCache.LiveBlobs);
+            Assert.Equal(before, SafeHGlobalHandle.LiveAllocations);
         }
 
         [Fact]
         public unsafe void ADisposedSchemaCacheFreesItsBlobsWithoutWaitingForTheCollector()
         {
             Collect();
-            int before = SchemaCache.LiveBlobs;
 
             using (EventSchema.Use(Declaration()))
             using (var builder = new RecordBuilder(FinalizerProviderId, id: 30, version: 0))
@@ -89,16 +89,20 @@ namespace Microsoft.O365.Security.ETW.Tests
 
                 using (SynthRecord record = builder.Pack())
                 {
+                    // Taken with the record already allocated: the counter spans every
+                    // unmanaged allocation in the process, not just the cache's.
+                    int before = SafeHGlobalHandle.LiveAllocations;
+
                     using (var cache = new SchemaCache())
                     {
                         SchemaEntry entry = cache.Get(record.Record);
                         Assert.Equal(0, entry.Status);
                         Assert.True(
-                            SchemaCache.LiveBlobs > before,
+                            SafeHGlobalHandle.LiveAllocations > before,
                             "Loading a schema should have allocated a blob.");
                     }
 
-                    Assert.Equal(before, SchemaCache.LiveBlobs);
+                    Assert.Equal(before, SafeHGlobalHandle.LiveAllocations);
                 }
             }
         }
