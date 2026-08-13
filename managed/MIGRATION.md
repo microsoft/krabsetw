@@ -50,8 +50,9 @@ Most consumers encounter none of them. The most likely to apply is #1, and only 
 implements `IEventRecord` directly.
 
 Separately, six **behaviour** changes compile silently — `TryGet*` on failure, case folding,
-`KernelProvider.GroupMask`, `TraceStats`, struct-typed properties and a `Stop` that cannot
-stop. These warrant the closest reading, and are listed after the nine.
+`KernelProvider.GroupMask`, `TraceStats`, struct-typed properties and `Stop` no longer
+releasing the trace's resources. These warrant the closest reading, and are listed after the
+nine.
 
 ### Compile breaks
 
@@ -169,14 +170,18 @@ everything after it in the payload, is unreadable. krabs does not decode structs
 fails worse, so nothing that worked before stops working — but the failure mode changes from
 silent corruption to a visible failure.
 
-**`Stop` throws if the trace will not stop.** `Stop` waits for `ProcessTrace` to return
-before releasing the state the callback thread reads through. That wait has always had a
-30-second limit; its result is no longer ignored. If it expires, `Stop` leaves the trace
-registered — releasing it is exactly what would crash — and throws a `TraceException` saying
-so. Previously it returned normally and the process could fault later, on the processing
-thread, with no connection to the call that caused it. A `Stop` that was working is
-unaffected: reaching this needs `ProcessTrace` not to return for 30 seconds after
-`CloseTrace`.
+**`Stop` no longer releases the trace's resources — `Dispose` does.** `Stop` signals the
+session to stop and returns, which is what the C++/CLI `Stop` does too. What changed is that
+the port used to release its callback registration and logger name inside `Stop`; it now
+holds them until `Dispose`, because `ProcessTrace` goes on draining buffered events after
+`CloseTrace` and is still reading through both. `Dispose` waits for that to finish (30
+seconds) and then releases.
+
+Two consequences. A caller that needs "no handler will run again" — before tearing down
+whatever its handlers touch — must wait for its `Start` call to return; `Stop` alone does not
+promise it, and never did in C++/CLI either. And a caller that stops a trace but never
+disposes it now leaks a registration and its schema cache: C++/CLI had a finalizer that
+eventually freed the native trace, and the port has none. Dispose your traces.
 
 **Not a behaviour change: nullable reference annotations.** The public surface is annotated,
 so a project that has opted into nullable reference types now receives accurate diagnostics

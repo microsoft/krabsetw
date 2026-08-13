@@ -299,6 +299,32 @@ namespace Microsoft.O365.Security.ETW
             TraceContext?[] contexts = Volatile.Read(ref _contexts);
             return (uint)index < (uint)contexts.Length ? Volatile.Read(ref contexts[index]) : null;
         }
+
+        /// <summary>
+        /// How many slots are currently registered. Exists so a test can show that repeated
+        /// Open/Stop cycles do not accumulate registrations now that only Dispose releases
+        /// them.
+        /// </summary>
+        internal static int InUse
+        {
+            get
+            {
+                lock (Gate)
+                {
+                    int count = 0;
+
+                    for (int i = 0; i < _contexts.Length; i++)
+                    {
+                        if (_contexts[i] != null)
+                        {
+                            count++;
+                        }
+                    }
+
+                    return count;
+                }
+            }
+        }
     }
 
     /// <summary>
