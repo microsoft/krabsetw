@@ -22,25 +22,28 @@ namespace Microsoft.O365.Security.ETW.Schema
 
         public readonly PropertyTable? Table;
 
-        /// <summary>TraceLogging event name, used to disambiguate keys that collide on hash.</summary>
-        private readonly byte[]? _traceLoggingName;
+        /// <summary>
+        /// The event's TraceLogging metadata block, used to disambiguate keys that collide on
+        /// hash. Null for events that did not come from the TraceLogging API.
+        /// </summary>
+        private readonly byte[]? _traceLoggingMetadata;
 
-        public SchemaEntry(IntPtr blob, int blobSize, PropertyTable table, byte[]? traceLoggingName)
+        public SchemaEntry(IntPtr blob, int blobSize, PropertyTable table, byte[]? traceLoggingMetadata)
         {
             Blob = blob;
             BlobSize = blobSize;
             Table = table;
             Status = NativeConstants.ERROR_SUCCESS;
-            _traceLoggingName = traceLoggingName;
+            _traceLoggingMetadata = traceLoggingMetadata;
         }
 
-        public SchemaEntry(int status, byte[]? traceLoggingName)
+        public SchemaEntry(int status, byte[]? traceLoggingMetadata)
         {
             Blob = IntPtr.Zero;
             BlobSize = 0;
             Table = null;
             Status = status;
-            _traceLoggingName = traceLoggingName;
+            _traceLoggingMetadata = traceLoggingMetadata;
         }
 
         public TRACE_EVENT_INFO* Info
@@ -49,14 +52,22 @@ namespace Microsoft.O365.Security.ETW.Schema
             get { return (TRACE_EVENT_INFO*)Blob; }
         }
 
-        public bool NameMatches(ReadOnlySpan<byte> name)
+        /// <summary>
+        /// Whether this entry describes an event carrying the given metadata block.
+        /// </summary>
+        /// <remarks>
+        /// Comparing the whole block, not just the name, is what keeps two same-named
+        /// TraceLogging events with different field layouts -- including two versions of one
+        /// event during a rolling upgrade -- from sharing an entry and decoding as each other.
+        /// </remarks>
+        public bool MetadataMatches(ReadOnlySpan<byte> metadata)
         {
-            if (_traceLoggingName == null)
+            if (_traceLoggingMetadata == null)
             {
-                return name.Length == 0;
+                return metadata.Length == 0;
             }
 
-            return ShortSpan.Equal(name, _traceLoggingName);
+            return ShortSpan.Equal(metadata, _traceLoggingMetadata);
         }
     }
 
@@ -75,18 +86,18 @@ namespace Microsoft.O365.Security.ETW.Schema
     {
         public readonly Guid Provider;
         public readonly ulong Keyword;
-        public readonly ulong NameHash;
+        public readonly ulong MetadataHash;
         public readonly ushort Id;
         public readonly byte Version;
         public readonly byte Opcode;
         public readonly byte Level;
         public readonly byte PointerSize;
 
-        public SchemaKey(Guid provider, ulong keyword, ulong nameHash, ushort id, byte version, byte opcode, byte level, int pointerSize)
+        public SchemaKey(Guid provider, ulong keyword, ulong metadataHash, ushort id, byte version, byte opcode, byte level, int pointerSize)
         {
             Provider = provider;
             Keyword = keyword;
-            NameHash = nameHash;
+            MetadataHash = metadataHash;
             Id = id;
             Version = version;
             Opcode = opcode;
@@ -118,7 +129,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 && Level == other.Level
                 && PointerSize == other.PointerSize
                 && Keyword == other.Keyword
-                && NameHash == other.NameHash
+                && MetadataHash == other.MetadataHash
                 && Provider == other.Provider;
         }
 
@@ -133,7 +144,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             {
                 int h = Provider.GetHashCode();
                 h = (h * 397) ^ (int)(Keyword ^ (Keyword >> 32));
-                h = (h * 397) ^ (int)(NameHash ^ (NameHash >> 32));
+                h = (h * 397) ^ (int)(MetadataHash ^ (MetadataHash >> 32));
                 h = (h * 397) ^ Id;
                 h = (h * 397) ^ (Version | (Opcode << 8) | (Level << 16) | (PointerSize << 24));
                 return h;
@@ -165,14 +176,17 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// </summary>
         public SchemaEntry Get(EVENT_RECORD* record)
         {
-            ReadOnlySpan<byte> tlName = TraceLoggingMetadata.GetEventName(record);
+            // The whole metadata block, not just the event name: for a self-describing event
+            // the block is the schema, so two events that share a name but not a field layout
+            // must not share a cache entry.
+            ReadOnlySpan<byte> tlMetadata = TraceLoggingMetadata.GetMetadata(record);
 
             ref EVENT_DESCRIPTOR descriptor = ref record->EventHeader.EventDescriptor;
             int pointerSize = PointerSizeFor(record);
 
             // Events arrive in bursts from the same provider, so the previous event's schema
             // is overwhelmingly the right answer. Confirming it structurally is cheaper than
-            // hashing the name and probing the dictionary.
+            // hashing the metadata and probing the dictionary.
             if (_lastEntry != null
                 && _lastKey.MatchesEvent(
                     record->EventHeader.ProviderId,
@@ -182,31 +196,31 @@ namespace Microsoft.O365.Security.ETW.Schema
                     descriptor.Opcode,
                     descriptor.Level,
                     pointerSize)
-                && _lastEntry.NameMatches(tlName))
+                && _lastEntry.MetadataMatches(tlMetadata))
             {
                 return _lastEntry;
             }
 
-            ulong nameHash = tlName.Length == 0 ? 0UL : Fnv1A(tlName);
+            ulong metadataHash = tlMetadata.Length == 0 ? 0UL : Fnv1A(tlMetadata);
 
             var key = new SchemaKey(
                 record->EventHeader.ProviderId,
                 descriptor.Keyword,
-                nameHash,
+                metadataHash,
                 descriptor.Id,
                 descriptor.Version,
                 descriptor.Opcode,
                 descriptor.Level,
                 pointerSize);
 
-            if (_cache.TryGetValue(key, out SchemaEntry? entry) && entry.NameMatches(tlName))
+            if (_cache.TryGetValue(key, out SchemaEntry? entry) && entry.MetadataMatches(tlMetadata))
             {
                 _lastKey = key;
                 _lastEntry = entry;
                 return entry;
             }
 
-            entry = Load(record, tlName);
+            entry = Load(record, tlMetadata);
             Misses++;
             _cache[key] = entry;
             _lastKey = key;
@@ -214,13 +228,13 @@ namespace Microsoft.O365.Security.ETW.Schema
             return entry;
         }
 
-        private SchemaEntry Load(EVENT_RECORD* record, ReadOnlySpan<byte> tlName)
+        private SchemaEntry Load(EVENT_RECORD* record, ReadOnlySpan<byte> tlMetadata)
         {
-            byte[]? nameCopy = tlName.Length == 0 ? null : tlName.ToArray();
+            byte[]? metadataCopy = tlMetadata.Length == 0 ? null : tlMetadata.ToArray();
 
             if (Testing.DeclaredSchemas.Any)
             {
-                SchemaEntry? declared = LoadDeclared(record, nameCopy);
+                SchemaEntry? declared = LoadDeclared(record, metadataCopy);
 
                 if (declared != null)
                 {
@@ -235,7 +249,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             {
                 return new SchemaEntry(status == NativeConstants.ERROR_SUCCESS
                     ? NativeConstants.ERROR_NOT_FOUND
-                    : status, nameCopy);
+                    : status, metadataCopy);
             }
 
             var allocation = new SafeHGlobalHandle((int)size);
@@ -245,7 +259,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             if (status != NativeConstants.ERROR_SUCCESS)
             {
                 allocation.Dispose();
-                return new SchemaEntry(status, nameCopy);
+                return new SchemaEntry(status, metadataCopy);
             }
 
             // The list owns the allocation for the life of the cache; the entry keeps the raw
@@ -255,7 +269,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             int pointerSize = PointerSizeFor(record);
             var table = new PropertyTable((TRACE_EVENT_INFO*)blob, pointerSize);
 
-            return new SchemaEntry(blob, (int)size, table, nameCopy);
+            return new SchemaEntry(blob, (int)size, table, metadataCopy);
         }
 
         /// <summary>
@@ -263,7 +277,7 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// nothing downstream can tell the difference. Returns null when no declaration
         /// covers the event, leaving TDH to answer.
         /// </summary>
-        private SchemaEntry? LoadDeclared(EVENT_RECORD* record, byte[]? nameCopy)
+        private SchemaEntry? LoadDeclared(EVENT_RECORD* record, byte[]? metadataCopy)
         {
             ref EVENT_DESCRIPTOR descriptor = ref record->EventHeader.EventDescriptor;
 
@@ -283,7 +297,7 @@ namespace Microsoft.O365.Security.ETW.Schema
 
             var table = new PropertyTable((TRACE_EVENT_INFO*)blob, PointerSizeFor(record));
 
-            return new SchemaEntry(blob, source.Length, table, nameCopy);
+            return new SchemaEntry(blob, source.Length, table, metadataCopy);
         }
 
         /// <summary>
@@ -362,19 +376,22 @@ namespace Microsoft.O365.Security.ETW.Schema
     internal static unsafe class TraceLoggingMetadata
     {
         /// <summary>
-        /// Returns the TraceLogging event name as UTF-8, or an empty span when the event was
-        /// not produced by the TraceLogging API.
+        /// The event's TraceLogging metadata block, or empty when the event did not come from
+        /// the TraceLogging API.
         /// </summary>
         /// <remarks>
-        /// Reimplements part of what TDH would otherwise do, so a schema key can be built
-        /// without calling TDH. Mirrors krabs::get_trace_logger_event_name.
+        /// This block *is* the schema for a self-describing event: it carries the name and
+        /// every field descriptor. Two events sharing a name but not a field layout have
+        /// different blocks, which is why the cache keys on the whole thing rather than the
+        /// name alone.
         ///
-        /// The metadata block is a packed pseudo-struct:
+        /// The block is a packed pseudo-struct:
         ///   UINT16 Size;
         ///   UINT8  Extension[];  // read until a byte has its high bit clear
         ///   char   Name[];       // UTF-8, NUL terminated
+        ///   ...    field descriptors follow
         /// </remarks>
-        public static ReadOnlySpan<byte> GetEventName(EVENT_RECORD* record)
+        public static ReadOnlySpan<byte> GetMetadata(EVENT_RECORD* record)
         {
             if (record->ExtendedDataCount == 0 || record->ExtendedData == IntPtr.Zero)
             {
@@ -408,26 +425,44 @@ namespace Microsoft.O365.Security.ETW.Schema
                 return default;
             }
 
-            int nameOffset = sizeof(ushort);
-            while (nameOffset < structSize)
-            {
-                byte b = metadata[nameOffset];
-                nameOffset++;
+            return new ReadOnlySpan<byte>(metadata, structSize);
+        }
 
-                if ((b & 0x80) != 0x80)
-                {
-                    break;
-                }
-            }
+        public static ReadOnlySpan<byte> GetEventName(EVENT_RECORD* record)
+        {
+            ReadOnlySpan<byte> block = GetMetadata(record);
 
-            if (nameOffset >= structSize)
+            if (block.Length == 0)
             {
                 return default;
             }
 
-            int available = structSize - nameOffset;
-            int terminator = ShortSpan.IndexOfZero(metadata + nameOffset, available);
+            fixed (byte* metadata = block)
+            {
+                int structSize = block.Length;
 
-            return new ReadOnlySpan<byte>(metadata + nameOffset, terminator < 0 ? available : terminator);        }
+                int nameOffset = sizeof(ushort);
+                while (nameOffset < structSize)
+                {
+                    byte b = metadata[nameOffset];
+                    nameOffset++;
+
+                    if ((b & 0x80) != 0x80)
+                    {
+                        break;
+                    }
+                }
+
+                if (nameOffset >= structSize)
+                {
+                    return default;
+                }
+
+                int available = structSize - nameOffset;
+                int terminator = ShortSpan.IndexOfZero(metadata + nameOffset, available);
+
+                return new ReadOnlySpan<byte>(metadata + nameOffset, terminator < 0 ? available : terminator);
+            }
+        }
     }
 }
