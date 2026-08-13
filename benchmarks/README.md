@@ -61,28 +61,27 @@ BenchmarkDotNet, and it reports a `sink/event` column.
 
 ## Results
 
-Four cells: {.NET Framework, .NET 10} × {C++/CLI, pure .NET}. All Release, x64, same
+Four cells: {.NET Framework, .NET 10} x {C++/CLI, pure .NET}. All Release, x64, same
 machine, all run in-process (`-i`) so every cell is measured identically. Times are per
-event. All four cells were collected in a single sitting, after the schema-lookup and
-property-lookup optimisations described in `managed/src/.../Schema`.
+event. All four cells were collected in a single sitting.
 
 ### .NET Framework (C++/CLI net462 vs pure net48)
 
 | | C++/CLI | Pure .NET | |
 | --- | ---: | ---: | ---: |
-| Dispatch | 288.6 ns | 87.2 ns | 3.3x |
-| Decode 3 strings | 1421.0 ns | 504.4 ns | 2.8x |
-| Filter, match | 669.2 ns | 290.4 ns | 2.3x |
-| Filter, reject | 398.9 ns | 279.1 ns | 1.4x |
+| Dispatch | 294.7 ns | 90.1 ns | 3.3x |
+| Decode 3 strings | 1402.0 ns | 506.4 ns | 2.8x |
+| Filter, match | 660.8 ns | 295.9 ns | 2.2x |
+| Filter, reject | 386.3 ns | 277.0 ns | 1.4x |
 
 ### .NET 10 (C++/CLI net8.0 rolled forward vs pure net10.0)
 
 | | C++/CLI | Pure .NET | |
 | --- | ---: | ---: | ---: |
-| Dispatch | 308.9 ns | 29.2 ns | 10.6x |
-| Decode 3 strings | 1414.2 ns | 283.4 ns | 5.0x |
-| Filter, match | 692.2 ns | 152.7 ns | 4.5x |
-| Filter, reject | 411.2 ns | 148.9 ns | 2.8x |
+| Dispatch | 235.4 ns | 25.6 ns | 9.2x |
+| Decode 3 strings | 1207.8 ns | 263.6 ns | 4.6x |
+| Filter, match | 570.2 ns | 136.0 ns | 4.2x |
+| Filter, reject | 343.8 ns | 131.3 ns | 2.6x |
 
 ### Allocation
 
@@ -92,22 +91,31 @@ and 256 B on .NET 10 for both implementations. Those are the three `System.Strin
 C++/CLI double copy (payload to `std::wstring` to `String^`) costs time, not surviving
 bytes.
 
-Zero-allocation decoding needs the ref API (`OnEventRef` / `EventRecordRef`), which the
-C++/CLI wrapper has no equivalent of and which this benchmark therefore cannot compare.
-See `managed\benchmarks` for that measurement.
+### The ref API
+
+Zero-allocation decoding needs `OnEventRef`/`EventRecordRef`, which the C++/CLI wrapper has
+no equivalent of and which the matrix above therefore cannot compare. Measured separately in
+`managed\benchmarks` over 256 captured records, per event:
+
+| | Span (`EventRecordRef`) | Compat (`IEventRecord`) |
+| --- | ---: | ---: |
+| net48 | 247 ns, 0 B | 338 ns, 64 B |
+| net10.0 | 121 ns, 0 B | 147 ns, 56 B |
+
+The interesting number is the allocation, not the time: the span path is the only one of the
+three APIs measured anywhere in this directory that survives a busy trace without producing
+garbage.
 
 ### Reading it
 
 The pure port gains far more from the modern runtime than the C++/CLI wrapper does:
-dispatch goes 124.2 to 48.9 ns (2.5x) for the port, but only 293.6 to 256.0 ns (1.15x) for
-C++/CLI. That is expected — the C++/CLI hot path is native code the .NET JIT never sees,
-so runtime improvements largely bypass it. End to end, pure .NET on .NET 10 dispatches 6x
+dispatch goes 90.1 to 25.6 ns (3.5x) for the port, but only 294.7 to 235.4 ns (1.25x) for
+C++/CLI. That is expected -- the C++/CLI hot path is native code the .NET JIT never sees, so
+runtime improvements largely bypass it. End to end, pure .NET on .NET 10 dispatches 11.5x
 faster than C++/CLI on .NET Framework.
 
-`Filter, reject` is the weakest cell (1.2x on .NET Framework) and the one to be least
+`Filter, reject` is the weakest cell (1.4x on .NET Framework) and the one to be least
 confident about.
-
-
 
 Both harnesses assert that the event handlers actually ran. This is not defensive
 boilerplate: the first version of this benchmark reported the C++/CLI decode costing 1 ns
