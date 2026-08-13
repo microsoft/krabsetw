@@ -55,7 +55,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             _resolved = _table.FirstDynamicIndex;
             for (int i = 0; i < _resolved; i++)
             {
-                _offsets[i] = _table.FixedOffsets[i];
+                _offsets[i] = _table.Properties[i].FixedOffset;
             }
         }
 
@@ -120,7 +120,7 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// </summary>
         public int SizeOf(int index, int offset)
         {
-            uint flags = _table.Flags[index];
+            uint flags = _table.Properties[index].Flags;
 
             if ((flags & NativeConstants.PropertyStruct) != 0)
             {
@@ -136,7 +136,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 // resolves to zero is a legitimately empty field and must stay distinct from
                 // "unspecified", which would otherwise send a string scanning to the end of
                 // the payload.
-                int lengthIndex = _table.Lengths[index];
+                int lengthIndex = _table.Properties[index].Length;
 
                 if (lengthIndex >= index)
                 {
@@ -154,14 +154,14 @@ namespace Microsoft.O365.Security.ETW.Schema
             }
             else
             {
-                ushort schemaLength = _table.Lengths[index];
+                ushort schemaLength = _table.Properties[index].Length;
                 length = schemaLength == 0 ? PropertySizer.LengthUnspecified : schemaLength;
             }
 
-            int count = _table.Counts[index];
+            int count = _table.Properties[index].Count;
             if ((flags & NativeConstants.PropertyParamCount) != 0)
             {
-                int countIndex = _table.Counts[index];
+                int countIndex = _table.Properties[index].Count;
                 if (countIndex >= index)
                 {
                     return -1;
@@ -188,8 +188,8 @@ namespace Microsoft.O365.Security.ETW.Schema
             }
 
             return PropertySizer.GetRuntimeSize(
-                _table.InTypes[index],
-                _table.OutTypes[index],
+                _table.Properties[index].InType,
+                _table.Properties[index].OutType,
                 length,
                 count,
                 _pointerSize,
@@ -211,11 +211,11 @@ namespace Microsoft.O365.Security.ETW.Schema
                 return false;
             }
 
-            ushort schemaLength = _table.Lengths[index];
+            ushort schemaLength = _table.Properties[index].Length;
 
             int size = PropertySizer.TryGetFixedElementSize(
-                _table.InTypes[index],
-                _table.OutTypes[index],
+                _table.Properties[index].InType,
+                _table.Properties[index].OutType,
                 schemaLength == 0 ? PropertySizer.LengthUnspecified : schemaLength,
                 _pointerSize);
 

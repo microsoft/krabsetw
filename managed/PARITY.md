@@ -415,6 +415,35 @@ explicit `Stop`.
 `_processingThread` is volatile now: it is written by the processing thread and read by
 whichever thread disposes, and a stale read would skip the wait entirely.
 
+### The property table cost more than the schema it annotated
+
+`PropertyTable` held nine parallel arrays — name signatures, name offsets, name lengths,
+in-types, out-types, flags, lengths, counts and fixed offsets. That is a reasonable shape for
+a wide table and the wrong one here: the average event has 3.68 properties and the median has
+2, measured across 50,058 event templates, so nine object headers dwarfed the data they
+carried. A two-property table allocated 400 bytes to hold about 64 bytes of it, which made
+each cache entry 2.7× the cost of krabs' — its entry is the TDH blob and a small key.
+
+The per-property fields are now one 24-byte `PropertyInfo` struct, leaving two allocations
+instead of nine. `NameSignatures` stays separate because a lookup scans only signatures and
+benefits from them being contiguous.
+
+| Properties | before | after |
+| --- | --- | --- |
+| 2 (median) | 400 B | 160 B |
+| 4 (mean) | 448 B | 224 B |
+| 8 (p90) | 576 B | 352 B |
+| 22 (p99) | 1040 B | 800 B |
+
+At the median a cache entry is now 386 bytes against krabs' ~226, rather than 626. The
+sizing path also reads the flags, in-type, out-type, length and count of one property
+together, which the old layout spread across five arrays.
+
+The struct needs no padding, but only because its fields are ordered widest-first — there is
+no `Pack` attribute, so a field added out of order would be padded rather than misaligned.
+`PropertyInfoLayoutTests` pins the size, every field offset and the array stride so that
+shows up as a failure instead of quietly growing every entry.
+
 ### A TraceLogging event was identified by its name, not its schema
 
 A self-describing event carries its own schema in an extended-data block, and native

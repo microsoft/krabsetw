@@ -373,13 +373,13 @@ namespace Microsoft.O365.Security.ETW
         internal ushort InTypeAt(int index)
         {
             var schema = Schema;
-            return schema?.Table == null ? (ushort)0 : schema.Table.InTypes[index];
+            return schema?.Table == null ? (ushort)0 : schema.Table.Properties[index].InType;
         }
 
         internal ushort OutTypeAt(int index)
         {
             var schema = Schema;
-            return schema?.Table == null ? (ushort)0 : schema.Table.OutTypes[index];
+            return schema?.Table == null ? (ushort)0 : schema.Table.Properties[index].OutType;
         }
 
         internal ReadOnlySpan<char> PropertyNameAt(int index)
@@ -391,7 +391,7 @@ namespace Microsoft.O365.Security.ETW
             }
 
             var table = schema.Table;
-            return new ReadOnlySpan<char>((byte*)schema.Blob + table.NameOffsets[index], table.NameLengths[index]);
+            return new ReadOnlySpan<char>((byte*)schema.Blob + table.Properties[index].NameOffset, table.Properties[index].NameLength);
         }
 
         #endregion
