@@ -32,7 +32,19 @@ namespace Microsoft.O365.Security.ETW
 
         private readonly TraceContext _context;
         private int _contextIndex = -1;
-        private Thread? _processingThread;
+
+        /// <remarks>
+        /// Written by the processing thread and read by whichever thread calls
+        /// <see cref="Dispose"/>, so it is volatile: a stale read would make Dispose believe
+        /// it is the processing thread and skip the wait that protects the context.
+        /// </remarks>
+        private volatile Thread? _processingThread;
+
+        /// <summary>
+        /// How long <see cref="Dispose"/> waits for ProcessTrace to return before giving up
+        /// and leaving the registration allocated.
+        /// </summary>
+        private static readonly TimeSpan ProcessingStopTimeout = TimeSpan.FromSeconds(30);
 
         private ulong _sessionHandle;
         private ulong _traceHandle;
@@ -167,7 +179,14 @@ namespace Microsoft.O365.Security.ETW
 
                 _context.SetKernelProviders(_providers);
                 _providersPublished = true;
-                _contextIndex = TraceRegistry.Register(_context);
+
+                // Reused across Open/Stop cycles: Stop no longer releases it, so registering
+                // unconditionally would leak a slot per cycle.
+                if (_contextIndex < 0)
+                {
+                    _contextIndex = TraceRegistry.Register(_context);
+                }
+
                 OpenConsumer();
 
                 _opened = true;
@@ -200,6 +219,11 @@ namespace Microsoft.O365.Security.ETW
             }
         }
 
+        /// <summary>
+        /// Signals the session to stop. Does not wait for processing to finish, and does not
+        /// release anything the callback thread can still reach; see
+        /// <see cref="UserTrace.Stop"/> for why.
+        /// </summary>
         public void Stop()
         {
             lock (_gate)
@@ -221,32 +245,32 @@ namespace Microsoft.O365.Security.ETW
                     _traceHandle = 0;
                 }
 
-                WaitForProcessingToStop();
-
-                if (_contextIndex >= 0)
-                {
-                    TraceRegistry.Unregister(_contextIndex);
-                    _contextIndex = -1;
-                }
-
-                if (_loggerName != IntPtr.Zero)
-                {
-                    Marshal.FreeHGlobal(_loggerName);
-                    _loggerName = IntPtr.Zero;
-                }
-
                 _opened = false;
             }
         }
 
-        private void WaitForProcessingToStop()
+        /// <summary>
+        /// Waits for the processing thread to leave ProcessTrace.
+        /// </summary>
+        /// <returns>
+        /// True when processing has stopped and what the callback reaches may be released.
+        /// </returns>
+        /// <remarks>
+        /// Called outside <see cref="_gate"/>: a handler blocked on that lock could never let
+        /// ProcessTrace return, so waiting while holding it would guarantee the timeout it is
+        /// meant to detect.
+        /// </remarks>
+        private bool WaitForProcessingToStop()
         {
+            // Disposing from inside a handler is legal, but the processing thread cannot wait
+            // for itself and the frames below it are still reading through the context.
+            // Report failure so the caller leaks rather than freeing underneath them.
             if (_processingThread == Thread.CurrentThread)
             {
-                return;
+                return false;
             }
 
-            _processingStopped.Wait(TimeSpan.FromSeconds(30));
+            return _processingStopped.Wait(ProcessingStopTimeout);
         }
 
         public TraceStats QueryStats()
@@ -431,7 +455,14 @@ namespace Microsoft.O365.Security.ETW
             logfile.BufferCallback = TraceCallbacks.BufferCallback;
             logfile.Context = (IntPtr)_contextIndex;
 
-            _loggerName = Marshal.StringToHGlobalUni(_name);
+            // Kept allocated past Stop, because a draining ProcessTrace may still be reading
+            // it. The name never changes, so one allocation serves every Open/Stop cycle and
+            // Dispose releases it.
+            if (_loggerName == IntPtr.Zero)
+            {
+                _loggerName = Marshal.StringToHGlobalUni(_name);
+            }
+
             logfile.LoggerName = _loggerName;
 
             _traceHandle = NativeMethods.OpenTrace(&logfile);
@@ -439,11 +470,6 @@ namespace Microsoft.O365.Security.ETW
             if (_traceHandle == InvalidTraceHandle)
             {
                 int error = Marshal.GetLastWin32Error();
-
-                Marshal.FreeHGlobal(_loggerName);
-                _loggerName = IntPtr.Zero;
-                TraceRegistry.Unregister(_contextIndex);
-                _contextIndex = -1;
 
                 throw new TraceException("OpenTrace failed for session '" + _name + "'.", error);
             }
@@ -456,6 +482,13 @@ namespace Microsoft.O365.Security.ETW
 
         #endregion
 
+        /// <summary>
+        /// Stops the trace and releases what its callback reaches.
+        /// </summary>
+        /// <remarks>
+        /// The wait lives here because this is the call that frees the registration and the
+        /// logger name. See <see cref="UserTrace.Dispose"/>.
+        /// </remarks>
         public void Dispose()
         {
             if (_disposed)
@@ -466,6 +499,27 @@ namespace Microsoft.O365.Security.ETW
             _disposed = true;
 
             Stop();
+
+            if (!WaitForProcessingToStop())
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                if (_contextIndex >= 0)
+                {
+                    TraceRegistry.Unregister(_contextIndex);
+                    _contextIndex = -1;
+                }
+
+                if (_loggerName != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(_loggerName);
+                    _loggerName = IntPtr.Zero;
+                }
+            }
+
             _context.Dispose();
             _processingStopped.Dispose();
         }

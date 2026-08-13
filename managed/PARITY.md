@@ -384,18 +384,39 @@ window a few instructions wide. `EnableWhileRunningTests` covers the functional 
 a provider enabled mid-run receives events, and the one enabled before `Start` keeps
 receiving them afterwards. Nothing covered enable-while-running before.
 
-### `Stop` could free the context while the processing thread was still in it
+### `Stop` freed state the processing thread was still reading through
 
-`Stop` waits for `ProcessTrace` to return before unregistering the trace context, because
-the callback thread reads through it — the code says so. It then discarded the wait's
-result, so a wait that timed out fell through to the teardown it was there to prevent and
-turned a hung trace into an access violation on a thread the caller does not control.
+`Stop` released the trace's callback registration and its logger name, having waited for
+`ProcessTrace` to return first — because the callback thread reads through both — and then
+discarded the wait's result. A wait that timed out fell straight through to the teardown it
+existed to prevent, turning a wedged trace into an access violation on a thread the caller
+does not control.
 
-A timeout now leaves the registration and the logger name allocated — deliberately leaked,
-because releasing them is precisely what is unsafe — and throws. `_processingThread` is also
-volatile now: it is written by the processing thread and read by whichever thread calls
-`Stop`, and a stale read would make `Stop` believe it *is* the processing thread and skip
-the wait altogether.
+Making the timeout loud turned out to be the wrong fix, because the wait was itself the
+problem. `Stop` held `_gate` across it, and `Enable` takes `_gate`, so a handler that called
+back into its own trace deadlocked both: the handler blocked on the lock, so `ProcessTrace`
+could not return, so the wait could not complete. Reproduced — `Stop` took exactly the
+30-second timeout, every time.
+
+`Stop` is now a signal, as it is in krabs (`stop_trace` then `close_trace`, no wait) and in
+C++/CLI. It does not wait and releases nothing, so it cannot deadlock and cannot free
+anything early. `Dispose` inherits the wait and the release, and does the waiting outside
+the lock. That is safe where `Stop` was not: `Dispose` is called by whoever owns the trace,
+after they are done with it, and a handler reaching it would mean the owner had already
+given up ownership. Disposing *from* a handler is still detected and skips the release
+rather than freeing underneath the frames below it.
+
+Because the registration now outlives `Stop`, `Open` reuses it rather than taking a fresh
+one per cycle — otherwise every `Open`/`Stop` pair would leak a slot. `StopAndDisposeTests`
+covers all three: that `Stop` returns promptly with a handler calling back into the trace,
+that repeated cycles do not accumulate registrations, and that `Dispose` releases without an
+explicit `Stop`.
+
+`_processingThread` is volatile now: it is written by the processing thread and read by
+whichever thread disposes, and a stale read would skip the wait entirely.
+
+The consequence for consumers is that `Dispose` is no longer optional — see `MIGRATION.md`.
+C++/CLI leaves its native trace to a finalizer, and the port has no equivalent backstop.
 
 ### `RecordBuilder` mis-padded an unfilled `Sid`
 

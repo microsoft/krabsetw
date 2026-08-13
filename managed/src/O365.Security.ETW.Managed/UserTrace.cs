@@ -325,7 +325,14 @@ namespace Microsoft.O365.Security.ETW
 
                 _context.SetProviders(_providers);
                 _providersPublished = true;
-                _contextIndex = TraceRegistry.Register(_context);
+
+                // Reused across Open/Stop cycles: Stop no longer releases it, so registering
+                // unconditionally would leak a slot per cycle.
+                if (_contextIndex < 0)
+                {
+                    _contextIndex = TraceRegistry.Register(_context);
+                }
+
                 OpenConsumer();
 
                 _opened = true;
@@ -369,6 +376,25 @@ namespace Microsoft.O365.Security.ETW
             }
         }
 
+        /// <summary>
+        /// Signals the session to stop. Does not wait for processing to finish.
+        /// </summary>
+        /// <remarks>
+        /// This is a signal, not a join, and it matches krabs: its stop is ControlTrace plus
+        /// CloseTrace and nothing more. CloseTrace only *asks* that processing end —
+        /// ProcessTrace goes on draining buffered events for a while afterwards, running a
+        /// handler for each — so a caller that needs "no handler will run again" before
+        /// tearing down what its handlers touch has to wait for <see cref="Start"/> to return
+        /// on whichever thread it was called.
+        ///
+        /// Waiting here instead would deadlock against a handler that calls back into its own
+        /// trace: the handler would block on <see cref="_gate"/>, so ProcessTrace would never
+        /// return, so the wait would never complete.
+        ///
+        /// Nothing is released here either. The registration and the logger name live until
+        /// <see cref="Dispose"/>, which is what makes it safe for this call not to wait: a
+        /// still-draining ProcessTrace can keep reading through both.
+        /// </remarks>
         public void Stop()
         {
             lock (_gate)
@@ -390,38 +416,6 @@ namespace Microsoft.O365.Security.ETW
                     _traceHandle = 0;
                 }
 
-                // CloseTrace only requests that processing end; ProcessTrace keeps draining
-                // buffered events for a while afterwards. Unregistering the context or
-                // freeing the cached schema blobs before it returns would leave the callback
-                // thread reading freed memory.
-                bool stopped = WaitForProcessingToStop();
-
-                if (!stopped)
-                {
-                    // The processing thread is still inside ProcessTrace. Releasing anything
-                    // it can reach would turn a hung trace into an access violation on a
-                    // thread the caller does not control, so the registration and the logger
-                    // name are deliberately leaked and the caller is told.
-                    throw new TraceException(
-                        "The trace did not stop processing within " +
-                        ProcessingStopTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture) +
-                        " seconds. Its context has been left registered, because freeing it " +
-                        "while the processing thread is still running would crash the process.",
-                        NativeConstants.ERROR_SUCCESS);
-                }
-
-                if (_contextIndex >= 0)
-                {
-                    TraceRegistry.Unregister(_contextIndex);
-                    _contextIndex = -1;
-                }
-
-                if (_loggerName != IntPtr.Zero)
-                {
-                    Marshal.FreeHGlobal(_loggerName);
-                    _loggerName = IntPtr.Zero;
-                }
-
                 _opened = false;
             }
         }
@@ -430,15 +424,21 @@ namespace Microsoft.O365.Security.ETW
         /// Waits for the processing thread to leave ProcessTrace.
         /// </summary>
         /// <returns>
-        /// False when the wait timed out and the processing thread may still be running.
+        /// True when processing has stopped and what the callback reaches may be released.
         /// </returns>
+        /// <remarks>
+        /// Deliberately called outside <see cref="_gate"/>: a handler blocked on that lock
+        /// could never let ProcessTrace return, so waiting while holding it would guarantee
+        /// the timeout it is trying to detect.
+        /// </remarks>
         private bool WaitForProcessingToStop()
         {
-            // Stopping from inside a handler is legal; the processing thread cannot wait for
-            // itself, and the callback frames below it still need the context alive.
+            // Disposing from inside a handler is legal, but the processing thread cannot wait
+            // for itself and the callback frames below it are still reading through the
+            // context. Report failure so the caller leaks rather than freeing underneath them.
             if (_processingThread == Thread.CurrentThread)
             {
-                return true;
+                return false;
             }
 
             return _processingStopped.Wait(ProcessingStopTimeout);
@@ -547,9 +547,15 @@ namespace Microsoft.O365.Security.ETW
             logfile.BufferCallback = TraceCallbacks.BufferCallback;
             logfile.Context = (IntPtr)_contextIndex;
 
-            // ETW is not documented to copy the logger name, so it stays allocated for as
-            // long as the trace handle is open.
-            _loggerName = Marshal.StringToHGlobalUni(_name);
+            // ETW is not documented to copy the logger name, so it stays allocated for as long
+            // as the trace handle is open -- and past Stop, because a draining ProcessTrace
+            // may still be reading it. The name never changes, so one allocation serves every
+            // Open/Stop cycle and Dispose releases it.
+            if (_loggerName == IntPtr.Zero)
+            {
+                _loggerName = Marshal.StringToHGlobalUni(_name);
+            }
+
             logfile.LoggerName = _loggerName;
 
             _traceHandle = NativeMethods.OpenTrace(&logfile);
@@ -557,11 +563,6 @@ namespace Microsoft.O365.Security.ETW
             if (_traceHandle == InvalidTraceHandle)
             {
                 int error = Marshal.GetLastWin32Error();
-
-                Marshal.FreeHGlobal(_loggerName);
-                _loggerName = IntPtr.Zero;
-                TraceRegistry.Unregister(_contextIndex);
-                _contextIndex = -1;
 
                 throw new TraceException("OpenTrace failed for session '" + _name + "'.", error);
             }
@@ -816,6 +817,22 @@ namespace Microsoft.O365.Security.ETW
 
         #endregion
 
+        /// <summary>
+        /// Stops the trace and releases what its callback reaches.
+        /// </summary>
+        /// <remarks>
+        /// This is where the wait lives, because this is the call that frees the registration
+        /// and the logger name. It is also the one call a handler cannot make on its own
+        /// trace without the caller having already given up ownership, so waiting here cannot
+        /// deadlock against <see cref="Enable(Provider)"/> the way waiting inside
+        /// <see cref="Stop"/> did.
+        ///
+        /// A wait that expires means the processing thread is still inside ProcessTrace.
+        /// Nothing is released in that case -- freeing memory it can still reach would turn a
+        /// wedged trace into an access violation -- and no exception is raised, because a
+        /// caller disposing in a finally block cannot do anything useful with one and would
+        /// lose whatever exception it was already unwinding.
+        /// </remarks>
         public void Dispose()
         {
             if (_disposed)
@@ -826,6 +843,27 @@ namespace Microsoft.O365.Security.ETW
             _disposed = true;
 
             Stop();
+
+            if (!WaitForProcessingToStop())
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                if (_contextIndex >= 0)
+                {
+                    TraceRegistry.Unregister(_contextIndex);
+                    _contextIndex = -1;
+                }
+
+                if (_loggerName != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(_loggerName);
+                    _loggerName = IntPtr.Zero;
+                }
+            }
+
             _processingStopped.Dispose();
             _context.Dispose();
         }
