@@ -47,8 +47,8 @@ namespace Microsoft.O365.Security.ETW
         private static readonly TimeSpan ProcessingStopTimeout = TimeSpan.FromSeconds(30);
 
         private ulong _sessionHandle;
-        private ulong _traceHandle;
-        private IntPtr _loggerName;
+        private TraceHandle? _traceHandle;
+        private SafeHGlobalHandle? _loggerName;
         private bool _opened;
         private volatile bool _providersPublished;
         private bool _disposed;
@@ -197,7 +197,7 @@ namespace Microsoft.O365.Security.ETW
         {
             Open();
 
-            ulong handle = _traceHandle;
+            ulong handle = _traceHandle!.Value;
 
             _processingThread = Thread.CurrentThread;
             _processingStopped.Reset();
@@ -253,11 +253,10 @@ namespace Microsoft.O365.Security.ETW
                 _sessionHandle = 0;
             }
 
-            if (_traceHandle != 0)
-            {
-                NativeMethods.CloseTrace(_traceHandle);
-                _traceHandle = 0;
-            }
+            // Disposing the handle is what issues CloseTrace, and doing it while ProcessTrace
+            // is running is how ETW is told to stop.
+            _traceHandle?.Dispose();
+            _traceHandle = null;
 
             _opened = false;
         }
@@ -266,14 +265,8 @@ namespace Microsoft.O365.Security.ETW
         {
             if (_contextIndex >= 0)
             {
-                TraceRegistry.Unregister(_contextIndex);
+                TraceRegistry.Unregister(_contextIndex, _context);
                 _contextIndex = -1;
-            }
-
-            if (_loggerName != IntPtr.Zero)
-            {
-                Marshal.FreeHGlobal(_loggerName);
-                _loggerName = IntPtr.Zero;
             }
         }
 
@@ -483,29 +476,25 @@ namespace Microsoft.O365.Security.ETW
             logfile.BufferCallback = TraceCallbacks.BufferCallback;
             logfile.Context = (IntPtr)_contextIndex;
 
-            // Kept allocated past Stop, because a draining ProcessTrace may still be reading
-            // it. The name never changes, so one allocation serves every Open/Stop cycle and
-            // Dispose releases it.
-            if (_loggerName == IntPtr.Zero)
+            // Kept past Stop, because a draining ProcessTrace may still be reading it. Its
+            // SafeHandle releases it, after this object's finalizer has closed the trace.
+            if (_loggerName == null)
             {
-                _loggerName = Marshal.StringToHGlobalUni(_name);
+                _loggerName = SafeHGlobalHandle.FromUnicodeString(_name);
             }
 
-            logfile.LoggerName = _loggerName;
+            logfile.LoggerName = _loggerName.Pointer;
 
-            _traceHandle = NativeMethods.OpenTrace(&logfile);
+            var opened = new TraceHandle(NativeMethods.OpenTrace(&logfile));
 
-            if (_traceHandle == InvalidTraceHandle)
+            if (opened.IsInvalid)
             {
                 int error = Marshal.GetLastWin32Error();
 
                 throw new TraceException("OpenTrace failed for session '" + _name + "'.", error);
             }
-        }
 
-        private static ulong InvalidTraceHandle
-        {
-            get { return IntPtr.Size == 8 ? ulong.MaxValue : 0x00000000FFFFFFFFUL; }
+            _traceHandle = opened;
         }
 
         #endregion
@@ -540,6 +529,7 @@ namespace Microsoft.O365.Security.ETW
 
             _context.Dispose();
             _processingStopped.Dispose();
+            _loggerName?.Dispose();
 
             GC.SuppressFinalize(this);
         }

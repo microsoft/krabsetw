@@ -417,26 +417,65 @@ whichever thread disposes, and a stale read would skip the wait entirely.
 
 ### Unmanaged memory had no finalizer behind it
 
-`Marshal.AllocHGlobal` is not reclaimed by the collector, so every type holding it needed a
-finalizer as well as `IDisposable` — otherwise abandoning one leaked for the life of the
-process, and `Dispose` was load-bearing rather than merely correct. Only `SynthRecord` had
-one. `SchemaCache` (the schema blobs), `UserTrace` and `KernelTrace` (the logger name, the
-session, and the callback registration) now do too.
+`Marshal.AllocHGlobal` is not reclaimed by the collector, so every allocation needed a
+last-resort release as well as `IDisposable` — otherwise abandoning an owner leaked for the
+life of the process, and `Dispose` was load-bearing rather than merely correct. Only
+`SynthRecord` had one.
 
-The trace finalizers are deliberately narrow. They touch only their own native state: the
-schema cache behind the trace context has its own finalizer, and a finalizer must not reach
-into managed objects whose finalizers may already have run. They take no lock either — a
-finalizer blocking on a lock another thread holds would stall every other finalizer in the
-process — which is safe because reaching one means nothing references the trace. `Start` also
-keeps the trace reachable across `ProcessTrace` with `GC.KeepAlive`, so a trace cannot be
-finalized while ETW still holds its logger name and context.
+Each allocation is now a `SafeHGlobalHandle`, so it releases *itself*: the schema blobs, the
+trace logger names, and the synthetic record's three buffers. The types that merely hold
+allocations no longer need finalizers at all, and the release is *critical* finalization —
+`SafeHandle` derives from `CriticalFinalizerObject`, so it runs after ordinary finalizers.
+That ordering is what makes the logger name safe: ETW reads it for as long as the trace
+handle is open, and the trace's own ordinary finalizer is what closes that handle.
+
+The consumer handle from `OpenTrace` is deliberately **not** a `SafeHandle`. It is a
+`TraceHandle`, a `CriticalFinalizerObject` holding the `ULONG64` directly, for two reasons.
+A `SafeHandle` stores an `IntPtr`, and squeezing a `TRACEHANDLE` into a 32-bit one is lossy
+above 32 bits — measured: `0x0000000100000000` converts back as `0`. The documented failure
+value is `(UINT64)UINTPTR_MAX`, which implies real handles are pointer-shaped, but that is an
+inference from the sentinel rather than a guarantee, and the sentinel itself differs between
+pre-Vista and Vista+. Second, `SafeHandle`'s reference counting is backwards here: ETW
+requires `CloseTrace` to be callable *while* `ProcessTrace` runs — that is how processing is
+stopped — whereas a ref count taken around the call would defer the close.
+
+The traces keep an ordinary finalizer for what remains theirs: the session, and the callback
+registration. `Start` also keeps the trace reachable across `ProcessTrace` with
+`GC.KeepAlive`, so a trace cannot be finalized while ETW still holds its logger name and
+context.
 
 Covered by `FinalizerTests`, which abandons each type inside a non-inlined helper, collects,
-and checks the count of live allocations returns to its baseline. Mutation-verified:
-emptying either finalizer fails it.
+and checks that `SafeHGlobalHandle.LiveAllocations` returns to its baseline.
 
 krabs needs none of this — its allocations are `std::unique_ptr` and `std::vector` members,
 released by the destructor when the trace object dies.
+
+### The trace registry rooted the consumer's object graph
+
+ETW hands back an opaque context on every event, so a trace has to be findable from a static
+table. That table held its entries strongly, and the entry is the thin end of a very long
+wedge: a trace context reaches the providers enabled on it, which reach the consumer's event
+handlers, which routinely close over the trace itself — to stop it, to enable another
+provider, to read its stats.
+
+So the static rooted the trace, which meant the trace's finalizer never ran, which meant it
+never unregistered. A cycle nothing could break, holding the consumer's entire object graph
+for the life of the process. Demonstrated with a weak reference to a canary object captured
+by a handler: collected when the handler does not touch the trace, immortal when it does.
+
+The table now holds weak references. The only strong reference to a context is its trace's
+own field, and the callback path stays correct because a trace cannot be collected while it
+is inside `ProcessTrace`. Slots whose target has been collected are handed out again, and
+`Unregister` only clears a slot that still holds the context it was given, so a slot reused
+between a trace becoming unreachable and its finalizer running cannot be wiped by the wrong
+owner.
+
+The cost is one weak dereference per event in place of an array load: measured at 0.9 ns on
+.NET 8 and 3.8 ns on .NET Framework, against a decode of roughly 250 ns.
+`TraceRegistryLifetimeTests` covers it, and fails if the entries are made strong again.
+
+This has no analogue in krabs, whose callback context is the address of the caller's own
+trace object and whose providers are held by reference.
 
 ### `RecordBuilder` mis-padded an unfilled `Sid`
 

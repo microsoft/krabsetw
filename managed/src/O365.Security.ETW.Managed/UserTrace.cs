@@ -159,8 +159,8 @@ namespace Microsoft.O365.Security.ETW
         private volatile Thread? _processingThread;
 
         private ulong _sessionHandle;
-        private ulong _traceHandle;
-        private IntPtr _loggerName;
+        private TraceHandle? _traceHandle;
+        private SafeHGlobalHandle? _loggerName;
         private bool _opened;
         private volatile bool _providersPublished;
         private bool _disposed;
@@ -347,7 +347,9 @@ namespace Microsoft.O365.Security.ETW
         {
             Open();
 
-            ulong handle = _traceHandle;
+            // Read once, outside the call: Stop closes this handle while ProcessTrace is
+            // still running, which is how ETW is told to stop.
+            ulong handle = _traceHandle!.Value;
 
             // Immediately before ProcessTrace, per krabs: any later and the rundown events
             // are emitted while nothing is consuming them.
@@ -541,30 +543,27 @@ namespace Microsoft.O365.Security.ETW
             logfile.BufferCallback = TraceCallbacks.BufferCallback;
             logfile.Context = (IntPtr)_contextIndex;
 
-            // ETW is not documented to copy the logger name, so it stays allocated for as long
-            // as the trace handle is open -- and past Stop, because a draining ProcessTrace
-            // may still be reading it. The name never changes, so one allocation serves every
-            // Open/Stop cycle and Dispose releases it.
-            if (_loggerName == IntPtr.Zero)
+            // Kept past Stop, because a draining ProcessTrace may still be reading it. The
+            // name never changes, so one allocation serves every Open/Stop cycle; its
+            // SafeHandle releases it, after this object's finalizer has closed the trace.
+            if (_loggerName == null)
             {
-                _loggerName = Marshal.StringToHGlobalUni(_name);
+                _loggerName = SafeHGlobalHandle.FromUnicodeString(_name);
             }
 
-            logfile.LoggerName = _loggerName;
+            logfile.LoggerName = _loggerName.Pointer;
 
-            _traceHandle = NativeMethods.OpenTrace(&logfile);
+            var opened = new TraceHandle(NativeMethods.OpenTrace(&logfile));
 
-            if (_traceHandle == InvalidTraceHandle)
+            if (opened.IsInvalid)
             {
                 int error = Marshal.GetLastWin32Error();
 
+                // Nothing to release: an invalid SafeHandle never calls ReleaseHandle.
                 throw new TraceException("OpenTrace failed for session '" + _name + "'.", error);
             }
-        }
 
-        private static ulong InvalidTraceHandle
-        {
-            get { return IntPtr.Size == 8 ? ulong.MaxValue : 0x00000000FFFFFFFFUL; }
+            _traceHandle = opened;
         }
 
         /// <summary>
@@ -848,6 +847,7 @@ namespace Microsoft.O365.Security.ETW
                 ReleaseUnmanaged();
             }
 
+            _loggerName?.Dispose();
             _processingStopped.Dispose();
             _context.Dispose();
 
@@ -858,11 +858,11 @@ namespace Microsoft.O365.Security.ETW
         /// Releases this trace's own native state if it was abandoned without being disposed.
         /// </summary>
         /// <remarks>
-        /// Only this object's native state is touched. The schema cache behind
-        /// <see cref="_context"/> has its own finalizer, and a finalizer must not reach into
-        /// managed objects whose finalizers may already have run. Nothing is locked either: a
-        /// finalizer that blocks on a lock some other thread is holding stalls every other
-        /// finalizer in the process.
+        /// Only this object's own state is touched. The schema cache behind
+        /// <see cref="_context"/> and the logger name allocation both clean themselves up,
+        /// and a finalizer must not reach into managed objects whose finalizers may already
+        /// have run. Nothing is locked either: a finalizer that blocks on a lock some other
+        /// thread is holding stalls every other finalizer in the process.
         ///
         /// Reaching here means nothing references the trace, and <see cref="Start"/> keeps it
         /// reachable across ProcessTrace, so processing cannot still be running.
@@ -885,27 +885,25 @@ namespace Microsoft.O365.Security.ETW
                 _sessionHandle = 0;
             }
 
-            if (_traceHandle != 0)
-            {
-                NativeMethods.CloseTrace(_traceHandle);
-                _traceHandle = 0;
-            }
+            // Disposing the handle is what issues CloseTrace, and doing it while ProcessTrace
+            // is running is how ETW is told to stop.
+            _traceHandle?.Dispose();
+            _traceHandle = null;
 
             _opened = false;
         }
 
+        /// <summary>
+        /// Releases the registration. The logger name is a <see cref="SafeHGlobalHandle"/>
+        /// and releases itself, which is what keeps its critical finalizer running *after*
+        /// this object's ordinary one has closed the trace handle ETW reads it through.
+        /// </summary>
         private void ReleaseUnmanaged()
         {
             if (_contextIndex >= 0)
             {
-                TraceRegistry.Unregister(_contextIndex);
+                TraceRegistry.Unregister(_contextIndex, _context);
                 _contextIndex = -1;
-            }
-
-            if (_loggerName != IntPtr.Zero)
-            {
-                Marshal.FreeHGlobal(_loggerName);
-                _loggerName = IntPtr.Zero;
             }
         }
     }

@@ -151,7 +151,7 @@ namespace Microsoft.O365.Security.ETW.Schema
     internal sealed unsafe class SchemaCache : IDisposable
     {
         private readonly Dictionary<SchemaKey, SchemaEntry> _cache = new Dictionary<SchemaKey, SchemaEntry>();
-        private readonly List<IntPtr> _blobs = new List<IntPtr>();
+        private readonly List<SafeHGlobalHandle> _blobs = new List<SafeHGlobalHandle>();
         private SchemaKey _lastKey;
         private SchemaEntry? _lastEntry;
         private bool _disposed;
@@ -238,17 +238,19 @@ namespace Microsoft.O365.Security.ETW.Schema
                     : status, nameCopy);
             }
 
-            IntPtr blob = Marshal.AllocHGlobal((int)size);
+            var allocation = new SafeHGlobalHandle((int)size);
+            IntPtr blob = allocation.Pointer;
             status = NativeMethods.TdhGetEventInformation(record, 0, IntPtr.Zero, (TRACE_EVENT_INFO*)blob, &size);
 
             if (status != NativeConstants.ERROR_SUCCESS)
             {
-                Marshal.FreeHGlobal(blob);
+                allocation.Dispose();
                 return new SchemaEntry(status, nameCopy);
             }
 
-            _blobs.Add(blob);
-            Interlocked.Increment(ref LiveBlobs);
+            // The list owns the allocation for the life of the cache; the entry keeps the raw
+            // pointer so reads stay a plain dereference.
+            _blobs.Add(allocation);
 
             int pointerSize = PointerSizeFor(record);
             var table = new PropertyTable((TRACE_EVENT_INFO*)blob, pointerSize);
@@ -274,10 +276,10 @@ namespace Microsoft.O365.Security.ETW.Schema
             }
 
             byte[] source = declaration.Blob();
-            IntPtr blob = Marshal.AllocHGlobal(source.Length);
+            var allocation = new SafeHGlobalHandle(source.Length);
+            IntPtr blob = allocation.Pointer;
             Marshal.Copy(source, 0, blob, source.Length);
-            _blobs.Add(blob);
-            Interlocked.Increment(ref LiveBlobs);
+            _blobs.Add(allocation);
 
             var table = new PropertyTable((TRACE_EVENT_INFO*)blob, PointerSizeFor(record));
 
@@ -327,34 +329,14 @@ namespace Microsoft.O365.Security.ETW.Schema
         }
 
         /// <summary>
-        /// Releases the cached schema blobs if the cache was abandoned without being disposed.
+        /// Releases the cached schema blobs.
         /// </summary>
         /// <remarks>
-        /// The blobs are unmanaged, so the collector does not reclaim them on its own, and
-        /// this type is the only thing that knows where they are. Reading <c>_blobs</c> here
-        /// is safe: a <c>List&lt;IntPtr&gt;</c> has no finalizer of its own, so it cannot
-        /// already have been finalized, and nothing else can be mutating it -- reaching this
-        /// point means the cache is unreachable.
+        /// No finalizer: each blob is a <see cref="SafeHGlobalHandle"/> and releases itself
+        /// through its own critical finalizer if the cache is abandoned. Disposing here just
+        /// makes it deterministic.
         /// </remarks>
-        ~SchemaCache()
-        {
-            Free();
-        }
-
         public void Dispose()
-        {
-            Free();
-            GC.SuppressFinalize(this);
-        }
-
-        /// <summary>Number of schema blobs allocated and not yet freed, across all caches.</summary>
-        /// <remarks>
-        /// Kept so a test can prove the finalizer actually releases them; a schema is loaded
-        /// once per event type, so this is nowhere near the hot path.
-        /// </remarks>
-        internal static int LiveBlobs;
-
-        private void Free()
         {
             if (_disposed)
             {
@@ -366,10 +348,8 @@ namespace Microsoft.O365.Security.ETW.Schema
 
             for (int i = 0; i < _blobs.Count; i++)
             {
-                Marshal.FreeHGlobal(_blobs[i]);
+                _blobs[i].Dispose();
             }
-
-            Interlocked.Add(ref LiveBlobs, -_blobs.Count);
 
             _blobs.Clear();
             _cache.Clear();
