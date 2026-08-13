@@ -415,6 +415,36 @@ explicit `Stop`.
 `_processingThread` is volatile now: it is written by the processing thread and read by
 whichever thread disposes, and a stale read would skip the wait entirely.
 
+### A TraceLogging event was identified by its name, not its schema
+
+A self-describing event carries its own schema in an extended-data block, and native
+TraceLogging leaves `EVENT_DESCRIPTOR.Id` at 0 — unlike `EventSource`, which assigns an id
+per `Write<T>` call site (measured: 153 and 154 for two shapes). So for a native provider the
+whole descriptor is identical across every event, and the metadata block is the only thing
+separating one event's layout from another's. The cache keyed on the event *name*, which is
+not enough, and krabs keys the same way (`schema_key::name`).
+
+Measured against a real native provider, two distinct failures:
+
+- **Two same-named events with different fields.** The first schema was applied to both, so
+  one shape decoded as the other: 964 of 1434 events returned a wrong value for a field
+  present in both — a plausible integer, no error.
+- **A rolling upgrade that appended a field.** The old schema stayed cached and the new field
+  was never readable, 0 times out of 193, with no indication anything was missing. Reversed,
+  with the new schema cached first, old events correctly reported the field absent.
+
+A version that *inserts* rather than appends corrupts instead of hiding: every field after
+the insertion point shifts. And which layout wins is a race — whichever the trace sees first
+— so the same binaries can behave differently between runs.
+
+The key is now the hash of the whole metadata block, and collisions are resolved by
+comparing the block rather than the name. Each distinct field layout gets its own entry.
+Covered by `TraceLoggingSchemaKeyTests`; reverting to the name fails two of its three cases.
+
+This matters most for a provider whose emitters can be different versions at once. HostIDS's
+Detours provider injects into other processes, so an old injected binary can outlive an agent
+upgrade by as long as the host process runs.
+
 ### Unmanaged memory had no finalizer behind it
 
 `Marshal.AllocHGlobal` is not reclaimed by the collector, so every allocation needed a
