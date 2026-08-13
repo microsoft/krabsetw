@@ -376,6 +376,97 @@ NUL-terminated, i.e. the counted and non-NUL-terminated variants.
 
 ## Resolved
 
+### A failed `Open` leaked the ETW session
+
+`Open` creates the session with `StartTrace` and only then opens the consumer, sets the
+handle and finally sets `_opened`. Anything that threw in between — a bad provider, a
+consumer that could not be opened — left the session running in the kernel while the object
+believed it had never opened. `Stop` early-returned on `!_opened`, so `Dispose` never issued
+`ControlTrace(STOP)`, and it called `SuppressFinalize` on the way out, so the finalizer could
+not clean up either. The session survived the process: machine-wide, invisible, and only
+removable with `logman stop`.
+
+`Stop` no longer looks at `_opened`. It stops whatever session exists, which is safe because
+`ControlSession` ignores its return code and a session that was never created simply answers
+`ERROR_WMI_INSTANCE_NOT_FOUND`.
+
+Covered by `FailedOpenTeardownTests`, which forces the failed-open state and asserts that a
+subsequent `ControlTrace(STOP)` reports 4201 — the session is already gone. Before the fix
+the test reported 0: the session was still there.
+
+### The finalizers took a static lock
+
+`~UserTrace` and `~KernelTrace` called `ReleaseUnmanaged`, which calls
+`TraceRegistry.Unregister`, which takes the static `Gate`. A finalizer that blocks on a lock
+a mutator thread happens to hold stalls the whole finalizer queue, including finalizers that
+free unmanaged memory for unrelated code. The comment on the finalizer already claimed
+nothing was locked; it was wrong.
+
+Both finalizers now call `StopSession` only — two native calls, no lock, no managed state.
+The registry slot is left to be reclaimed by the weak reference it already holds.
+
+### The offset resolver could outlive the record it was resolving against
+
+`EventScratch.Resolve` called `_offsets.Begin(...)` only when a property table had been
+found. On an event with no table the resolver kept the previous event's record and payload
+pointers, both of which point into a buffer ETW reuses as soon as the callback returns. Any
+later read through that resolver was a use-after-free. `Begin` is now unconditional.
+
+### Extended data was read without checking the record was still valid
+
+`EventRecordAdapter` guards `Ref` against use after `End()`, but `GetStackTrace`,
+`TryGetContainerId` and `TryGetProcessStartKey` read `_record` directly. After `End()` that
+is a dangling pointer, and the accessors returned empty or `false` rather than saying so.
+All three now route through the same `ValidRecord` property `Ref` uses.
+
+### A span was returned out of a `fixed` block
+
+`SchemaCache.GetEventName` built its return value inside a `fixed` statement. That happens to
+be safe here — the memory is native and not moved by the GC — but it is the exact shape of a
+real bug and nothing in the signature says otherwise. Rewritten to slice the span it was
+already handed.
+
+### `Dispose` was not safe against a race with itself
+
+`_disposed` was a plain `bool` read and written without synchronisation, so two threads
+disposing the same trace could both run the teardown. Neither outcome was a crash — the
+schema cache is guarded and the SafeHandles are idempotent — but a concurrent waiter could
+see `_processingStopped` disposed underneath it. Now an `Interlocked.Exchange`.
+
+### Deadlock analysis: no reachable deadlock
+
+Recorded because the question is easier to answer once than to re-derive. The whole library
+holds exactly two locks:
+
+- `_gate`, one per `UserTrace`/`KernelTrace` instance.
+- `TraceRegistry.Gate`, static.
+
+`Gate` is a leaf. `Register`, `Unregister` and `InUse` touch only the slot array and the weak
+references in it; none of them calls back into a trace, a provider or user code. The only
+order that ever occurs is `_gate` then `Gate` — from `Open` and from `Dispose` — and since
+`Gate` never reaches for `_gate`, an inversion is not expressible.
+
+No lock is held across a wait. There are exactly two blocking waits in the library, both
+`_processingStopped.Wait` inside `WaitForProcessingToStop`, and `Dispose` performs it between
+its two `_gate` regions rather than inside one. This is the fix from *`Stop` freed state the
+processing thread was still reading through*: the earlier code held `_gate` across a 30 second
+wait while `Enable` needed the same lock, which deadlocked reproducibly at exactly 30.0 s.
+
+User code is never called with a lock held. The live path — the ETW callback to
+`TraceContext.OnEvent` to `Route` — takes no lock at all: `TraceRegistry.Get` is a pair of
+volatile reads and the provider set is a single immutable `Routes` object read volatilely.
+The testing `PushEvent` path takes `_gate` to publish providers but releases it before
+dispatching. So a handler may call any method on any trace, including its own, without
+risking an order it cannot see.
+
+Disposing from inside a handler does not self-wait: `WaitForProcessingToStop` compares
+against `_processingThread` and returns immediately on the processing thread.
+
+Every wait is bounded (30 s) and `Stop` no longer waits at all, so a handler that blocks
+forever costs a bounded delay rather than a hang. That last point matters to consumers that
+call `Stop` while holding their own lock — HostIDS's `StopProcessTrace` does exactly this,
+and its own comment records that it hit this class of bug independently.
+
 ### An empty array was sized as one element
 
 A property whose element count comes from the payload (`PropertyParamCount`) can legitimately

@@ -51,7 +51,7 @@ namespace Microsoft.O365.Security.ETW
         private SafeHGlobalHandle? _loggerName;
         private bool _opened;
         private volatile bool _providersPublished;
-        private bool _disposed;
+        private int _disposed;
 
         private EventTraceProperties _properties = new EventTraceProperties
         {
@@ -197,7 +197,18 @@ namespace Microsoft.O365.Security.ETW
         {
             Open();
 
-            ulong handle = _traceHandle!.Value;
+            ulong handle;
+
+            // Read under the lock, so a Stop racing this cannot null the handle first.
+            lock (_gate)
+            {
+                if (_traceHandle == null)
+                {
+                    return;
+                }
+
+                handle = _traceHandle.Value;
+            }
 
             _processingThread = Thread.CurrentThread;
             _processingStopped.Reset();
@@ -232,11 +243,7 @@ namespace Microsoft.O365.Security.ETW
         {
             lock (_gate)
             {
-                if (!_opened)
-                {
-                    return;
-                }
-
+                // Keyed off what exists rather than off _opened; see UserTrace.Stop.
                 StopSession();
             }
         }
@@ -508,12 +515,11 @@ namespace Microsoft.O365.Security.ETW
         /// </remarks>
         public void Dispose()
         {
-            if (_disposed)
+            // Interlocked so two threads racing Dispose cannot both run the teardown.
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
             {
                 return;
             }
-
-            _disposed = true;
 
             Stop();
 
@@ -535,14 +541,12 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <summary>
-        /// Releases this trace's own native state if it was abandoned without being disposed.
-        /// See <see cref="UserTrace"/>'s finalizer for why it touches nothing else and takes
-        /// no lock.
+        /// Stops the session if the trace was abandoned without being disposed. Takes no lock
+        /// and releases nothing else; see <see cref="UserTrace"/>'s finalizer for why.
         /// </summary>
         ~KernelTrace()
         {
             StopSession();
-            ReleaseUnmanaged();
         }
     }
 }

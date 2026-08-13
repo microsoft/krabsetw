@@ -428,6 +428,19 @@ namespace Microsoft.O365.Security.ETW.Schema
             return new ReadOnlySpan<byte>(metadata, structSize);
         }
 
+        /// <summary>
+        /// Returns the TraceLogging event name as UTF-8, or an empty span when the event was
+        /// not produced by the TraceLogging API.
+        /// </summary>
+        /// <remarks>
+        /// Reimplements part of what TDH would otherwise do, so a schema key can be built
+        /// without calling TDH. Mirrors krabs::get_trace_logger_event_name.
+        ///
+        /// Sliced from the block rather than walked with a pointer: taking a pointer with
+        /// `fixed` and returning a span built from it would be correct only for as long as
+        /// the block happens to be unmanaged memory, and would silently become a
+        /// use-after-unpin the day it was not.
+        /// </remarks>
         public static ReadOnlySpan<byte> GetEventName(EVENT_RECORD* record)
         {
             ReadOnlySpan<byte> block = GetMetadata(record);
@@ -437,32 +450,27 @@ namespace Microsoft.O365.Security.ETW.Schema
                 return default;
             }
 
-            fixed (byte* metadata = block)
+            int nameOffset = sizeof(ushort);
+            while (nameOffset < block.Length)
             {
-                int structSize = block.Length;
+                byte b = block[nameOffset];
+                nameOffset++;
 
-                int nameOffset = sizeof(ushort);
-                while (nameOffset < structSize)
+                if ((b & 0x80) != 0x80)
                 {
-                    byte b = metadata[nameOffset];
-                    nameOffset++;
-
-                    if ((b & 0x80) != 0x80)
-                    {
-                        break;
-                    }
+                    break;
                 }
-
-                if (nameOffset >= structSize)
-                {
-                    return default;
-                }
-
-                int available = structSize - nameOffset;
-                int terminator = ShortSpan.IndexOfZero(metadata + nameOffset, available);
-
-                return new ReadOnlySpan<byte>(metadata + nameOffset, terminator < 0 ? available : terminator);
             }
+
+            if (nameOffset >= block.Length)
+            {
+                return default;
+            }
+
+            ReadOnlySpan<byte> rest = block.Slice(nameOffset);
+            int terminator = rest.IndexOf((byte)0);
+
+            return terminator < 0 ? rest : rest.Slice(0, terminator);
         }
     }
 }

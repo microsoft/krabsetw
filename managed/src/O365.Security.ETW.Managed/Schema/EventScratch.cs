@@ -70,10 +70,11 @@ namespace Microsoft.O365.Security.ETW.Schema
             _resolved = true;
             _schema = _cache.Get(_record);
 
-            if (_schema.Table != null)
-            {
-                _offsets.Begin(_record, _schema);
-            }
+            // Begun unconditionally, including when the event has no schema. Begin handles a
+            // null table, and skipping it would leave the resolver holding the *previous*
+            // event's record and payload pointer -- harmless only for as long as every caller
+            // remembers to check Table first, which is not a property this type controls.
+            _offsets.Begin(_record, _schema);
         }
 
         /// <summary>Number of TDH lookups performed across this trace's lifetime.</summary>
