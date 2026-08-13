@@ -351,27 +351,27 @@ namespace Microsoft.O365.Security.ETW.Testing
                 {
                     bytesToTrim = 0;
 
-                    string name = new string((char*)(blob + table.NameOffsets[i]), 0, table.NameLengths[i]);
+                    string name = new string((char*)(blob + table.Properties[i].NameOffset), 0, table.Properties[i].NameLength);
                     int found = IndexOf(name);
 
                     if (found < 0)
                     {
                         unfilled.Add(name);
-                        payload.AddRange(new byte[FillWidth((TdhInType)table.InTypes[i], name, pointerSize)]);
+                        payload.AddRange(new byte[FillWidth((TdhInType)table.Properties[i].InType, name, pointerSize)]);
                         continue;
                     }
 
                     PropertyThunk thunk = _properties[found];
 
-                    if (thunk.InType != (TdhInType)table.InTypes[i])
+                    if (thunk.InType != (TdhInType)table.Properties[i].InType)
                     {
                         throw new ArgumentException(
                             "Invalid property type given for property " + name +
-                            " Expected: " + (TdhInType)table.InTypes[i] +
+                            " Expected: " + (TdhInType)table.Properties[i].InType +
                             " Received: " + thunk.InType);
                     }
 
-                    byte[] bytes = thunk.BytesFor(pointerSize, table.OutTypes[i]);
+                    byte[] bytes = thunk.BytesFor(pointerSize, table.Properties[i].OutType);
                     int terminator = TerminatorWidth(thunk.InType);
 
                     if (terminator > 0)
@@ -443,12 +443,12 @@ namespace Microsoft.O365.Security.ETW.Testing
         /// </summary>
         private static bool SchemaDeclaresStringLength(PropertyTable table, int index)
         {
-            if ((table.Flags[index] & NativeConstants.PropertyParamLength) != 0)
+            if ((table.Properties[index].Flags & NativeConstants.PropertyParamLength) != 0)
             {
                 return true;
             }
 
-            return table.Lengths[index] != 0;
+            return table.Properties[index].Length != 0;
         }
 
         /// <summary>
@@ -460,9 +460,9 @@ namespace Microsoft.O365.Security.ETW.Testing
         {
             int declared;
 
-            if ((table.Flags[index] & NativeConstants.PropertyParamLength) != 0)
+            if ((table.Properties[index].Flags & NativeConstants.PropertyParamLength) != 0)
             {
-                int lengthIndex = table.Lengths[index];
+                int lengthIndex = table.Properties[index].Length;
 
                 if (lengthIndex >= index)
                 {
@@ -470,7 +470,7 @@ namespace Microsoft.O365.Security.ETW.Testing
                 }
 
                 string lengthName = new string(
-                    (char*)(blob + table.NameOffsets[lengthIndex]), 0, table.NameLengths[lengthIndex]);
+                    (char*)(blob + table.Properties[lengthIndex].NameOffset), 0, table.Properties[lengthIndex].NameLength);
 
                 int lengthProperty = IndexOf(lengthName);
 
@@ -492,7 +492,7 @@ namespace Microsoft.O365.Security.ETW.Testing
                     ", which the schema uses to size it, was given " + supplied + ".");
             }
 
-            declared = table.Lengths[index];
+            declared = table.Properties[index].Length;
 
             if (declared != units)
             {
