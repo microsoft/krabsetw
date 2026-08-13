@@ -323,6 +323,20 @@ A sweep of the 1503 providers registered on a build machine found 4163 ANSI-type
 properties: 4162 `TDH_OUTTYPE_STRING`, one `win:Xml`, and zero UTF-8 or JSON. So the
 exposure is currently theoretical.
 
+The out-types actually consumed were then checked directly, rather than inferred from that
+sweep, by decoding live events:
+
+| Shape | Out-type | Encoding |
+| --- | --- | --- |
+| Manifest `win:AnsiString`/`xs:string` (WinINet 1057, WinRM 1044, CodeIntegrity 3076-3119) | 1 (`STRING`) | ANSI code page |
+| TraceLogging ANSI string (`TraceLoggingValue(const char*)`) | 0 (`NULL`) | ANSI code page |
+
+Both decode byte `0xE9` as `U+00E9`, i.e. identically to C++/CLI. `AnsiConsumerShapeTests`
+pins these two shapes plus the UTF-8 one, and pins them on the **bytes**: comparing only the
+decoded string cannot detect a wrong encoding, because `RecordBuilder` encodes through the
+same out-type lookup the reader decodes with, so changing it changes both sides and the
+round trip still succeeds.
+
 Note that `TdhOutType` in the port had these two values numbered three too high until
 recently; the enum in `tdh.h` is implicitly numbered and the transcription had drifted.
 Values are now spelled out explicitly.
