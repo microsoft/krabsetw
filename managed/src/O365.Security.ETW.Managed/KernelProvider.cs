@@ -78,28 +78,27 @@ namespace Microsoft.O365.Security.ETW
             var handler = OnEventRef;
             var compat = OnEvent;
 
-            if (handler != null || compat != null)
+            if (handler == null && compat == null && _filters.Count == 0)
             {
-                handler?.Invoke(record);
-
-                if (compat != null)
-                {
-                    SchemaEntry schema = record.SchemaEntry;
-
-                    if (schema.Status != NativeConstants.ERROR_SUCCESS)
-                    {
-                        var onError = OnError;
-                        onError?.Invoke(new EventRecordError(
-                            ErrorMessages.StatusAndRecordContext(
-                                schema.Status, record.ProviderId, record.Id),
-                            adapter));
-                    }
-                    else
-                    {
-                        compat(adapter);
-                    }
-                }
+                return;
             }
+
+            // Gated exactly as Provider.Dispatch is, and for the same reasons: one error on
+            // the provider, and nothing downstream is offered an event it cannot decode.
+            SchemaEntry schema = record.SchemaEntry;
+
+            if (schema.Status != NativeConstants.ERROR_SUCCESS)
+            {
+                var onError = OnError;
+                onError?.Invoke(new EventRecordError(
+                    ErrorMessages.StatusAndRecordContext(
+                        schema.Status, record.ProviderId, record.Id),
+                    adapter));
+                return;
+            }
+
+            handler?.Invoke(record);
+            compat?.Invoke(adapter);
 
             for (int i = 0; i < _filters.Count; i++)
             {

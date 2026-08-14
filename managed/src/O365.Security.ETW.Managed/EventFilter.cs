@@ -69,7 +69,13 @@ namespace Microsoft.O365.Security.ETW
         /// <summary>Invoked for each event that satisfies the filter.</summary>
         public event IEventRecordDelegate? OnEvent;
 
-        /// <summary>Invoked when an event's schema could not be resolved.</summary>
+        /// <summary>
+        /// Invoked when an event's schema could not be resolved. Reached only when the filter
+        /// is driven directly, as <c>Proxy(EventFilter)</c> does: a filter reached through a
+        /// provider is only ever offered an event whose schema already resolved, because
+        /// <see cref="Provider.Dispatch"/> reports the failure through
+        /// <see cref="Provider.OnError"/> and skips its filters.
+        /// </summary>
         public event EventRecordErrorDelegate? OnError;
 
         internal bool HasHandlers
@@ -121,54 +127,30 @@ namespace Microsoft.O365.Security.ETW
 
         internal void Dispatch(in EventRecordRef record, EventRecordAdapter adapter)
         {
-            // Native returns immediately when a filter has no event callbacks. OnError is
-            // included because the native filter still reports schema failures raised by its
-            // predicate when only an error handler is attached.
-            if (OnEventRef == null && OnEvent == null && OnError == null)
-            {
-                return;
-            }
-
             if (!MatchesEventId(record.Id))
             {
                 return;
             }
 
+            // Provider.Dispatch resolves the schema and reports a failure once through
+            // Provider.OnError before reaching any filter, so on that path this gate always
+            // passes -- the cost is one cached status read. It earns its keep when a filter
+            // is driven directly rather than through a provider, as Proxy(EventFilter) does,
+            // where nothing above the filter can resolve or report.
             Predicate? predicate = Predicate;
 
-            if (predicate != null)
-            {
-                // A predicate that needs the payload cannot decide without a schema. Native
-                // discovers this by having the parser throw; deciding it from the predicate's
-                // static tier keeps the outcome independent of evaluation order.
-                if (predicate.Tier == PredicateTier.Payload && !EnsureSchema(record, adapter))
-                {
-                    return;
-                }
-
-                if (!predicate.Test(record))
-                {
-                    return;
-                }
-            }
-
-            var handler = OnEventRef;
-            var compat = OnEvent;
-
-            if (handler == null && compat == null)
+            if (predicate != null && !predicate.Test(record))
             {
                 return;
             }
 
-            // The ref surface reads the record header without a schema, so it is not gated
-            // on one. The compat IEventRecord surface mirrors C++/CLI, whose EventRecord wraps
-            // a krabs::schema and therefore cannot be handed to a handler without one.
-            handler?.Invoke(record);
-
-            if (compat != null && EnsureSchema(record, adapter))
+            if (!EnsureSchema(record, adapter))
             {
-                compat(adapter);
+                return;
             }
+
+            OnEventRef?.Invoke(record);
+            OnEvent?.Invoke(adapter);
         }
 
         /// <summary>

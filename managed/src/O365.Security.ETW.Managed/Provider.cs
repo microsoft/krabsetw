@@ -164,27 +164,36 @@ namespace Microsoft.O365.Security.ETW
             var handler = OnEventRef;
             var compat = OnEvent;
 
-            if (handler != null || compat != null)
+            if (handler == null && compat == null && _filters.Count == 0)
             {
-                // The ref surface reads the record header without a schema, so it is not
-                // gated on one. The compat IEventRecord surface mirrors C++/CLI, whose
-                // EventRecord wraps a krabs::schema.
-                handler?.Invoke(record);
-
-                if (compat != null)
-                {
-                    SchemaEntry schema = record.SchemaEntry;
-
-                    if (schema.Status != NativeConstants.ERROR_SUCCESS)
-                    {
-                        RaiseError(schema.Status, record, adapter);
-                    }
-                    else
-                    {
-                        compat(adapter);
-                    }
-                }
+                return;
             }
+
+            // Every remaining surface is gated on a schema. Neither event surface can do
+            // anything useful without one: IEventRecord exposes TaskName, Properties and
+            // friends as plain properties with no failure channel, and EventRecordRef can
+            // only reach the header and the undecoded UserDataSpan. Filters cannot evaluate
+            // a payload predicate without one either. A consumer that wants the event
+            // regardless of decodability wants OnMetadata, which fires above and is not
+            // gated.
+            //
+            // Resolving here rather than in each filter is a deliberate divergence. Native
+            // lets the schema constructor throw out of each predicate (krabs
+            // filtering/predicates.hpp:134) into that filter's own try/catch
+            // (filtering/event_filter.hpp:214), so an undecodable event raises one error per
+            // filter, on a surface consumers rarely subscribe -- Provider.OnError never sees
+            // it at all for a filtered provider. Reporting it once, on the provider, matches
+            // where consumers actually attach their error handling.
+            SchemaEntry schema = record.SchemaEntry;
+
+            if (schema.Status != NativeConstants.ERROR_SUCCESS)
+            {
+                RaiseError(schema.Status, record, adapter);
+                return;
+            }
+
+            handler?.Invoke(record);
+            compat?.Invoke(adapter);
 
             for (int i = 0; i < _filters.Count; i++)
             {
