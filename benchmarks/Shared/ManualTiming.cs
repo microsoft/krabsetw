@@ -21,12 +21,34 @@ namespace Krabs.Benchmarks
             var bench = new ProxyBenchmarks();
             bench.Setup();
 
-            Console.WriteLine("{0,-22} {1,12} {2,14} {3,12}", "Method", "ns/event", "bytes/event", "sink/event");
+            Console.WriteLine("{0,-32} {1,12} {2,14} {3,12}", "Method", "ns/event", "bytes/event", "sink/event");
 
-            Time(bench, "Dispatch", bench.Dispatch);
-            Time(bench, "DecodeThreeStrings", bench.DecodeThreeStrings);
-            Time(bench, "FilterMatch", bench.FilterMatch);
-            Time(bench, "FilterReject", bench.FilterReject);
+            Time(bench, "PowerShell_Metadata", bench.PowerShell_Metadata);
+            Time(bench, "PowerShell_Dispatch", bench.PowerShell_Dispatch);
+            Time(bench, "PowerShell_Decode", bench.PowerShell_Decode);
+            Time(bench, "PowerShell_FilterMatch", bench.PowerShell_FilterMatch);
+            Time(bench, "PowerShell_FilterReject", bench.PowerShell_FilterReject);
+
+            Time(bench, "Network_Metadata", bench.Network_Metadata);
+            Time(bench, "Network_Dispatch", bench.Network_Dispatch);
+            Time(bench, "Network_Decode", bench.Network_Decode);
+            Time(bench, "Network_FilterMatch", bench.Network_FilterMatch);
+            Time(bench, "Network_FilterReject", bench.Network_FilterReject);
+#if PURE
+            Time(bench, "PowerShell_DispatchRef", bench.PowerShell_DispatchRef);
+            Time(bench, "PowerShell_DecodeRef", bench.PowerShell_DecodeRef);
+            Time(bench, "PowerShell_FilterMatchRef", bench.PowerShell_FilterMatchRef);
+            Time(bench, "PowerShell_FilterRejectRef", bench.PowerShell_FilterRejectRef);
+            Time(bench, "PowerShell_InlineMatchRef", bench.PowerShell_InlineFilterMatchRef);
+            Time(bench, "PowerShell_InlineRejectRef", bench.PowerShell_InlineFilterRejectRef);
+
+            Time(bench, "Network_DispatchRef", bench.Network_DispatchRef);
+            Time(bench, "Network_DecodeRef", bench.Network_DecodeRef);
+            Time(bench, "Network_FilterMatchRef", bench.Network_FilterMatchRef);
+            Time(bench, "Network_FilterRejectRef", bench.Network_FilterRejectRef);
+            Time(bench, "Network_InlineMatchRef", bench.Network_InlineFilterMatchRef);
+            Time(bench, "Network_InlineRejectRef", bench.Network_InlineFilterRejectRef);
+#endif
         }
 
         private static void Time(ProxyBenchmarks bench, string name, Action action)
