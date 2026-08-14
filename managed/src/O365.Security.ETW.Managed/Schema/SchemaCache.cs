@@ -84,7 +84,7 @@ namespace Microsoft.O365.Security.ETW.Schema
     /// </remarks>
     internal readonly struct SchemaKey : IEquatable<SchemaKey>
     {
-        public readonly Guid Provider;
+        public readonly GuidKey Provider;
         public readonly ulong Keyword;
         public readonly ulong MetadataHash;
         public readonly ushort Id;
@@ -93,7 +93,7 @@ namespace Microsoft.O365.Security.ETW.Schema
         public readonly byte Level;
         public readonly byte PointerSize;
 
-        public SchemaKey(Guid provider, ulong keyword, ulong metadataHash, ushort id, byte version, byte opcode, byte level, int pointerSize)
+        public SchemaKey(GuidKey provider, ulong keyword, ulong metadataHash, ushort id, byte version, byte opcode, byte level, int pointerSize)
         {
             Provider = provider;
             Keyword = keyword;
@@ -110,7 +110,7 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// buckets. Callers that already hold the name confirm it separately.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool MatchesEvent(Guid provider, ulong keyword, ushort id, byte version, byte opcode, byte level, int pointerSize)
+        public bool MatchesEvent(GuidKey provider, ulong keyword, ushort id, byte version, byte opcode, byte level, int pointerSize)
         {
             return Id == id
                 && Version == version
@@ -118,7 +118,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 && Level == level
                 && PointerSize == pointerSize
                 && Keyword == keyword
-                && Blit.GuidEquals(Provider, provider);
+                && Provider.Equals(provider);
         }
 
         public bool Equals(SchemaKey other)
@@ -130,7 +130,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 && PointerSize == other.PointerSize
                 && Keyword == other.Keyword
                 && MetadataHash == other.MetadataHash
-                && Provider == other.Provider;
+                && Provider.Equals(other.Provider);
         }
 
         public override bool Equals(object? obj)
@@ -184,12 +184,16 @@ namespace Microsoft.O365.Security.ETW.Schema
             ref EVENT_DESCRIPTOR descriptor = ref record->EventHeader.EventDescriptor;
             int pointerSize = PointerSizeFor(record);
 
+            // Split once, out of the header. Every comparison below then works on two ulongs
+            // rather than copying sixteen bytes into and out of a Guid at each hand-off.
+            GuidKey provider = GuidKey.Read(&record->EventHeader.ProviderId);
+
             // Events arrive in bursts from the same provider, so the previous event's schema
             // is overwhelmingly the right answer. Confirming it structurally is cheaper than
             // hashing the metadata and probing the dictionary.
             if (_lastEntry != null
                 && _lastKey.MatchesEvent(
-                    record->EventHeader.ProviderId,
+                    provider,
                     descriptor.Keyword,
                     descriptor.Id,
                     descriptor.Version,
@@ -204,7 +208,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             ulong metadataHash = tlMetadata.Length == 0 ? 0UL : Fnv1A(tlMetadata);
 
             var key = new SchemaKey(
-                record->EventHeader.ProviderId,
+                provider,
                 descriptor.Keyword,
                 metadataHash,
                 descriptor.Id,
