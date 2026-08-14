@@ -29,8 +29,13 @@ namespace Microsoft.O365.Security.ETW
         private Routes<Provider> _providers = Routes<Provider>.Empty;
         private Routes<KernelProvider> _kernelProviders = Routes<KernelProvider>.Empty;
 
-        public ulong EventsTotal;
+        /// <summary>
+        /// Every event delivered to the consumer, whether or not a provider claimed it. This
+        /// matches krabs::trace::on_event, which increments before forwarding, so
+        /// <see cref="TraceStats.EventsTotal"/> is this count plus the events ETW reports lost.
+        /// </summary>
         public ulong EventsHandled;
+
         public ulong BuffersProcessed;
 
         /// <summary>Whether MOF (WBEM) events are routed to providers by schema provider GUID.</summary>
@@ -93,7 +98,7 @@ namespace Microsoft.O365.Security.ETW
 
         public void OnEvent(EVENT_RECORD* record)
         {
-            EventsTotal++;
+            EventsHandled++;
 
             _scratch.Begin(record);
             _adapter.Begin(record, _scratch);
@@ -102,11 +107,7 @@ namespace Microsoft.O365.Security.ETW
             {
                 var view = new EventRecordRef(record, _scratch);
 
-                if (Route(view, record))
-                {
-                    EventsHandled++;
-                }
-                else
+                if (!Route(view, record))
                 {
                     DispatchDefault(view);
                 }
@@ -437,10 +438,13 @@ namespace Microsoft.O365.Security.ETW
         internal static Exception? LastException;
 
         // EVENT_TRACE_LOGFILE is not blittable, so the buffer callback receives it as an
-        // opaque pointer. Only the trailing Context field is needed, and its offset is taken
-        // from the declared layout rather than hard coded.
+        // opaque pointer. Only the Context and BuffersRead fields are needed, and their
+        // offsets are taken from the declared layout rather than hard coded.
         private static readonly int ContextOffset =
             (int)Marshal.OffsetOf(typeof(EVENT_TRACE_LOGFILE), nameof(EVENT_TRACE_LOGFILE.Context));
+
+        private static readonly int BuffersReadOffset =
+            (int)Marshal.OffsetOf(typeof(EVENT_TRACE_LOGFILE), nameof(EVENT_TRACE_LOGFILE.BuffersRead));
 
         private static void CountBuffer(IntPtr logfile)
         {
@@ -456,7 +460,8 @@ namespace Microsoft.O365.Security.ETW
 
                 if (context != null)
                 {
-                    context.BuffersProcessed++;
+                    // krabs assigns ETW's own cumulative count rather than tallying callbacks.
+                    context.BuffersProcessed = *(uint*)((byte*)logfile + BuffersReadOffset);
                 }
             }
             catch (Exception ex)

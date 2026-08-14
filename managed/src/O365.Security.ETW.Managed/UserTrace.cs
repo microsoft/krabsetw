@@ -323,6 +323,10 @@ namespace Microsoft.O365.Security.ETW
                 _rundownIssued = false;
                 EnableProviders();
 
+                // krabs::trace::open resets the count, so a reopened trace starts from zero.
+                _context.EventsHandled = 0;
+                _context.BuffersProcessed = 0;
+
                 _context.SetProviders(_providers);
                 _providersPublished = true;
 
@@ -471,7 +475,7 @@ namespace Microsoft.O365.Security.ETW
                 properties->FreeBuffers,
                 properties->BuffersWritten,
                 properties->RealTimeBuffersLost,
-                _context.EventsTotal,
+                _context.EventsHandled + properties->EventsLost,
                 _context.EventsHandled,
                 properties->EventsLost);
         }
