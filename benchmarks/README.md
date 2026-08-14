@@ -61,60 +61,42 @@ BenchmarkDotNet, and it reports a `sink/event` column.
 
 ## Results
 
-Four cells: {.NET Framework, .NET 10} x {C++/CLI, pure .NET}. All Release, x64, same
-machine, all run in-process (`-i`) so every cell is measured identically. Times are per
-event. All four cells were collected in a single sitting.
+All Release, x64, same machine, every cell run in-process (`-i`) and collected in a single
+sitting. Times are per event, on one synthetic record with three string properties.
 
-### .NET Framework (C++/CLI net462 vs pure net48)
+`ref` is the `OnEventRef`/`EventRecordRef` path reading the same three strings as spans. The
+C++/CLI wrapper has no equivalent API, so those cells are the port's alone; `Dispatch` and
+the filters have no ref variant because neither materialises a string in the first place.
 
-| | C++/CLI | Pure .NET | |
-| --- | ---: | ---: | ---: |
-| Dispatch | 294.7 ns | 90.1 ns | 3.3x |
-| Decode 3 strings | 1402.0 ns | 506.4 ns | 2.8x |
-| Filter, match | 660.8 ns | 295.9 ns | 2.2x |
-| Filter, reject | 386.3 ns | 277.0 ns | 1.4x |
+| | C++/CLI net462 | net48 `IEventRecord` | net48 ref | C++/CLI net8.0 | net10 `IEventRecord` | net10 ref |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Dispatch | 282.8 ns | 89.0 ns | -- | 231.1 ns | 30.3 ns | -- |
+| Decode 3 strings | 1410.8 ns | 500.8 ns | **409.7 ns** | 1181.3 ns | 247.3 ns | **182.0 ns** |
+| Filter, match | 651.7 ns | 300.9 ns | -- | 582.0 ns | 135.2 ns | -- |
+| Filter, reject | 379.2 ns | 282.9 ns | -- | 347.3 ns | 130.5 ns | -- |
+| Allocated, decode | 281 B | 281 B | **0 B** | 256 B | 256 B | **0 B** |
 
-### .NET 10 (C++/CLI net8.0 rolled forward vs pure net10.0)
-
-| | C++/CLI | Pure .NET | |
-| --- | ---: | ---: | ---: |
-| Dispatch | 235.4 ns | 25.6 ns | 9.2x |
-| Decode 3 strings | 1207.8 ns | 263.6 ns | 4.6x |
-| Filter, match | 570.2 ns | 136.0 ns | 4.2x |
-| Filter, reject | 343.8 ns | 131.3 ns | 2.6x |
-
-### Allocation
-
-Identical in every cell: 0 B except `DecodeThreeStrings`, which is 281 B on .NET Framework
-and 256 B on .NET 10 for both implementations. Those are the three `System.String`s the
-`IEventRecord` API contractually returns, so neither implementation can avoid them. The
-C++/CLI double copy (payload to `std::wstring` to `String^`) costs time, not surviving
-bytes.
-
-### The ref API
-
-Zero-allocation decoding needs `OnEventRef`/`EventRecordRef`, which the C++/CLI wrapper has
-no equivalent of and which the matrix above therefore cannot compare. Measured separately in
-`managed\benchmarks` over 256 captured records, per event:
-
-| | Span (`EventRecordRef`) | Compat (`IEventRecord`) |
-| --- | ---: | ---: |
-| net48 | 247 ns, 0 B | 338 ns, 64 B |
-| net10.0 | 121 ns, 0 B | 147 ns, 56 B |
-
-The interesting number is the allocation, not the time: the span path is the only one of the
-three APIs measured anywhere in this directory that survives a busy trace without producing
-garbage.
+The C++/CLI net8.0 column is the net8.0 build rolled forward onto the .NET 10 runtime: the
+C++/CLI toolset has no net10.0 target, and running the net8.0 assembly under `RollForward=Major`
+is what a consumer upgrading their host would actually get.
 
 ### Reading it
 
-The pure port gains far more from the modern runtime than the C++/CLI wrapper does:
-dispatch goes 90.1 to 25.6 ns (3.5x) for the port, but only 294.7 to 235.4 ns (1.25x) for
-C++/CLI. That is expected -- the C++/CLI hot path is native code the .NET JIT never sees, so
-runtime improvements largely bypass it. End to end, pure .NET on .NET 10 dispatches 11.5x
-faster than C++/CLI on .NET Framework.
+Every cell outside the decode row allocates nothing in either implementation. In the decode
+row both implementations allocate the same amount -- 281 B on .NET Framework, 256 B on
+.NET 10 -- because those are the three `System.String`s the `IEventRecord` contract returns
+and neither implementation can avoid them. The C++/CLI double copy (payload to `std::wstring`
+to `String^`) costs time, not surviving bytes. Only the ref column removes the allocation,
+and that is the point of it: it is the difference between a busy trace producing garbage
+proportional to its event rate and producing none.
 
-`Filter, reject` is the weakest cell (1.4x on .NET Framework) and the one to be least
+The port gains far more from the modern runtime than the C++/CLI wrapper does: dispatch goes
+89.0 to 30.3 ns (2.9x) for the port and only 282.8 to 231.1 ns (1.2x) for C++/CLI. That is
+expected -- the C++/CLI hot path is native code the JIT never sees, so runtime improvements
+largely bypass it. End to end, the ref path on .NET 10 decodes three strings 7.8x faster than
+C++/CLI on .NET Framework, and without allocating.
+
+`Filter, reject` is the weakest cell (1.3x on .NET Framework) and the one to be least
 confident about.
 
 Both harnesses assert that the event handlers actually ran. This is not defensive

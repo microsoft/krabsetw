@@ -51,6 +51,9 @@ namespace Krabs.Benchmarks
         private Proxy _decodeProxy;
         private Proxy _matchingFilterProxy;
         private Proxy _rejectingFilterProxy;
+#if PURE
+        private Proxy _decodeRefProxy;
+#endif
 
         private int _sink;
 
@@ -83,6 +86,15 @@ namespace Krabs.Benchmarks
             _rejectingFilterProxy = MakeFilterProxy(
                 UnicodeString.Is("Payload", PayloadText + " no match"));
 
+#if PURE
+            _decodeRefProxy = MakeRefTraceProxy((in EventRecordRef record) =>
+            {
+                _sink += record.GetUnicodeString("UserData".AsSpan()).Length;
+                _sink += record.GetUnicodeString("ContextInfo".AsSpan()).Length;
+                _sink += record.GetUnicodeString("Payload".AsSpan()).Length;
+            });
+#endif
+
             VerifyWiring();
         }
 
@@ -103,6 +115,12 @@ namespace Krabs.Benchmarks
                 "user data".Length + "context info".Length + PayloadText.Length);
             Check("FilterMatch", () => _matchingFilterProxy.PushEvent(_record), 1);
             Check("FilterReject", () => _rejectingFilterProxy.PushEvent(_record), 0);
+#if PURE
+            Check(
+                "DecodeThreeStringsRef",
+                () => _decodeRefProxy.PushEvent(_record),
+                "user data".Length + "context info".Length + PayloadText.Length);
+#endif
         }
 
         private void Check(string name, Action push, int expectedDelta)
@@ -146,8 +164,30 @@ namespace Krabs.Benchmarks
             return proxy;
         }
 
-        private Proxy MakeFilterProxy(Predicate predicate)
+#if PURE
+        /// <summary>
+        /// The same wiring as <see cref="MakeTraceProxy"/>, but through the ref API. Only
+        /// the pure .NET port has one, so this arm has no C++/CLI counterpart to compare
+        /// against -- it exists to show what the same decode costs once the three strings
+        /// are read as spans instead of being materialised.
+        /// </summary>
+        private Proxy MakeRefTraceProxy(EventRecordDelegate handler)
         {
+            var trace = new UserTrace();
+            var proxy = new Proxy(trace);
+
+            var provider = new Provider(ProviderId);
+            provider.OnEventRef += handler;
+
+            trace.Enable(provider);
+
+            _roots.Add(trace);
+            _roots.Add(provider);
+            return proxy;
+        }
+#endif
+
+        private Proxy MakeFilterProxy(Predicate predicate)        {
             var trace = new UserTrace();
             var proxy = new Proxy(trace);
 
@@ -203,6 +243,18 @@ namespace Krabs.Benchmarks
         {
             _rejectingFilterProxy.PushEvent(_record);
         }
+
+#if PURE
+        /// <summary>
+        /// The same three strings as <see cref="DecodeThreeStrings"/>, read as spans. The
+        /// only cell in this file with no C++/CLI counterpart.
+        /// </summary>
+        [Benchmark]
+        public void DecodeThreeStringsRef()
+        {
+            _decodeRefProxy.PushEvent(_record);
+        }
+#endif
     }
 
     public static class Program
