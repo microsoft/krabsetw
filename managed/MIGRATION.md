@@ -37,7 +37,7 @@ handlers without a live trace.
 | # | Breaking change | Affects |
 | --- | --- | --- |
 | 1 | `GetDateTime` returns `DateTime`, not a boxed one | implementors of `IEventRecord` |
-| 2 | `IDisposable` removed from `Predicate`, `Property`, `KernelProvider`, `RawProvider` | anyone `using`/disposing them |
+| 2 | `IDisposable` removed from `Predicate`, `Property`, `KernelProvider`, `RawProvider`, `Provider`, `EventFilter` | anyone `using`/disposing them |
 | 3 | `EventRecord` and `EventRecordMetadata` classes removed | anyone naming the concrete types |
 | 4 | `PropertyEnumerable` and `PropertyEnumerator` removed | anyone naming the iterator types |
 | 5 | `Property.Type` removed; `Property.OutType` is `uint`, not `int` | readers of `Property` |
@@ -77,14 +77,16 @@ The one capability lost is that `null` was a *distinguishable* "no value" sentin
 `default(DateTime)` is a legal date. `GetUInt32` has always been in the same position — `0`
 was never distinguishable either — so this makes `DateTime` consistent rather than an outlier.
 
-**2. `IDisposable` is gone from four types.** `Predicate`, `Property`, `KernelProvider` and
-`RawProvider` held a `NativePtr<T>` in C++/CLI, so disposal freed C-runtime heap. The port's
-equivalents are plain managed objects with nothing to release, and an empty `Dispose` would
-imply an ownership that does not exist. Remove the `using` blocks and `Dispose` calls; a
-`using` statement on any of these no longer compiles.
+**2. `IDisposable` is gone from six types.** `Predicate`, `Property`, `KernelProvider`,
+`RawProvider`, `Provider` and `EventFilter` held a `NativePtr<T>` in C++/CLI — directly, or
+via a member that did — so the compiler gave each an implicit destructor and disposal freed
+C-runtime heap. The port's equivalents are plain managed objects with nothing to release, and
+an empty `Dispose` would imply an ownership that does not exist. Remove the `using` blocks and
+`Dispose` calls; a `using` statement on any of these no longer compiles.
 
-`UserTrace`, `KernelTrace`, `EventFilter`, `Testing.RecordBuilder` and `Testing.SynthRecord`
-are unaffected and remain disposable. `Testing.Proxy` *gained* `IDisposable`.
+`UserTrace`, `KernelTrace`, `Testing.RecordBuilder` and `Testing.SynthRecord` are unaffected
+and remain disposable — each owns a trace handle, unmanaged buffers, or both.
+`Testing.Proxy` *gained* `IDisposable`.
 
 **5. `Property` type members changed.**
 

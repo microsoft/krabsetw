@@ -19,7 +19,7 @@ namespace Microsoft.O365.Security.ETW
     /// relies on the pushdown alone, which silently misbehaves for the providers and event
     /// types that ETW does not apply id filtering to.
     /// </remarks>
-    public sealed class EventFilter : IDisposable
+    public sealed class EventFilter
     {
         private readonly ushort[]? _eventIds;
         private readonly List<ushort>? _pushdownIds;
@@ -172,10 +172,6 @@ namespace Microsoft.O365.Security.ETW
                 adapter));
 
             return false;
-        }
-
-        public void Dispose()
-        {
         }
     }
 }
