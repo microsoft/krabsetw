@@ -6,6 +6,12 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
+    <!--
+      Keep output at bin\$(Configuration)\ instead of bin\x64\$(Configuration)\. The solution
+      builds these projects with Platform=x64, but CI packs the library csproj directly without
+      rebuilding, where Platform is not set; without this the two disagree and pack fails NU5026.
+    -->
+    <AppendPlatformToOutputPath>false</AppendPlatformToOutputPath>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>

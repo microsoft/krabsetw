@@ -12,7 +12,10 @@
     <TargetFrameworks>net48;net10.0-windows</TargetFrameworks>
     <Company>Microsoft Corporation</Company>
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
-    <Platforms>AnyCPU;x64;ARM64</Platforms>
+    <!-- This project sits outside managed\, so it does not inherit that directory's
+         Directory.Build.props. Krabs.Managed.slnx needs one platform across every project
+         it contains, and the managed ones are x64. -->
+    <Platforms>x64</Platforms>
     <AssemblyName>EtwTestsCS.PureDotNet</AssemblyName>
     <RootNamespace>EtwTestsCS</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

@@ -4,9 +4,10 @@
     <TargetFrameworks>net462;net48;net8.0-windows;net10.0-windows</TargetFrameworks>
     <AssemblyName>Microsoft.O365.Security.ETW</AssemblyName>
     <RootNamespace>Microsoft.O365.Security.ETW</RootNamespace>
-    <!-- Pure IL with no native dependency, so one assembly serves x64 and ARM64. The solution
-         still builds under the x64 platform (the parity tests load the x64-only C++/CLI
-         assembly); this only affects the PE architecture flag of the library itself. -->
+    <!-- Pure IL with no native dependency, so one assembly serves x64 and ARM64. The projects
+         build under the x64 platform because the test host has to be 64-bit - LayoutFacts
+         asserts IntPtr.Size and hard-codes the native struct offsets - but that is a property
+         of the host, not of this library, so its own PE flag stays AnyCPU. -->
     <PlatformTarget>AnyCPU</PlatformTarget>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <Nullable>enable</Nullable>
