@@ -86,8 +86,8 @@ schema was resolved. This is the floor of the dispatch path.
 
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net10 |
 | --- | ---: | ---: | ---: | ---: |
-| PowerShell | 57.5 ns | 37.8 ns | 40.5 ns | **14.9 ns** |
-| Network | 57.4 ns | 38.4 ns | 40.2 ns | **14.8 ns** |
+| PowerShell | 57.5 ns | 37.8 ns | 40.6 ns | **14.9 ns** |
+| Network | 57.4 ns | 38.4 ns | 40.4 ns | **14.8 ns** |
 
 1.4x faster on .NET Framework, 2.5x on .NET 10.
 
@@ -105,8 +105,8 @@ it. Both are fixed; the standard deviation is now 0.04 ns.
 
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell | 275.8 ns | 247.9 ns | 67.4 ns | 67.6 ns | 33.7 ns | **32.4 ns** |
-| Network | 290.8 ns | 256.9 ns | 67.6 ns | 67.8 ns | 33.7 ns | **34.0 ns** |
+| PowerShell | 275.8 ns | 247.9 ns | 67.4 ns | 68.0 ns | 33.7 ns | **32.4 ns** |
+| Network | 290.8 ns | 256.9 ns | 68.0 ns | 67.9 ns | 33.7 ns | **34.0 ns** |
 
 4.1x faster on .NET Framework, 7.4x on .NET 10. `ref` and compat are the same here because
 neither materialises a value.
@@ -115,8 +115,8 @@ neither materialises a value.
 
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell (3 strings) | 1491.5 ns | 1251.7 ns | 452.9 ns | 380.9 ns | 272.5 ns | **189.4 ns** |
-| Network (8 integers) | 941.3 ns | 808.2 ns | 314.5 ns | 269.9 ns | 148.2 ns | **112.9 ns** |
+| PowerShell (3 strings) | 1491.5 ns | 1251.7 ns | 469.6 ns | 374.6 ns | 272.5 ns | **189.4 ns** |
+| Network (8 integers) | 941.3 ns | 808.2 ns | 243.4 ns | 195.6 ns | 148.2 ns | **112.9 ns** |
 
 Allocation, same rows:
 
@@ -142,21 +142,21 @@ evaluated directly in an `OnEventRef` handler.
 
 | Shape | | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell | match | 676.3 ns | 601.2 ns | 268.1 ns | 269.6 ns | 146.7 ns | **149.0 ns** |
-| PowerShell | reject | 380.2 ns | 343.2 ns | 254.3 ns | 255.9 ns | 142.8 ns | **143.2 ns** |
-| Network | match | 536.6 ns | 480.6 ns | 132.4 ns | 133.3 ns | 59.9 ns | **61.2 ns** |
-| Network | reject | 278.6 ns | 245.7 ns | 128.4 ns | 127.5 ns | 58.7 ns | **58.5 ns** |
+| PowerShell | match | 676.3 ns | 601.2 ns | 266.9 ns | 268.2 ns | 146.7 ns | **149.0 ns** |
+| PowerShell | reject | 380.2 ns | 343.2 ns | 258.7 ns | 258.0 ns | 142.8 ns | **143.2 ns** |
+| Network | match | 536.6 ns | 480.6 ns | 110.6 ns | 110.1 ns | 59.9 ns | **61.2 ns** |
+| Network | reject | 278.6 ns | 245.7 ns | 107.6 ns | 107.6 ns | 58.7 ns | **58.5 ns** |
 
 Inline, port only:
 
 | Shape | | pure net48 | pure net10 |
 | --- | --- | ---: | ---: |
-| PowerShell | match | 268.1 ns | 140.4 ns |
-| PowerShell | reject | 238.6 ns | 136.1 ns |
-| Network | match | 125.3 ns | 51.4 ns |
-| Network | reject | 124.9 ns | 51.4 ns |
+| PowerShell | match | 246.9 ns | 140.4 ns |
+| PowerShell | reject | 236.2 ns | 136.1 ns |
+| Network | match | 103.1 ns | 51.4 ns |
+| Network | reject | 103.6 ns | 51.4 ns |
 
-Inline is 0–14% faster than `EventFilter` — the cost of the filter object is the virtual
+Inline is 6–16% faster than `EventFilter` — the cost of the filter object is the virtual
 predicate call and the id check, and it is small.
 
 **This understates `EventFilter` in production.** `Proxy` drives the dispatch path directly
@@ -166,7 +166,7 @@ and therefore cannot exercise **event-id pushdown**: when a provider carries onl
 optimisation is disabled for the whole provider GUID as soon as any provider-level handler
 is attached (`UserTrace.cs:795`) — which is exactly what the inline arms do. So the `reject`
 rows above measure the *worst* case for `EventFilter` and the *best* case for inline; with
-pushdown active a rejected event costs nothing rather than ~70 ns. Prefer `EventFilter`.
+pushdown active a rejected event costs nothing rather than 60–110 ns. Prefer `EventFilter`.
 
 ### Reading it
 
@@ -185,7 +185,7 @@ An earlier revision of this file claimed C++/CLI got *slower* on .NET 10 — dis
 cell is faster on .NET 10, by 10–20%. The claim was an artefact of comparing arms collected
 at different times, which is why the matrix is now regenerated as a set.
 
-The narrowest margin is metadata on .NET Framework (40.2 vs 57.4 ns). It is also the row
+The narrowest margin is metadata on .NET Framework (40.4 vs 57.4 ns). It is also the row
 most sensitive to the port's inlining, so treat it as the cell to re-measure first after any
 change to `EventRecordAdapter` or `TraceContext.OnEvent`.
 
