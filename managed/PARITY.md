@@ -323,9 +323,9 @@ is that nothing in the known consumer set used it:
 
 | Removed | Reason |
 | --- | --- |
-| `EventRecord`, `EventRecordMetadata` classes | The port's adapter is reused and mutated per event; naming it publicly makes "hold it past the callback" look supported. C++/CLI also exposed public `_EVENT_HEADER*` / `_EVENT_RECORD*` fields with no C# equivalent. |
+| `EventRecord`, `EventRecordMetadata` classes | The port's adapter is reused and mutated per event; naming it publicly makes "hold it past the callback" look supported. C++/CLI also exposed `protected` `_EVENT_HEADER*` / `_EVENT_RECORD*` fields with no C# equivalent. |
 | `PropertyEnumerable`, `PropertyEnumerator` | Allocates a `Property` per property; unused. |
-| `IDisposable` on `Predicate`, `Property`, `KernelProvider`, `RawProvider` | These held a `NativePtr<T>` in C++/CLI, so disposal freed C-runtime heap. The port's equivalents are plain managed objects with nothing to release; an empty `Dispose` would imply ownership that does not exist. |
+| `IDisposable` on `Predicate`, `Property`, `KernelProvider`, `RawProvider`, `Provider`, `EventFilter` | These held a `NativePtr<T>` in C++/CLI — directly, or via a member that did — so the compiler gave each an implicit destructor and disposal freed C-runtime heap. The port's equivalents are plain managed objects with nothing to release; an empty `Dispose` would imply ownership that does not exist. |
 | `IUserTrace.Enable(RawProvider)` | `RawProvider` is `[Obsolete]` in both implementations; the replacement is `Provider.OnMetadata`. |
 | `Property.Type`, 3-argument `Property` ctor, `OutType` as `int` | The port exposes `InType`/`OutType`/`Length` as `uint`. Unused. |
 | `EventHeaderProperty.LEGACY_EVENTLOG`, `FORWARDED_XML` | Renamed to `LegacyEventLog`, `ForwardedXML`. |
@@ -427,6 +427,30 @@ whose schema length disagrees fails rather than truncating. This matches krabs. 
 earlier note claiming the port truncated was stale.
 
 ## Known defects
+
+### krabs halves fixed-length Unicode strings (fixed in the port, open in C++/CLI)
+
+Tracked internally.
+
+`tdh.h` documents the two string in-types asymmetrically. For `TDH_INTYPE_UNICODESTRING`,
+`epi.length` "contains number of WCHARs in the string"; for `TDH_INTYPE_ANSISTRING` it
+"contains number of BYTEs". `krabs/size_provider.hpp` returns `propertyInfo.length`
+unscaled for both, special-casing only `TDH_INTYPE_POINTER`, so a fixed-length Unicode
+string is sized at half its true width. `parser::parse<std::wstring>` then divides the
+byte count by `sizeof(wchar_t)`, so the string itself is truncated to half its characters
+*and* every property after it in the event is read from the wrong offset.
+
+The port scales by two for `UnicodeString` and leaves `AnsiString` unscaled
+(`PropertySizer.cs`), on both the schema-length path and the `PropertyParamLength` path —
+`tdh.h` calls the referenced property a WCHAR count too. Coverage is
+`PropertySizerTests.FixedLengthUnicodeStringLengthIsACountOfWchars` and its ANSI
+counterpart, which pin the asymmetry rather than the individual sizes.
+
+This is a divergence from C++/CLI until the same fix lands there: a consumer migrating off
+C++/CLI can see a different decoded value for such a property, and for anything after it.
+Unlike the ANSI out-type defect below, the real-world exposure has not been measured — a
+provider sweep for fixed-length Unicode string properties has not been run. Variable-length
+and NUL-terminated strings are unaffected; both implementations scan the payload identically.
 
 ### krabs mis-sizes struct properties (open, C++ side, affects shipping code)
 
