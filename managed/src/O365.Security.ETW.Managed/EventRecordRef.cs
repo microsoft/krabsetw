@@ -360,14 +360,62 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetRaw(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value)
         {
-            int index = IndexOf(name);
-            if (index < 0)
+            return TryGetRaw(name, out value, out _, out _);
+        }
+
+        /// <summary>
+        /// Resolves a property's bytes and its TDH in-type from a single schema fetch.
+        /// </summary>
+        /// <remarks>
+        /// The decoders need the index, the payload and the in-type. Asking for them
+        /// separately -- IndexOf, then TryGetRaw, then InTypeAt -- resolves the schema three
+        /// times for one property read.
+        /// </remarks>
+        internal bool TryGetRaw(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value, out ushort inType)
+        {
+            return TryGetRaw(name, out value, out inType, out _);
+        }
+
+        /// <summary>
+        /// As above, also reporting the out-type, which decides how ANSI bytes are encoded.
+        /// </summary>
+        internal bool TryGetRaw(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value, out ushort inType, out ushort outType)
+        {
+            value = default;
+            inType = 0;
+            outType = 0;
+
+            var schema = Schema;
+            var table = schema?.Table;
+            if (table == null)
             {
-                value = default;
                 return false;
             }
 
-            return TryGetRaw(index, out value);
+            int index = table.IndexOf(name, (byte*)schema!.Blob);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            var offsets = Offsets;
+
+            int offset = offsets.GetOffset(index);
+            if (offset < 0)
+            {
+                return false;
+            }
+
+            int size = offsets.SizeOf(index, offset);
+            if (size < 0 || offset + size > _record->UserDataLength)
+            {
+                return false;
+            }
+
+            inType = table.Properties[index].InType;
+            outType = table.Properties[index].OutType;
+            value = new ReadOnlySpan<byte>((byte*)_record->UserData + offset, size);
+            return true;
         }
 
         internal ushort InTypeAt(int index)

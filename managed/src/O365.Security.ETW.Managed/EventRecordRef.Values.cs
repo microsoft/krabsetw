@@ -25,13 +25,12 @@ namespace Microsoft.O365.Security.ETW
         {
             value = default;
 
-            int index = IndexOf(name);
-            if (index < 0 || !TryGetRaw(index, out ReadOnlySpan<byte> raw))
+            if (!TryGetRaw(name, out ReadOnlySpan<byte> raw, out ushort inType))
             {
                 return false;
             }
 
-            value = DecodeUnicode(raw, InTypeAt(index));
+            value = DecodeUnicode(raw, inType);
             return true;
         }
 
@@ -63,14 +62,12 @@ namespace Microsoft.O365.Security.ETW
             value = default;
             outType = 0;
 
-            int index = IndexOf(name);
-            if (index < 0 || !TryGetRaw(index, out ReadOnlySpan<byte> raw))
+            if (!TryGetRaw(name, out ReadOnlySpan<byte> raw, out ushort inType, out outType))
             {
                 return false;
             }
 
-            value = DecodeAnsi(raw, InTypeAt(index));
-            outType = OutTypeAt(index);
+            value = DecodeAnsi(raw, inType);
             return true;
         }
 
@@ -89,8 +86,7 @@ namespace Microsoft.O365.Security.ETW
         {
             value = default;
 
-            int index = IndexOf(name);
-            if (index < 0 || !TryGetRaw(index, out ReadOnlySpan<byte> raw) || raw.Length < 2)
+            if (!TryGetRaw(name, out ReadOnlySpan<byte> raw) || raw.Length < 2)
             {
                 return false;
             }
@@ -318,8 +314,7 @@ namespace Microsoft.O365.Security.ETW
         {
             value = 0;
 
-            int index = IndexOf(name);
-            if (index < 0 || !TryGetRaw(index, out ReadOnlySpan<byte> raw))
+            if (!TryGetRaw(name, out ReadOnlySpan<byte> raw))
             {
                 return false;
             }
@@ -351,8 +346,27 @@ namespace Microsoft.O365.Security.ETW
         {
             pointer = null;
 
-            int index = IndexOf(name);
-            if (index < 0 || !TryGetRaw(index, out ReadOnlySpan<byte> raw))
+            // Resolved once and reused. Going through IndexOf and then TryGetRaw would fetch
+            // the schema twice for a single read, and each fetch is a getter pair plus the
+            // resolved-yet check. The fixed-width accessors are the ones that notice: their
+            // own bodies are a handful of instructions, so the overhead is most of the cost.
+            var schema = Schema;
+            var table = schema?.Table;
+            if (table == null)
+            {
+                return false;
+            }
+
+            int index = table.IndexOf(name, (byte*)schema!.Blob);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            var offsets = Offsets;
+
+            int offset = offsets.GetOffset(index);
+            if (offset < 0)
             {
                 return false;
             }
@@ -360,12 +374,13 @@ namespace Microsoft.O365.Security.ETW
             // krabs::parser::parse requires sizeof(T) == propInfo.length_ exactly. Accepting
             // a wider property would silently truncate, and the C++/CLI surface reports that
             // as a failed parse rather than a value.
-            if (raw.Length != size)
+            int actual = offsets.SizeOf(index, offset);
+            if (actual != size || offset + actual > _record->UserDataLength)
             {
                 return false;
             }
 
-            pointer = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(raw));
+            pointer = (byte*)_record->UserData + offset;
             return true;
         }
 
