@@ -54,6 +54,25 @@ system-wide activity — `RundownTests`, `KernelGroupMaskTests` — are the exce
 
 ## Deliberate divergences
 
+### Records are invalidated when the callback returns
+
+C++/CLI hands the callback an `EventRecordMetadata` (or a subclass) that wraps a raw
+`EVENT_RECORD*`. That pointer is only ever assigned — the constructor and `Update` set
+`record_` and `header_`, and nothing ever clears them (`EventRecordMetadata.hpp:26-41`).
+`CallbackBridge` keeps one such instance per bridge and calls `Update` on it for each event
+(`Callbacks.hpp:75-88`). A consumer that stores the `IEventRecord^` past the callback
+therefore reads either freed memory or, once the next event arrives, that event's data —
+silently, with no diagnostic. Native krabs has the same lifetime and relies on convention.
+
+The port keeps the same reuse — one adapter per trace, rebound per event, so the hot path
+still allocates nothing — but clears the pointer when the callback returns. A stashed record
+throws `ObjectDisposedException` on its next use instead of returning another event's data.
+
+Callers that never stashed a record see no behavioural change. Callers that did were already
+broken; they now find out. The invalidation is a single field store on the normal path:
+`TraceContext.OnEvent` carries no exception handler, and the exceptional path is covered by
+the callers that already own an EH region (`TraceCallbacks.Dispatch`, `Testing.Proxy.PushEvent`).
+
 ### Testing surface beyond krabs
 
 The `Testing` namespace gained surface the C++/CLI implementation never had, so a parity

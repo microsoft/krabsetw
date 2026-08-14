@@ -10,7 +10,7 @@ namespace Microsoft.O365.Security.ETW
     /// </summary>
     public class KernelProvider
     {
-        private readonly List<EventFilter> _filters = new List<EventFilter>();
+        private EventFilter[] _filters = new EventFilter[0];
 
         /// <summary>
         /// Constructs a KernelProvider identified by its GUID and enabled by a trace flag.
@@ -66,7 +66,10 @@ namespace Microsoft.O365.Security.ETW
         {
             if (filter == null) throw new ArgumentNullException(nameof(filter));
 
-            _filters.Add(filter);
+            var grown = new EventFilter[_filters.Length + 1];
+            Array.Copy(_filters, grown, _filters.Length);
+            grown[_filters.Length] = filter;
+            _filters = grown;
         }
 
         internal void Dispatch(in EventRecordRef record, EventRecordAdapter adapter)
@@ -77,8 +80,9 @@ namespace Microsoft.O365.Security.ETW
 
             var handler = OnEventRef;
             var compat = OnEvent;
+            var filters = _filters;
 
-            if (handler == null && compat == null && _filters.Count == 0)
+            if (handler == null && compat == null && filters.Length == 0)
             {
                 return;
             }
@@ -100,9 +104,9 @@ namespace Microsoft.O365.Security.ETW
             handler?.Invoke(record);
             compat?.Invoke(adapter);
 
-            for (int i = 0; i < _filters.Count; i++)
+            for (int i = 0; i < filters.Length; i++)
             {
-                _filters[i].Dispatch(record, adapter);
+                filters[i].Dispatch(record, adapter);
             }
         }
     }
