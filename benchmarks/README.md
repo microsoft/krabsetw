@@ -86,31 +86,37 @@ schema was resolved. This is the floor of the dispatch path.
 
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net10 |
 | --- | ---: | ---: | ---: | ---: |
-| PowerShell | 57.7 ns | 54.8 ns | 69.7 ns | **15.0 ns** |
-| Network | 57.7 ns | 55.1 ns | 76.9 ns | **14.2 ns** |
+| PowerShell | 57.5 ns | 37.8 ns | 40.5 ns | **14.9 ns** |
+| Network | 57.4 ns | 38.4 ns | 40.2 ns | **14.8 ns** |
 
-**The port is slower than C++/CLI here on .NET Framework** — 69.7 vs 57.7 ns — and 3.8x
-faster on .NET 10. This is the one row where .NET Framework loses, and it is the honest
-shape of the trade: the metadata path is so short that it is dominated by the managed
-callback and header marshalling, which the older JIT does not optimise well. Everything
-below this line, the port wins on both runtimes.
+1.4x faster on .NET Framework, 2.5x on .NET 10.
+
+An earlier revision of this file reported the port *losing* this row on .NET Framework, at
+69.7 and 76.9 ns. Two of those three figures were wrong. The gap between the two shapes was
+noise — the standard deviation on that run was 6.8 ns, and a metadata subscription reads no
+payload at all, so a shape-dependent cost on it was never physically plausible. The absolute
+number was real, and profiling found two causes: `EventRecordAdapter`'s accessors were past
+RyuJIT's inlining budget because of an inline `throw` with string concatenation, and a
+`try`/`finally` on the per-event path prevented both inlining and register allocation across
+it. Both are fixed; the standard deviation is now 0.04 ns.
+
 
 ### Dispatch — provider matched, schema resolved, no property read
 
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell | 273.7 ns | 341.1 ns | 87.1 ns | 86.5 ns | 34.4 ns | **32.6 ns** |
-| Network | 290.5 ns | 345.2 ns | 91.3 ns | 93.0 ns | 41.0 ns | **40.6 ns** |
+| PowerShell | 275.8 ns | 247.9 ns | 67.4 ns | 67.6 ns | 33.7 ns | **32.4 ns** |
+| Network | 290.8 ns | 256.9 ns | 67.6 ns | 67.8 ns | 33.7 ns | **34.0 ns** |
 
-3.1x faster on .NET Framework, 8.4x on .NET 10. `ref` and compat are the same here because
+4.1x faster on .NET Framework, 7.4x on .NET 10. `ref` and compat are the same here because
 neither materialises a value.
 
 ### Decode — every property read
 
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell (3 strings) | 1481.6 ns | 1482.6 ns | 495.0 ns | 416.2 ns | 280.7 ns | **198.7 ns** |
-| Network (8 integers) | 930.7 ns | 967.6 ns | 344.5 ns | 286.2 ns | 166.7 ns | **119.3 ns** |
+| PowerShell (3 strings) | 1491.5 ns | 1251.7 ns | 452.9 ns | 380.9 ns | 272.5 ns | **189.4 ns** |
+| Network (8 integers) | 941.3 ns | 808.2 ns | 314.5 ns | 269.9 ns | 148.2 ns | **112.9 ns** |
 
 Allocation, same rows:
 
@@ -120,7 +126,7 @@ Allocation, same rows:
 | Network | 0 B | 0 B | 0 B | **0 B** | 0 B | **0 B** |
 
 The Network row allocates nothing anywhere: an all-integer payload returns value types, so
-there is nothing for either implementation to put on the heap. Its speedup — 7.8x from
+there is nothing for either implementation to put on the heap. Its speedup — 8.3x from
 C++/CLI net462 to the port's net10 ref path — is entirely decode cost.
 
 The PowerShell row is where the ref path earns its existence. Both implementations allocate
@@ -136,21 +142,21 @@ evaluated directly in an `OnEventRef` handler.
 
 | Shape | | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell | match | 678.0 ns | 729.8 ns | 282.8 ns | 283.7 ns | 147.9 ns | **152.9 ns** |
-| PowerShell | reject | 388.2 ns | 413.2 ns | 266.7 ns | 269.7 ns | 143.8 ns | **145.3 ns** |
-| Network | match | 535.2 ns | 619.8 ns | 162.6 ns | 162.6 ns | 72.8 ns | **73.9 ns** |
-| Network | reject | 280.3 ns | 308.7 ns | 155.9 ns | 155.5 ns | 71.7 ns | **71.1 ns** |
+| PowerShell | match | 676.3 ns | 601.2 ns | 268.1 ns | 269.6 ns | 146.7 ns | **149.0 ns** |
+| PowerShell | reject | 380.2 ns | 343.2 ns | 254.3 ns | 255.9 ns | 142.8 ns | **143.2 ns** |
+| Network | match | 536.6 ns | 480.6 ns | 132.4 ns | 133.3 ns | 59.9 ns | **61.2 ns** |
+| Network | reject | 278.6 ns | 245.7 ns | 128.4 ns | 127.5 ns | 58.7 ns | **58.5 ns** |
 
 Inline, port only:
 
 | Shape | | pure net48 | pure net10 |
 | --- | --- | ---: | ---: |
-| PowerShell | match | 281.0 ns | 140.7 ns |
-| PowerShell | reject | 276.7 ns | 137.1 ns |
-| Network | match | 155.0 ns | 64.1 ns |
-| Network | reject | 153.7 ns | 64.5 ns |
+| PowerShell | match | 268.1 ns | 140.4 ns |
+| PowerShell | reject | 238.6 ns | 136.1 ns |
+| Network | match | 125.3 ns | 51.4 ns |
+| Network | reject | 124.9 ns | 51.4 ns |
 
-Inline is 5–12% faster than `EventFilter` — the cost of the filter object is the virtual
+Inline is 0–14% faster than `EventFilter` — the cost of the filter object is the virtual
 predicate call and the id check, and it is small.
 
 **This understates `EventFilter` in production.** `Proxy` drives the dispatch path directly
@@ -164,16 +170,24 @@ pushdown active a rejected event costs nothing rather than ~70 ns. Prefer `Event
 
 ### Reading it
 
-The port gains far more from the modern runtime than the C++/CLI wrapper does. Dispatch goes
-87.1 → 34.4 ns (2.5x) for the port, while C++/CLI gets *slower*, 273.7 → 341.1 ns. That is
-expected in both directions: the C++/CLI hot path is native code the JIT never sees, so
-runtime improvements bypass it, while the added managed/native transition cost on the newer
-runtime is real. Every C++/CLI cell is flat or worse on .NET 10.
+The port wins every cell on both runtimes, by 1.4x at the narrowest (metadata on .NET
+Framework) and 8.3x at the widest (Network decode, C++/CLI net462 against the port's net10
+ref path).
 
-The one cell to be least confident about is OnMetadata on .NET Framework, where the port
-loses outright. If a consumer's entire workload is metadata-only on .NET Framework, the port
-is not an upgrade on speed — it is an upgrade on allocation, and only once they move to
-`OnEventRef` or a newer runtime.
+The port also gains more from the modern runtime than the C++/CLI wrapper does. Dispatch
+goes 67.4 → 33.7 ns (2.0x) for the port against 275.8 → 247.9 ns (1.1x) for C++/CLI. That
+asymmetry is expected: the C++/CLI hot path is native code the JIT never sees, so runtime
+improvements largely bypass it, while the port is managed end to end and collects them in
+full.
+
+An earlier revision of this file claimed C++/CLI got *slower* on .NET 10 — dispatch 273.7 →
+341.1 ns. Re-measuring the whole matrix in one sitting did not reproduce it: every C++/CLI
+cell is faster on .NET 10, by 10–20%. The claim was an artefact of comparing arms collected
+at different times, which is why the matrix is now regenerated as a set.
+
+The narrowest margin is metadata on .NET Framework (40.2 vs 57.4 ns). It is also the row
+most sensitive to the port's inlining, so treat it as the cell to re-measure first after any
+change to `EventRecordAdapter` or `TraceContext.OnEvent`.
 
 Both harnesses assert that the event handlers actually ran. This is not defensive
 boilerplate: the first version of this benchmark reported the C++/CLI decode costing 1 ns
