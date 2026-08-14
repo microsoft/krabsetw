@@ -49,10 +49,10 @@ handlers without a live trace.
 Most consumers encounter none of them. The most likely to apply is #1, and only to code that
 implements `IEventRecord` directly.
 
-Separately, six **behaviour** changes compile silently — `TryGet*` on failure, case folding,
-`KernelProvider.GroupMask`, `TraceStats`, struct-typed properties and `Stop` no longer
-releasing the trace's resources. These warrant the closest reading, and are listed after the
-nine.
+Separately, seven **behaviour** changes compile silently — record invalidation, `TryGet*` on
+failure, case folding, `KernelProvider.GroupMask`, `TraceStats`, struct-typed properties and
+`Stop` no longer releasing the trace's resources. These warrant the closest reading, and are
+listed after the nine.
 
 ### Compile breaks
 
@@ -142,6 +142,23 @@ deliberate removal. `RecordBuilder.Sid` still exists for writing test records.
 ### Behaviour changes that still compile
 
 These are the changes that produce no build-time diagnostic.
+
+**An `IEventRecord` is invalid once the handler returns.** C++/CLI reuses one record object
+per bridge and only ever reassigns its `EVENT_RECORD*` (`EventRecordMetadata.hpp:26-41`,
+`Callbacks.hpp:75-88`), so a handler that stashed the record kept reading it — first from
+freed memory, then, once the next event arrived, that event's data, with no diagnostic
+either way. The port reuses the object the same way, so nothing is allocated, but clears the
+pointer on return: a stashed record throws `ObjectDisposedException` on its next use.
+
+If you stored records to process later, copy what you need inside the handler instead:
+
+```csharp
+provider.OnEvent += record =>
+{
+    // was: _pending.Add(record);   // silently read the wrong event later
+    _pending.Add(new MyEvent(record.ProcessId, record.GetUnicodeString("ImageName")));
+};
+```
 
 **`TraceStats.EventsHandled` now counts every event, and `EventsTotal` includes lost
 events.** The port previously reported `EventsHandled` as only the events some provider

@@ -52,7 +52,10 @@ namespace Microsoft.O365.Security.ETW
         /// <summary>A keyword mask with every bit set.</summary>
         public const ulong AllBitsSet = ulong.MaxValue;
 
-        private readonly List<EventFilter> _filters = new List<EventFilter>();
+        // A snapshot array rather than a List: the per-event loop then indexes a local with
+        // one bounds check and no indirection through List's backing store. Filters are only
+        // ever appended, and in practice only during setup.
+        private EventFilter[] _filters = new EventFilter[0];
 
         public Provider(Guid id)
         {
@@ -141,7 +144,10 @@ namespace Microsoft.O365.Security.ETW
         {
             if (filter == null) throw new ArgumentNullException(nameof(filter));
 
-            _filters.Add(filter);
+            var grown = new EventFilter[_filters.Length + 1];
+            Array.Copy(_filters, grown, _filters.Length);
+            grown[_filters.Length] = filter;
+            _filters = grown;
         }
 
         internal IReadOnlyList<EventFilter> Filters
@@ -163,8 +169,9 @@ namespace Microsoft.O365.Security.ETW
 
             var handler = OnEventRef;
             var compat = OnEvent;
+            var filters = _filters;
 
-            if (handler == null && compat == null && _filters.Count == 0)
+            if (handler == null && compat == null && filters.Length == 0)
             {
                 return;
             }
@@ -195,9 +202,9 @@ namespace Microsoft.O365.Security.ETW
             handler?.Invoke(record);
             compat?.Invoke(adapter);
 
-            for (int i = 0; i < _filters.Count; i++)
+            for (int i = 0; i < filters.Length; i++)
             {
-                _filters[i].Dispatch(record, adapter);
+                filters[i].Dispatch(record, adapter);
             }
         }
 

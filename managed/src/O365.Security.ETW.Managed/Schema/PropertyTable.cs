@@ -170,17 +170,22 @@ namespace Microsoft.O365.Security.ETW.Schema
         {
             ulong signature = NameSignature.Compute(name);
             var signatures = NameSignatures;
-            int count = signatures.Length;
-            int start = _hint;
 
-            for (int n = 0; n < count; n++)
+            // The hint is checked on its own so the scan below can be a plain ascending walk
+            // bounded by the array's own length, which is the shape RyuJIT needs to drop the
+            // bounds check. A rotating start index defeats that: the JIT cannot prove a
+            // wrapped `start + n` stays in range.
+            int hint = _hint;
+            if ((uint)hint < (uint)signatures.Length &&
+                signatures[hint] == signature &&
+                ShortSpan.Equal((char*)(blob + Properties[hint].NameOffset), name))
             {
-                int i = start + n;
-                if (i >= count)
-                {
-                    i -= count;
-                }
+                Advance(hint, signatures.Length);
+                return hint;
+            }
 
+            for (int i = 0; i < signatures.Length; i++)
+            {
                 if (signatures[i] != signature)
                 {
                     continue;
@@ -189,13 +194,19 @@ namespace Microsoft.O365.Security.ETW.Schema
                 // The signature already agrees on length; confirm the rest to rule out collisions.
                 if (ShortSpan.Equal((char*)(blob + Properties[i].NameOffset), name))
                 {
-                    int next = i + 1;
-                    _hint = next == count ? 0 : next;
+                    Advance(i, signatures.Length);
                     return i;
                 }
             }
 
             return -1;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Advance(int matched, int count)
+        {
+            int next = matched + 1;
+            _hint = next == count ? 0 : next;
         }
     }
 
