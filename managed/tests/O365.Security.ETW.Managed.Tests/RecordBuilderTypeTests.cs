@@ -366,8 +366,6 @@ namespace Microsoft.O365.Security.ETW.Tests
                 proxy.PushEvent(record);
             }
 
-            filter.Dispose();
-
             if (failure != null)
             {
                 throw failure;

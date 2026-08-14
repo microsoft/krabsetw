@@ -47,7 +47,7 @@ namespace Microsoft.O365.Security.ETW
     /// <summary>
     /// An ETW provider to enable on a trace, together with the filters applied to its events.
     /// </summary>
-    public sealed class Provider : IDisposable
+    public sealed class Provider
     {
         /// <summary>A keyword mask with every bit set.</summary>
         public const ulong AllBitsSet = ulong.MaxValue;
@@ -272,10 +272,6 @@ namespace Microsoft.O365.Security.ETW
             }
 
             throw new ArgumentException("Provider name does not exist. (" + name + ")", nameof(name));
-        }
-
-        public void Dispose()
-        {
         }
     }
 
