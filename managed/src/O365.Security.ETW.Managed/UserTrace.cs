@@ -283,6 +283,16 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <summary>
+        /// The events this trace has seen, routed or not. <see cref="QueryStats"/> is the
+        /// consumer-facing form, but it queries the live ETW session, so it cannot be used
+        /// against a trace driven by <see cref="Testing.Proxy"/>. Not part of the consumer API.
+        /// </summary>
+        internal ulong EventsHandledCount
+        {
+            get { return _context.EventsHandled; }
+        }
+
+        /// <summary>
         /// Delivers a record to this trace's providers as though ETW had produced it.
         /// Drives <see cref="Testing.Proxy"/>; not part of the consumer API.
         /// </summary>

@@ -1,0 +1,26 @@
+Test run for Q:\git\krabsetw\worktrees\pure-dotnet\managed\tests\O365.Security.ETW.Managed.Tests\bin\Release\net8.0-windows\O365.Security.ETW.Managed.Tests.dll (.NETCoreApp,Version=v8.0)
+Test run for Q:\git\krabsetw\worktrees\pure-dotnet\managed\tests\O365.Security.ETW.Managed.Tests\bin\Release\net10.0-windows\O365.Security.ETW.Managed.Tests.dll (.NETCoreApp,Version=v10.0)
+Test run for Q:\git\krabsetw\worktrees\pure-dotnet\managed\tests\O365.Security.ETW.Managed.Tests\bin\Release\net48\O365.Security.ETW.Managed.Tests.dll (.NETFramework,Version=v4.8)
+Test run for Q:\git\krabsetw\worktrees\pure-dotnet\tests\ManagedETWTests.PureDotNet\bin\Release\net48\EtwTestsCS.PureDotNet.dll (.NETFramework,Version=v4.8)
+A total of 1 test files matched the specified pattern.
+A total of 1 test files matched the specified pattern.
+A total of 1 test files matched the specified pattern.
+A total of 1 test files matched the specified pattern.
+Test run for Q:\git\krabsetw\worktrees\pure-dotnet\tests\ManagedETWTests.PureDotNet\bin\Release\net10.0-windows\EtwTestsCS.PureDotNet.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:    85, Skipped:     0, Total:    85, Duration: 180 ms - EtwTestsCS.PureDotNet.dll (net10.0)
+
+Passed!  - Failed:     0, Passed:    85, Skipped:     0, Total:    85, Duration: 580 ms - EtwTestsCS.PureDotNet.dll (net48)
+
+Passed!  - Failed:     0, Passed:   339, Skipped:     0, Total:   339, Duration: 35 s - O365.Security.ETW.Managed.Tests.dll (net8.0)
+
+Passed!  - Failed:     0, Passed:   339, Skipped:     0, Total:   339, Duration: 35 s - O365.Security.ETW.Managed.Tests.dll (net10.0)
+[xUnit.net 00:00:38.11]     Microsoft.O365.Security.ETW.Tests.TraceStatsTests.EventsHandledCountsEveryEventNotJustTheOnesAProviderClaimed [FAIL]
+  Failed Microsoft.O365.Security.ETW.Tests.TraceStatsTests.EventsHandledCountsEveryEventNotJustTheOnesAProviderClaimed [2 s]
+  Error Message:
+   EventsHandled (4) should exceed the 4 events a provider claimed, because it counts every event.
+  Stack Trace:
+     at Microsoft.O365.Security.ETW.Tests.TraceStatsTests.EventsHandledCountsEveryEventNotJustTheOnesAProviderClaimed() in Q:\git\krabsetw\worktrees\pure-dotnet\managed\tests\O365.Security.ETW.Managed.Tests\TraceStatsTests.cs:line 83
+
+Failed!  - Failed:     1, Passed:   338, Skipped:     0, Total:   339, Duration: 36 s - O365.Security.ETW.Managed.Tests.dll (net48)
