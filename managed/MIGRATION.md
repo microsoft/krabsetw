@@ -127,12 +127,50 @@ Items 3 and 4.
 | 3 | `EventRecord`, `EventRecordMetadata` classes | The port's adapter is reused and mutated per event, so naming it publicly makes "hold it past the callback" look supported. C++/CLI also exposed public `_EVENT_HEADER*` / `_EVENT_RECORD*` fields that have no C# equivalent. Keep using `IEventRecord` / `IEventRecordMetadata`, which are unchanged. |
 | 4 | `PropertyEnumerable`, `PropertyEnumerator` | Allocated a `Property` per property. `IEventRecord.Properties` still works; only the concrete iterator types are gone. |
 
+**Reading a SID property has no replacement.** `GetSecurityIdentifier` /
+`TrySecurityIdentifier` were declared on the concrete `EventRecord`, which is gone, and
+nothing in the port replaces them — neither `EventRecordRef` nor the compat adapter can read
+a `Sid`-typed property. If you depend on this, say so; it is a capability gap rather than a
+deliberate removal. `RecordBuilder.Sid` still exists for writing test records.
+
+`GetPointer` / `TryGetPointer` survive as `EventRecordRef.TryGetPointer`, which returns
+`ulong` rather than `IntPtr` so the value is not boxed. There is no compat equivalent.
+
 `IEventRecordError` *was* kept — `EventRecordError` implements it — because
 `EventRecordErrorDelegate` is declared in terms of it and consumers mock it.
 
 ### Behaviour changes that still compile
 
 These are the changes that produce no build-time diagnostic.
+
+**`TraceStats.EventsHandled` now counts every event, and `EventsTotal` includes lost
+events.** The port previously reported `EventsHandled` as only the events some provider
+claimed, and `EventsTotal` as the unclaimed-inclusive count with lost events omitted.
+Neither matched krabs, which increments one counter before forwarding and derives
+`eventsTotal = eventsHandled + EventsLost`. Both readings now match C++/CLI. If you were
+using `EventsHandled` as "events my providers matched", that number is no longer available —
+count them in your handler instead. The counters are also now reset by `Open`, as krabs
+resets them in `start`/`open`/`process`, so a reopened trace no longer accumulates across
+cycles.
+
+**Composite predicates evaluate the cheaper side first.** `a && b` evaluates left to right
+in krabs, but the port orders the two sides by tier, so a header predicate always runs
+before a payload one regardless of how you wrote it. This is invisible for the built-in
+predicates, which are pure. It is only observable if you subclass `Predicate` and give
+`Test` a side effect — in which case the side effect may run in a different order, or be
+short-circuited away entirely. Do side-effecting work in the event handler, not a predicate.
+
+**Three value conversions differ at degenerate inputs.** See `PARITY.md` for why each was
+not reproduced.
+
+| Input | C++/CLI | Port |
+| --- | --- | --- |
+| Negative FILETIME | `ArgumentOutOfRangeException` out of `GetDateTime` *and* `TryGetDateTime` | `TryGetDateTime` returns `false`; `GetDateTime` throws `ParserException` |
+| Socket address whose length is not 16 or 28 | Sized from the address family, fixed 16/28 bytes copied out of a 128-byte buffer | Sized from the property, exactly its bytes copied |
+| Empty binary property | `TryGetBinary` returns `true` with a `null` array | `TryGetBinary` returns `true` with a zero-length array |
+
+If you wrapped `TryGetDateTime` in a `try`, you no longer need to. If you null-checked the
+array from a successful `TryGetBinary`, that branch is now dead.
 
 **Schema resolution failures now surface on `Provider.OnError`, not on each filter.** In
 C++/CLI an event whose schema cannot be resolved raises `OnError` on every filter attached to
@@ -383,6 +421,11 @@ A handler that needs any of these stays on `IEventRecord`:
 - **IP-address and socket-address accessors**, because `IPAddress` and `SocketAddress` are
   classes.
 - **`Properties` enumeration.**
+- **Throwing `Get*` accessors.** The surface is `TryGet*` only, uniformly — there is no
+  `GetUInt32` or `GetUnicodeString` on `EventRecordRef`. `IEventRecord` keeps both forms.
+  A missing or wrongly typed property is an ordinary condition on a hot path, and the ref
+  surface exists to avoid per-event costs; a throwing accessor invites exceptions as control
+  flow. Handle the `false` return, or use `IEventRecord` if you want the throwing form.
 
 ---
 

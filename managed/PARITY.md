@@ -141,6 +141,37 @@ if (!record.TryGetUInt32("missing", out v)) { /* C++/CLI: 42    port: 0 */ }
 This applies uniformly to every `TryGet*`, not just `TryGetDateTime`. The port's behaviour
 is deterministic and is kept.
 
+### Value conversions that differ at the edges
+
+Three conversions on the compat surface behave differently from C++/CLI at inputs that are
+degenerate or out of range. All three are cases where C++/CLI's behaviour is hard to defend
+on its own terms, so the port did not reproduce it.
+
+**A negative FILETIME is reported as unreadable rather than throwing.** C++/CLI hands the
+raw value to `DateTime::FromFileTimeUtc` *outside* its try/catch (`EventRecord.hpp:441-480`),
+so a negative FILETIME — not a representable time — throws `ArgumentOutOfRangeException` out
+of `TryGetDateTime` as well as `GetDateTime`. A `TryGet` that throws defeats the point of
+the pattern, so the port's `TryGetDateTime` returns `false` and `GetDateTime` then throws
+`ParserException` like any other unreadable property. The exception type a caller sees
+changes; a caller using the `TryGet` form no longer needs a `try` around it.
+
+**A `SocketAddress` is sized from the property, not from the address family.** C++/CLI
+builds `gcnew SocketAddress(family)` — which takes the family's *default* length — and then
+copies a fixed `sizeof(sockaddr_in)` (16) or `sizeof(sockaddr_in6)` (28) bytes depending on
+`ss_family`, reading out of a 128-byte `sockaddr_storage` into which only the property's
+bytes were copied (`EventRecord.hpp:874-887`, `parse_types.hpp:187`). Anything not
+`AF_INET` is treated as v6 and reads 28 bytes regardless of how many the property actually
+had, so a shorter property yields whatever was left in the storage buffer. The port sizes
+the result from the property's own length and copies exactly that. `SocketAddress.Size` and
+the trailing bytes therefore differ for any property whose length is not exactly 16 or 28.
+
+**An empty binary property returns an empty array, not `null`.** C++/CLI's
+`ConvertToByteArray` takes `&data.bytes()[0]` — indexing element zero of a possibly empty
+`std::vector`, which is undefined behaviour — and returns `nullptr` when that address comes
+back null (`EventRecord.hpp:915-924`). So `TryGetBinary` could report success and hand back
+a null array. The port returns a zero-length array. Consumers that null-check the result of
+a successful `TryGetBinary` will stop taking that branch.
+
 ### `KernelProvider` group mask narrowed to `uint`
 
 Native `PERFINFO_MASK` is `typedef ULONG` (`krabs/perfinfo_groupmask.hpp:16`), and C++/CLI
@@ -280,6 +311,8 @@ is that nothing in the known consumer set used it:
 | `Property.Type`, 3-argument `Property` ctor, `OutType` as `int` | The port exposes `InType`/`OutType`/`Length` as `uint`. Unused. |
 | `EventHeaderProperty.LEGACY_EVENTLOG`, `FORWARDED_XML` | Renamed to `LegacyEventLog`, `ForwardedXML`. |
 | `EventTraceProperties` public fields | Now properties. Object-initializer syntax is unaffected; only `ref`/`out` use breaks. |
+| `GetSecurityIdentifier`, `TryGetSecurityIdentifier` | Declared on the concrete C++/CLI `EventRecord` (`EventRecord.hpp:347-382`), not on `IEventRecord`, so only consumers holding the concrete type were affected — and that type is removed anyway. The port has **no** way to read a SID property: `EventRecordRef` has no accessor and neither does the compat adapter. `RecordBuilder` can still *write* one. This is a genuine capability gap, not just a rename. |
+| `GetPointer`, `TryGetPointer` returning `IntPtr^` | Same placement (`EventRecord.hpp:394-423`). The port keeps the capability on the ref surface as `EventRecordRef.TryGetPointer`, returning `ulong` rather than `IntPtr` so it does not box; the compat adapter has no equivalent. |
 
 `IEventRecordError` *was* restored — `EventRecordError` implements it — because
 `EventRecordErrorDelegate` is declared in terms of it and the interface is mocked by
@@ -289,6 +322,36 @@ The public surface is differenced by reading metadata directly rather than by re
 because one side is a mixed-mode C++/CLI binary that cannot be loaded on .NET. That differ
 is kept out of tree; it does not compare custom attributes, so `[Obsolete]` differences are
 invisible to it.
+
+### Composite predicates evaluate the cheaper side first
+
+krabs' `and_filter` / `or_filter` evaluate strictly left to right — `t1_ && t2_` in
+`predicates.hpp`. The port's `AndPredicate` / `OrPredicate` constructors instead order the
+two operands by `PredicateTier`, so a predicate that only needs the header is always tested
+before one that needs the decoded payload:
+
+```csharp
+// Cheapest side first. Ordering is decided once, here, not per event.
+if (left.Tier <= right.Tier) { _first = left;  _second = right; }
+else                         { _first = right; _second = left;  }
+```
+
+The reason is that the tiers are not equally priced: a header predicate reads a field that
+is already in the buffer, while a payload predicate forces schema resolution and property
+lookup. Testing `payloadPredicate && processIdPredicate` in source order pays the expensive
+side on every event, including the ones the cheap side would have rejected outright.
+Ordering is computed once at construction, not per event, so it costs nothing at dispatch.
+
+The composite's own `Tier` is the *higher* of the two, so a filter containing any payload
+predicate still resolves a schema — the reordering changes which side runs first, never
+whether the filter is treated as a payload filter.
+
+**This is observable**, because `Predicate` is public and abstract with a public `Test`, so
+a consumer can write a predicate with a side effect. Such a predicate may now run in a
+different order, or — where short-circuiting decides the result — not run at all when krabs
+would have run it, and vice versa. None of the built-in predicates have side effects, so
+this only affects consumer-authored ones. Predicates are expected to be pure; if you need
+ordered evaluation with side effects, do the work in the event handler instead.
 
 ### Structs are not decoded
 
