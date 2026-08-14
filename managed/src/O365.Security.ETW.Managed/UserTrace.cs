@@ -316,6 +316,15 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <summary>
+        /// Invalidates the reused adapter after a handler threw. Mirrors what the real
+        /// callback boundary does; not part of the consumer API.
+        /// </summary>
+        internal void EndEvent()
+        {
+            _context.EndEvent();
+        }
+
+        /// <summary>
         /// Creates the session and opens it for consumption, without beginning to process
         /// events. Lets a caller enable providers and know the session exists before
         /// <see cref="Start"/> blocks.

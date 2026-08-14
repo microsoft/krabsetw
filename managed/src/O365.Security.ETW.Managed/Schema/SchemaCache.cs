@@ -118,7 +118,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                 && Level == level
                 && PointerSize == pointerSize
                 && Keyword == keyword
-                && Provider == provider;
+                && Blit.GuidEquals(Provider, provider);
         }
 
         public bool Equals(SchemaKey other)

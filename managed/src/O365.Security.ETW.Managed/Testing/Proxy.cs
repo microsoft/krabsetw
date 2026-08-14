@@ -57,13 +57,34 @@ namespace Microsoft.O365.Security.ETW.Testing
             {
                 if (_userTrace != null)
                 {
-                    _userTrace.PushEvent(record.Record);
+                    try
+                    {
+                        _userTrace.PushEvent(record.Record);
+                    }
+                    catch
+                    {
+                        // What TraceCallbacks.Dispatch does when a handler throws. Costs
+                        // nothing when one does not, which is why the invalidation lives here
+                        // and not in a finally inside the dispatch path.
+                        _userTrace.EndEvent();
+                        throw;
+                    }
+
                     return;
                 }
 
                 if (_kernelTrace != null)
                 {
-                    _kernelTrace.PushEvent(record.Record);
+                    try
+                    {
+                        _kernelTrace.PushEvent(record.Record);
+                    }
+                    catch
+                    {
+                        _kernelTrace.EndEvent();
+                        throw;
+                    }
+
                     return;
                 }
 

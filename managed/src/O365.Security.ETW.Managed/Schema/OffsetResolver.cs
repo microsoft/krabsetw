@@ -51,12 +51,24 @@ namespace Microsoft.O365.Security.ETW.Schema
                 _offsets = new int[Math.Max(_table.Count, _offsets.Length * 2)];
             }
 
-            // Offsets up to the first payload-dependent property are schema-known.
+            // Offsets up to the first payload-dependent property are schema-known, so they are
+            // read straight from the table by OffsetAt rather than copied here. Copying them
+            // cost one array store per fixed property on every event, whether or not anything
+            // read them -- the whole per-event cost for an all-fixed schema like
+            // Kernel-Network, which is consumed without reading a property at all.
             _resolved = _table.FirstDynamicIndex;
-            for (int i = 0; i < _resolved; i++)
-            {
-                _offsets[i] = _table.Properties[i].FixedOffset;
-            }
+        }
+
+        /// <summary>
+        /// The offset of an already-resolved property: from the schema below the first
+        /// payload-dependent property, from the memoised walk above it.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int OffsetAt(int index)
+        {
+            return index < _table.FirstDynamicIndex
+                ? _table.Properties[index].FixedOffset
+                : _offsets[index];
         }
 
         /// <summary>
@@ -74,7 +86,7 @@ namespace Microsoft.O365.Security.ETW.Schema
             // properties out of order sees the same answers as one reading them in order.
             if (index < _resolved)
             {
-                return _offsets[index];
+                return OffsetAt(index);
             }
 
             if (_broken)
@@ -92,7 +104,7 @@ namespace Microsoft.O365.Security.ETW.Schema
                     return -1;
                 }
 
-                int previousOffset = _offsets[previous];
+                int previousOffset = OffsetAt(previous);
                 int size = SizeOf(previous, previousOffset);
 
                 if (size < 0)

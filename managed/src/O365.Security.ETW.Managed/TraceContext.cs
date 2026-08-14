@@ -96,6 +96,15 @@ namespace Microsoft.O365.Security.ETW
             }
         }
 
+        /// <remarks>
+        /// Deliberately free of exception handling. A try/finally here costs ~14ns per event
+        /// on .NET Framework -- measurably more than everything this method does -- because
+        /// the JIT will neither inline into an EH region nor keep values in registers across
+        /// one. The adapter is invalidated on the way out below, and every caller invalidates
+        /// it on the exceptional path from inside an EH region it already has, so the
+        /// guarantee is unchanged: a stashed IEventRecord throws rather than reading a buffer
+        /// ETW has taken back.
+        /// </remarks>
         public void OnEvent(EVENT_RECORD* record)
         {
             EventsHandled++;
@@ -103,19 +112,23 @@ namespace Microsoft.O365.Security.ETW
             _scratch.Begin(record);
             _adapter.Begin(record, _scratch);
 
-            try
-            {
-                var view = new EventRecordRef(record, _scratch);
+            var view = new EventRecordRef(record, _scratch);
 
-                if (!Route(view, record))
-                {
-                    DispatchDefault(view);
-                }
-            }
-            finally
+            if (!Route(view, record))
             {
-                _adapter.End();
+                DispatchDefault(view);
             }
+
+            _adapter.End();
+        }
+
+        /// <summary>
+        /// Invalidates the reused adapter. Called by <see cref="OnEvent"/> on the way out, and
+        /// by callers when a handler threw and it did not get there.
+        /// </summary>
+        public void EndEvent()
+        {
+            _adapter.End();
         }
 
         /// <summary>
@@ -144,7 +157,7 @@ namespace Microsoft.O365.Security.ETW
 
                 for (int i = 0; i < kernel.Ids.Length; i++)
                 {
-                    if (kernel.Ids[i] == kernelId)
+                    if (Blit.GuidEquals(kernel.Ids[i], kernelId))
                     {
                         kernel.Handlers[i].Dispatch(view, _adapter);
                         return true;
@@ -164,7 +177,7 @@ namespace Microsoft.O365.Security.ETW
 
                 for (int i = 0; i < providers.Ids.Length; i++)
                 {
-                    if (providers.Ids[i] == providerId)
+                    if (Blit.GuidEquals(providers.Ids[i], providerId))
                     {
                         providers.Handlers[i].Dispatch(view, _adapter);
                         return true;
@@ -182,7 +195,7 @@ namespace Microsoft.O365.Security.ETW
 
                     for (int i = 0; i < providers.Ids.Length; i++)
                     {
-                        if (providers.Ids[i] == providerId)
+                        if (Blit.GuidEquals(providers.Ids[i], providerId))
                         {
                             providers.Handlers[i].Dispatch(view, _adapter);
                             return true;
@@ -474,14 +487,21 @@ namespace Microsoft.O365.Security.ETW
         {
             // Nothing may propagate into native code: ETW has no way to handle it and the
             // process would be torn down.
+            TraceContext? context = null;
+
             try
             {
-                TraceContext? context = TraceRegistry.Get((int)record->UserContext);
+                context = TraceRegistry.Get((int)record->UserContext);
                 context?.OnEvent(record);
             }
             catch (Exception ex)
             {
                 LastException = ex;
+
+                // OnEvent invalidates the adapter on its way out and never got there. Doing it
+                // here rather than in a finally inside OnEvent keeps the hot path free of an
+                // EH region, at no cost to the guarantee: this catch already exists.
+                context?.EndEvent();
             }
         }
     }
