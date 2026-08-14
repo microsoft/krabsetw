@@ -225,6 +225,47 @@ because transcoding from the provider's ANSI code page is what forces the alloca
 `AsnDecoder.TryReadPrimitiveCharacterStringBytes`); and no `Properties` enumeration. A
 handler that needs those stays on `IEventRecord`.
 
+### Schema resolution failures are reported once, on the provider
+
+An event whose schema cannot be resolved is reported through `Provider.OnError` and nothing
+downstream of it runs — neither the provider's own event surfaces nor any of its filters.
+`OnMetadata` is unaffected: it fires first, before anything resolves a schema, so a consumer
+that only subscribes `OnMetadata` never pays for resolution and never sees an error for an
+event no schema can describe.
+
+The rule, end to end:
+
+| Subscribed | Resolves a schema | On failure |
+| --- | --- | --- |
+| `OnMetadata` only | no | nothing; `OnMetadata` still fires |
+| `OnEvent` / `OnEventRef`, or any filter | yes | one `Provider.OnError`; handlers and filters skipped |
+
+krabs reports the same failure in a different place. Its predicates construct
+`krabs::schema` outside their own `try` (`krabs/filtering/predicates.hpp:134`), so an
+unresolvable schema throws past the predicate into each filter's `try/catch`
+(`krabs/filtering/event_filter.hpp:214`), which reports it to *that filter's* error
+callbacks. The provider's own error callback is a separate list and is never reached. The
+practical consequences are that an undecodable event raises one error per filter rather than
+one per event, and that a provider with only filters attached — the common shape — reports
+nothing at all to `Provider.OnError`.
+
+That last point is what motivated the change. HostIDS subscribes `OnError` only on providers
+(`BaseEtwUserTraceContext.Enable`) while attaching its handlers to filters, so under krabs'
+placement its ETW schema-error telemetry covers only the producers that use a provider-level
+callback. Reporting on the provider puts the error where consumers actually attach.
+
+`EventFilter.OnError` is retained and still raised when a filter is driven directly rather
+than through a provider, as `Proxy(EventFilter)` does — there is nothing above the filter to
+resolve or report in that configuration, and `describe_OnError.schema_not_found_should_raise_onerror_on_event_filter`
+covers it.
+
+A predicate that names a property the schema does not contain is a separate case and is
+**not** an error in either implementation: krabs catches it inside the predicate and returns
+`false` (`predicates.hpp:140-143`), and the port's accessors return `false` the same way. The
+event is treated as a non-match and nothing is reported. Surfacing that as an error is
+tracked separately; it would need a tri-state predicate result to distinguish "did not match"
+from "could not be evaluated".
+
 ### Public surface that was removed
 
 `MIGRATION.md` lists what was removed and what replaces it. The rationale, in each case,

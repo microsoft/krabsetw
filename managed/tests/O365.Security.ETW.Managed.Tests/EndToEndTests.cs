@@ -151,25 +151,25 @@ namespace Microsoft.O365.Security.ETW.Tests
         public void PredicateRejectsNonMatchingEvents()
         {
             int matched = 0;
-            int rejected = 0;
+            int other = 0;
             var signal = new ManualResetEventSlim();
 
-            // Two filters on one provider, so event id pushdown keeps both ids but each
-            // filter still has to reject the other's events.
-            var interesting = new EventFilter(Filter.EventIdIs(1) && EtwHarness.ThisProcess);
+            // Two filters on one provider. TraceLogging events all carry id 0, so there is no
+            // id pushdown to lean on and each filter has to reject the other's events itself.
+            var interesting = new EventFilter(Filter.EventNameIs("Interesting") && EtwHarness.ThisProcess);
             interesting.OnEventRef += (in EventRecordRef record) =>
             {
                 Interlocked.Increment(ref matched);
                 signal.Set();
             };
 
-            var boring = new EventFilter(Filter.EventIdIs(2) && EtwHarness.ThisProcess);
+            var boring = new EventFilter(Filter.EventNameIs("Boring") && EtwHarness.ThisProcess);
             boring.OnEventRef += (in EventRecordRef record) =>
             {
-                Interlocked.Increment(ref rejected);
+                Interlocked.Increment(ref other);
             };
 
-            var provider = new Provider(TestEventSource.ProviderGuid)
+            var provider = new Provider(TestTraceLoggingSource.ProviderGuid)
             {
                 Any = 0
             };
@@ -178,12 +178,12 @@ namespace Microsoft.O365.Security.ETW.Tests
 
             RunTrace(provider, signal, () =>
             {
-                TestEventSource.Log.Interesting("a", 1);
-                TestEventSource.Log.Boring(7);
+                TestTraceLoggingSource.Log.Interesting("a", 1);
+                TestTraceLoggingSource.Log.Boring(7);
             });
 
-            Assert.True(matched > 0, "The event id 1 filter never fired.");
-            Assert.True(rejected > 0, "The event id 2 filter never fired.");
+            Assert.True(matched > 0, "The Interesting filter never fired.");
+            Assert.True(other > 0, "The Boring filter never fired.");
         }
 
         [Fact]
@@ -270,40 +270,104 @@ namespace Microsoft.O365.Security.ETW.Tests
 
         /// <summary>
         /// TDH cannot decode manifest-based EventSource payloads, because the manifest is
-        /// published in-band rather than registered with the machine. C++/CLI reports that
-        /// through OnError and never invokes OnEvent; the ref surface does not need a schema
-        /// for header access, so it still fires.
+        /// published in-band rather than registered with the machine. The failure is reported
+        /// once, on the provider, and nothing downstream of it runs.
         /// </summary>
         [Fact]
-        public void MissingSchemaRoutesCompatHandlersToOnErrorButNotSpanHandlers()
+        public void MissingSchemaReportsOnceOnTheProviderAndSkipsFilters()
         {
             int refHits = 0;
             int compatHits = 0;
-            string error = null;
+            int metadataHits = 0;
+            string filterError = null;
+            string providerError = null;
             var signal = new ManualResetEventSlim();
 
             var filter = new EventFilter(Filter.EventIdIs(1) && EtwHarness.ThisProcess);
             filter.OnEventRef += (in EventRecordRef record) => Interlocked.Increment(ref refHits);
             filter.OnEvent += record => Interlocked.Increment(ref compatHits);
-            filter.OnError += e =>
-            {
-                error = e.Message;
-                signal.Set();
-            };
+            filter.OnError += e => filterError = e.Message;
 
             var provider = new Provider(TestEventSource.ProviderGuid)
             {
                 Any = 0
             };
+
+            // Fires before any schema is resolved, so it is unaffected by the failure.
+            provider.OnMetadata += record => Interlocked.Increment(ref metadataHits);
+            provider.OnError += e =>
+            {
+                providerError = e.Message;
+                signal.Set();
+            };
+
             provider.AddFilter(filter);
 
             RunTrace(provider, signal, () => TestEventSource.Log.Interesting("no schema", 1));
 
-            Assert.True(refHits > 0, "The ref handler never fired.");
+            Assert.True(metadataHits > 0, "OnMetadata should fire without a schema.");
+            Assert.Equal(0, refHits);
             Assert.Equal(0, compatHits);
+            Assert.Null(filterError);
+            Assert.NotNull(providerError);
+            Assert.Contains("status_code=", providerError);
+            Assert.Contains("event_id=1", providerError);
+        }
+
+        /// <summary>
+        /// A consumer that only wants metadata never resolves a schema, so an event no schema
+        /// can describe is not an error for it.
+        /// </summary>
+        [Fact]
+        public void AMetadataOnlyProviderNeitherResolvesASchemaNorReportsAnError()
+        {
+            int metadataHits = 0;
+            string error = null;
+            var signal = new ManualResetEventSlim();
+
+            var provider = new Provider(TestEventSource.ProviderGuid)
+            {
+                Any = 0
+            };
+            provider.OnMetadata += record =>
+            {
+                Interlocked.Increment(ref metadataHits);
+                signal.Set();
+            };
+            provider.OnError += e => error = e.Message;
+
+            RunTrace(provider, signal, () => TestEventSource.Log.Interesting("no schema", 1));
+
+            Assert.True(metadataHits > 0, "OnMetadata never fired.");
+            Assert.Null(error);
+        }
+
+        /// <summary>
+        /// The provider-level counterpart, where there is no filter at all.
+        /// </summary>
+        [Fact]
+        public void MissingSchemaSkipsAProviderLevelRefHandler()
+        {
+            int refHits = 0;
+            string error = null;
+            var signal = new ManualResetEventSlim();
+
+            var provider = new Provider(TestEventSource.ProviderGuid)
+            {
+                Any = 0
+            };
+            provider.OnEventRef += (in EventRecordRef record) => Interlocked.Increment(ref refHits);
+            provider.OnError += e =>
+            {
+                error = e.Message;
+                signal.Set();
+            };
+
+            RunTrace(provider, signal, () => TestEventSource.Log.Interesting("no schema", 1));
+
+            Assert.Equal(0, refHits);
             Assert.NotNull(error);
             Assert.Contains("status_code=", error);
-            Assert.Contains("event_id=1", error);
         }
 
         private static void RunTrace(Provider provider, ManualResetEventSlim signal, Action emit)

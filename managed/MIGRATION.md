@@ -134,6 +134,26 @@ Items 3 and 4.
 
 These are the changes that produce no build-time diagnostic.
 
+**Schema resolution failures now surface on `Provider.OnError`, not on each filter.** In
+C++/CLI an event whose schema cannot be resolved raises `OnError` on every filter attached to
+the provider, and never raises the provider's own `OnError`. The port raises
+`Provider.OnError` once and skips the provider's handlers and all of its filters.
+
+```csharp
+provider.OnError += e => Log(e.Message);   // C++/CLI: never fires for a filtered provider
+filter.OnError   += e => Log(e.Message);   // C++/CLI: fires, once per filter per event
+```
+
+If you subscribed `EventFilter.OnError` to learn that events were undecodable, move that
+subscription to the provider. If you already subscribe `Provider.OnError`, you will begin
+seeing errors from filtered providers that were previously silent — one per event rather than
+one per filter. `EventFilter.OnError` still fires when a filter is driven directly through
+`Proxy(EventFilter)`, where there is no provider above it.
+
+Unchanged: `OnMetadata` fires before anything resolves a schema, so a metadata-only consumer
+neither pays for resolution nor sees these errors. Also unchanged: a predicate naming a
+property the schema does not contain is a non-match, not an error, in both implementations.
+
 **`TryGet*` now zeroes the out parameter on failure.** krabs assigns the out parameter only
 on success, and `[Out]` in C++/CLI is metadata only — the CLR does not enforce assignment —
 so a failed lookup left the caller's variable holding whatever it held before the call. The
