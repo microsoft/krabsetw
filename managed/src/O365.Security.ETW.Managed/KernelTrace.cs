@@ -165,6 +165,15 @@ namespace Microsoft.O365.Security.ETW
             _context.OnEvent(record);
         }
 
+        /// <summary>
+        /// Invalidates the reused adapter after a handler threw. Mirrors what the real
+        /// callback boundary does; not part of the consumer API.
+        /// </summary>
+        internal void EndEvent()
+        {
+            _context.EndEvent();
+        }
+
         public void Open()
         {
             lock (_gate)

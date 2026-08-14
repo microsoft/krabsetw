@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.O365.Security.ETW.Interop;
 using Microsoft.O365.Security.ETW.Schema;
@@ -42,55 +43,116 @@ namespace Microsoft.O365.Security.ETW
         /// <c>_record</c> directly would make a stale read *quietly* return "no container id"
         /// or an empty stack rather than failing, and a consumer cannot tell that apart from
         /// an event that genuinely carried neither.
+        /// <para>
+        /// The throw lives in its own method so that this one stays a null check the JIT will
+        /// inline. Inline, the string concatenation alone puts it past the inlining budget,
+        /// and every header read then costs two calls instead of a compare.
+        /// </para>
         /// </remarks>
         private EVENT_RECORD* ValidRecord
         {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
                 if (_record == null)
                 {
-                    throw new InvalidOperationException(
-                        "This event record is no longer valid. It points at a buffer owned by ETW " +
-                        "that is only live for the duration of the callback. Copy what you need " +
-                        "before returning, or use EventRecordRef.");
+                    ThrowInvalidated();
                 }
 
                 return _record;
             }
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidated()
+        {
+            throw new InvalidOperationException(
+                "This event record is no longer valid. It points at a buffer owned by ETW " +
+                "that is only live for the duration of the callback. Copy what you need " +
+                "before returning, or use EventRecordRef.");
+        }
+
         private EventRecordRef Ref
         {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return new EventRecordRef(ValidRecord, _scratch); }
         }
 
         #region Metadata
 
-        public ushort Id => Ref.Id;
+        public ushort Id
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.Id; }
+        }
 
-        public byte Opcode => Ref.Opcode;
+        public byte Opcode
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.Opcode; }
+        }
 
-        public byte Version => Ref.Version;
+        public byte Version
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.Version; }
+        }
 
-        public byte Level => Ref.Level;
+        public byte Level
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.Level; }
+        }
 
-        public ushort Flags => Ref.Flags;
+        public ushort Flags
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.Flags; }
+        }
 
-        public EventHeaderProperty EventProperty => (EventHeaderProperty)Ref.EventProperty;
+        public EventHeaderProperty EventProperty
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return (EventHeaderProperty)Ref.EventProperty; }
+        }
 
-        public uint ProcessId => Ref.ProcessId;
+        public uint ProcessId
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.ProcessId; }
+        }
 
-        public uint ThreadId => Ref.ThreadId;
+        public uint ThreadId
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.ThreadId; }
+        }
 
         public DateTime Timestamp => Ref.Timestamp;
 
-        public Guid ProviderId => Ref.ProviderId;
+        public Guid ProviderId
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.ProviderId; }
+        }
 
-        public Guid ActivityId => Ref.ActivityId;
+        public Guid ActivityId
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.ActivityId; }
+        }
 
-        public ushort UserDataLength => Ref.UserDataLength;
+        public ushort UserDataLength
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.UserDataLength; }
+        }
 
-        public IntPtr UserData => Ref.UserData;
+        public IntPtr UserData
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Ref.UserData; }
+        }
 
         public DecodingSource GetEventType()
         {
