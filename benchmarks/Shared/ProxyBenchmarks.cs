@@ -29,18 +29,24 @@ namespace Krabs.Benchmarks
     ///
     /// Two event shapes are measured, because the cost profile depends on the payload:
     ///
-    ///   PowerShell  three long UTF-16 strings. Decoding is dominated by copying, which is
-    ///               where the C++/CLI wrapper pays twice -- payload to std::wstring, then
-    ///               std::wstring to System::String.
+    ///   DNS         a real Microsoft-Windows-DNS-Client resolution, reading the three
+    ///               properties HostIDS's DnsResolutionProducer reads. Two of them are
+    ///               UTF-16 strings, which is where the C++/CLI wrapper pays twice --
+    ///               payload to std::wstring, then std::wstring to System::String.
     ///   Network     eight small fixed-width integers, shaped after a kernel TCP send. No
     ///               copying to speak of, so what is left is the per-property lookup.
     /// </remarks>
     [MemoryDiagnoser]
     public class ProxyBenchmarks
     {
-        /// <summary>Microsoft-Windows-PowerShell, event 7937 (executing pipeline).</summary>
-        private static readonly Guid PowerShellProviderId =
-            Guid.Parse("a0c1853b-5c40-4b15-8766-3cf1c58f985a");
+        /// <summary>
+        /// Microsoft-Windows-DNS-Client, event 3008 version 0 (query completed). This is
+        /// the event HostIDS's DnsResolutionProducer consumes, and the shape below is the
+        /// real one: the property names, order and in-types were taken from a live capture
+        /// of this provider rather than from the manifest, which ships no templates for it.
+        /// </summary>
+        private static readonly Guid DnsProviderId =
+            Guid.Parse("1c95126e-7eea-49a9-a3fe-a378b03ddb4d");
 
         /// <summary>
         /// Microsoft-Windows-Kernel-Network, event 11 version 0 (TCP receive): eight small
@@ -53,21 +59,29 @@ namespace Krabs.Benchmarks
         private static readonly Guid NetworkProviderId =
             Guid.Parse("7DD42A49-5329-4832-8DFD-43D979153A88");
 
-        private const string PayloadText =
-            "a representative payload string, long enough that copying it is not free";
+        // Anonymised, but sized from the capture. Across 789 real event 3008 records:
+        // QueryName ran 11-76 chars (median 31, mean 30.6); QueryResults was empty on 46%
+        // of them and, when present, ran 10-390 chars (median 10, mean 27.1). The values
+        // below are a successful A-record lookup returning a single address, which is the
+        // modal non-empty case -- and the only one that does any work in HostIDS, which
+        // returns early when QueryResults is blank. Reserved .test names (RFC 6761) and
+        // documentation addresses are used so nothing real is checked in.
+        private const string QueryNameText = "shared.prod.ingest.contoso.test";
 
-        private const string NoMatchText =
-            "a representative payload string, long enough that copying it is not free no match";
+        private const string NoMatchNameText = "shared.prod.ingest.contoso.invalid";
 
-        private const string ContextInfoText = "context info";
-        private const string UserDataText = "user data";
+        private const string QueryResultsText = "::ffff:10.20.30.40;";
+
+        private const uint DnsQueryType = 1;          // A
+        private const ulong DnsQueryOptions = 32784;  // the value on 706 of 789 captured records
+        private const uint DnsQueryStatus = 0;        // success
 
         private const uint NetPid = 4321;
         private const uint NetSize = 1460;
         private const uint NetDestAddr = 167772161; // 10.0.0.1
         private const ushort NetDestPort = 443;
 
-        private SynthRecord _psRecord;
+        private SynthRecord _dnsRecord;
         private SynthRecord _netRecord;
 
         /// <summary>
@@ -81,11 +95,11 @@ namespace Krabs.Benchmarks
         /// </remarks>
         private readonly List<object> _roots = new List<object>();
 
-        private Proxy _psMetadataProxy;
-        private Proxy _psDispatchProxy;
-        private Proxy _psDecodeProxy;
-        private Proxy _psMatchProxy;
-        private Proxy _psRejectProxy;
+        private Proxy _dnsMetadataProxy;
+        private Proxy _dnsDispatchProxy;
+        private Proxy _dnsDecodeProxy;
+        private Proxy _dnsMatchProxy;
+        private Proxy _dnsRejectProxy;
 
         private Proxy _netMetadataProxy;
         private Proxy _netDispatchProxy;
@@ -94,18 +108,18 @@ namespace Krabs.Benchmarks
         private Proxy _netRejectProxy;
 
 #if PURE
-        private Proxy _psDispatchRefProxy;
-        private Proxy _psDecodeRefProxy;
-        private Proxy _psMatchRefProxy;
-        private Proxy _psRejectRefProxy;
+        private Proxy _dnsDispatchRefProxy;
+        private Proxy _dnsDecodeRefProxy;
+        private Proxy _dnsMatchRefProxy;
+        private Proxy _dnsRejectRefProxy;
 
         private Proxy _netDispatchRefProxy;
         private Proxy _netDecodeRefProxy;
         private Proxy _netMatchRefProxy;
         private Proxy _netRejectRefProxy;
 
-        private Proxy _psInlineMatchRefProxy;
-        private Proxy _psInlineRejectRefProxy;
+        private Proxy _dnsInlineMatchRefProxy;
+        private Proxy _dnsInlineRejectRefProxy;
         private Proxy _netInlineMatchRefProxy;
         private Proxy _netInlineRejectRefProxy;
 #endif
@@ -121,9 +135,9 @@ namespace Krabs.Benchmarks
             get { return _sink; }
         }
 
-        private static int PsDecodeSum
+        private static int DnsDecodeSum
         {
-            get { return UserDataText.Length + ContextInfoText.Length + PayloadText.Length; }
+            get { return QueryNameText.Length + (int)DnsQueryType + QueryResultsText.Length; }
         }
 
         private static int NetDecodeSum
@@ -134,27 +148,28 @@ namespace Krabs.Benchmarks
         [GlobalSetup]
         public void Setup()
         {
-            _psRecord = CreatePowerShellRecord();
+            _dnsRecord = CreateDnsRecord();
             _netRecord = CreateNetworkRecord();
 
-            // ---- PowerShell shape -------------------------------------------------
+            // ---- DNS shape --------------------------------------------------------
 
-            _psMetadataProxy = MakeMetadataProxy(PowerShellProviderId);
+            _dnsMetadataProxy = MakeMetadataProxy(DnsProviderId);
 
-            _psDispatchProxy = MakeTraceProxy(PowerShellProviderId, record => { _sink++; });
+            _dnsDispatchProxy = MakeTraceProxy(DnsProviderId, record => { _sink++; });
 
-            _psDecodeProxy = MakeTraceProxy(PowerShellProviderId, record =>
+            // Exactly what DnsResolutionProducer.OnDnsResolutionEvent reads, in its order.
+            _dnsDecodeProxy = MakeTraceProxy(DnsProviderId, record =>
             {
-                _sink += record.GetUnicodeString("UserData").Length;
-                _sink += record.GetUnicodeString("ContextInfo").Length;
-                _sink += record.GetUnicodeString("Payload").Length;
+                _sink += record.GetUnicodeString("QueryName").Length;
+                _sink += (int)record.GetUInt32("QueryType");
+                _sink += record.GetUnicodeString("QueryResults").Length;
             });
 
-            _psMatchProxy = MakeFilterProxy(
-                PowerShellProviderId, UnicodeString.Is("Payload", PayloadText));
+            _dnsMatchProxy = MakeFilterProxy(
+                DnsProviderId, UnicodeString.Is("QueryName", QueryNameText));
 
-            _psRejectProxy = MakeFilterProxy(
-                PowerShellProviderId, UnicodeString.Is("Payload", NoMatchText));
+            _dnsRejectProxy = MakeFilterProxy(
+                DnsProviderId, UnicodeString.Is("QueryName", NoMatchNameText));
 
             // ---- Network shape ----------------------------------------------------
 
@@ -176,21 +191,23 @@ namespace Krabs.Benchmarks
                 NetworkProviderId, Filter.IsUInt32("PID", NetPid + 1));
 
 #if PURE
-            _psDispatchRefProxy = MakeRefTraceProxy(
-                PowerShellProviderId, (in EventRecordRef record) => { _sink++; });
+            _dnsDispatchRefProxy = MakeRefTraceProxy(
+                DnsProviderId, (in EventRecordRef record) => { _sink++; });
 
-            _psDecodeRefProxy = MakeRefTraceProxy(PowerShellProviderId, (in EventRecordRef record) =>
+            _dnsDecodeRefProxy = MakeRefTraceProxy(DnsProviderId, (in EventRecordRef record) =>
             {
-                _sink += record.GetUnicodeString("UserData".AsSpan()).Length;
-                _sink += record.GetUnicodeString("ContextInfo".AsSpan()).Length;
-                _sink += record.GetUnicodeString("Payload".AsSpan()).Length;
+                // The ref surface has no throwing Get* for fixed-width types, only TryGet*.
+                _sink += record.GetUnicodeString("QueryName".AsSpan()).Length;
+                record.TryGetUInt32("QueryType".AsSpan(), out uint queryType);
+                _sink += (int)queryType;
+                _sink += record.GetUnicodeString("QueryResults".AsSpan()).Length;
             });
 
-            _psMatchRefProxy = MakeRefFilterProxy(
-                PowerShellProviderId, UnicodeString.Is("Payload", PayloadText));
+            _dnsMatchRefProxy = MakeRefFilterProxy(
+                DnsProviderId, UnicodeString.Is("QueryName", QueryNameText));
 
-            _psRejectRefProxy = MakeRefFilterProxy(
-                PowerShellProviderId, UnicodeString.Is("Payload", NoMatchText));
+            _dnsRejectRefProxy = MakeRefFilterProxy(
+                DnsProviderId, UnicodeString.Is("QueryName", NoMatchNameText));
 
             _netDispatchRefProxy = MakeRefTraceProxy(
                 NetworkProviderId, (in EventRecordRef record) => { _sink++; });
@@ -217,21 +234,21 @@ namespace Krabs.Benchmarks
 
             // The alternative to an EventFilter once handlers no longer allocate: do the
             // test inside the handler. Same decision, same event, no filter object.
-            _psInlineMatchRefProxy = MakeRefTraceProxy(
-                PowerShellProviderId, (in EventRecordRef record) =>
+            _dnsInlineMatchRefProxy = MakeRefTraceProxy(
+                DnsProviderId, (in EventRecordRef record) =>
                 {
-                    if (record.GetUnicodeString("Payload".AsSpan())
-                        .SequenceEqual(PayloadText.AsSpan()))
+                    if (record.GetUnicodeString("QueryName".AsSpan())
+                        .SequenceEqual(QueryNameText.AsSpan()))
                     {
                         _sink++;
                     }
                 });
 
-            _psInlineRejectRefProxy = MakeRefTraceProxy(
-                PowerShellProviderId, (in EventRecordRef record) =>
+            _dnsInlineRejectRefProxy = MakeRefTraceProxy(
+                DnsProviderId, (in EventRecordRef record) =>
                 {
-                    if (record.GetUnicodeString("Payload".AsSpan())
-                        .SequenceEqual(NoMatchText.AsSpan()))
+                    if (record.GetUnicodeString("QueryName".AsSpan())
+                        .SequenceEqual(NoMatchNameText.AsSpan()))
                     {
                         _sink++;
                     }
@@ -269,11 +286,11 @@ namespace Krabs.Benchmarks
         /// </remarks>
         private void VerifyWiring()
         {
-            Check("PowerShell_Metadata", () => _psMetadataProxy.PushEvent(_psRecord), 1);
-            Check("PowerShell_Dispatch", () => _psDispatchProxy.PushEvent(_psRecord), 1);
-            Check("PowerShell_Decode", () => _psDecodeProxy.PushEvent(_psRecord), PsDecodeSum);
-            Check("PowerShell_FilterMatch", () => _psMatchProxy.PushEvent(_psRecord), 1);
-            Check("PowerShell_FilterReject", () => _psRejectProxy.PushEvent(_psRecord), 0);
+            Check("Dns_Metadata", () => _dnsMetadataProxy.PushEvent(_dnsRecord), 1);
+            Check("Dns_Dispatch", () => _dnsDispatchProxy.PushEvent(_dnsRecord), 1);
+            Check("Dns_Decode", () => _dnsDecodeProxy.PushEvent(_dnsRecord), DnsDecodeSum);
+            Check("Dns_FilterMatch", () => _dnsMatchProxy.PushEvent(_dnsRecord), 1);
+            Check("Dns_FilterReject", () => _dnsRejectProxy.PushEvent(_dnsRecord), 0);
 
             Check("Network_Metadata", () => _netMetadataProxy.PushEvent(_netRecord), 1);
             Check("Network_Dispatch", () => _netDispatchProxy.PushEvent(_netRecord), 1);
@@ -282,18 +299,18 @@ namespace Krabs.Benchmarks
             Check("Network_FilterReject", () => _netRejectProxy.PushEvent(_netRecord), 0);
 
 #if PURE
-            Check("PowerShell_DispatchRef", () => _psDispatchRefProxy.PushEvent(_psRecord), 1);
-            Check("PowerShell_DecodeRef", () => _psDecodeRefProxy.PushEvent(_psRecord), PsDecodeSum);
-            Check("PowerShell_FilterMatchRef", () => _psMatchRefProxy.PushEvent(_psRecord), 1);
-            Check("PowerShell_FilterRejectRef", () => _psRejectRefProxy.PushEvent(_psRecord), 0);
+            Check("Dns_DispatchRef", () => _dnsDispatchRefProxy.PushEvent(_dnsRecord), 1);
+            Check("Dns_DecodeRef", () => _dnsDecodeRefProxy.PushEvent(_dnsRecord), DnsDecodeSum);
+            Check("Dns_FilterMatchRef", () => _dnsMatchRefProxy.PushEvent(_dnsRecord), 1);
+            Check("Dns_FilterRejectRef", () => _dnsRejectRefProxy.PushEvent(_dnsRecord), 0);
 
             Check("Network_DispatchRef", () => _netDispatchRefProxy.PushEvent(_netRecord), 1);
             Check("Network_DecodeRef", () => _netDecodeRefProxy.PushEvent(_netRecord), NetDecodeSum);
             Check("Network_FilterMatchRef", () => _netMatchRefProxy.PushEvent(_netRecord), 1);
             Check("Network_FilterRejectRef", () => _netRejectRefProxy.PushEvent(_netRecord), 0);
 
-            Check("PowerShell_InlineMatchRef", () => _psInlineMatchRefProxy.PushEvent(_psRecord), 1);
-            Check("PowerShell_InlineRejectRef", () => _psInlineRejectRefProxy.PushEvent(_psRecord), 0);
+            Check("Dns_InlineMatchRef", () => _dnsInlineMatchRefProxy.PushEvent(_dnsRecord), 1);
+            Check("Dns_InlineRejectRef", () => _dnsInlineRejectRefProxy.PushEvent(_dnsRecord), 0);
             Check("Network_InlineMatchRef", () => _netInlineMatchRefProxy.PushEvent(_netRecord), 1);
             Check("Network_InlineRejectRef", () => _netInlineRejectRefProxy.PushEvent(_netRecord), 0);
 #endif
@@ -313,13 +330,15 @@ namespace Krabs.Benchmarks
             }
         }
 
-        private static SynthRecord CreatePowerShellRecord()
+        private static SynthRecord CreateDnsRecord()
         {
-            using (var rb = new RecordBuilder(PowerShellProviderId, 7937, 1))
+            using (var rb = new RecordBuilder(DnsProviderId, 3008, 0))
             {
-                rb.AddUnicodeString("UserData", UserDataText);
-                rb.AddUnicodeString("ContextInfo", ContextInfoText);
-                rb.AddUnicodeString("Payload", PayloadText);
+                rb.AddUnicodeString("QueryName", QueryNameText);
+                rb.AddValue<uint>("QueryType", DnsQueryType);
+                rb.AddValue<ulong>("QueryOptions", DnsQueryOptions);
+                rb.AddValue<uint>("QueryStatus", DnsQueryStatus);
+                rb.AddUnicodeString("QueryResults", QueryResultsText);
 
                 return rb.Pack();
             }
@@ -327,7 +346,7 @@ namespace Krabs.Benchmarks
 
         /// <summary>
         /// Microsoft-Windows-Kernel-Network event 11 (TCP receive), with the real property
-        /// names and types. The counterweight to the PowerShell record, where decode cost is
+        /// names and types. The counterweight to the DNS record, where decode cost is
         /// almost entirely copying.
         /// </summary>
         private static SynthRecord CreateNetworkRecord()
@@ -452,13 +471,13 @@ namespace Krabs.Benchmarks
         }
 #endif
 
-        // ---- PowerShell shape -----------------------------------------------------
+        // ---- DNS shape -----------------------------------------------------------
 
         /// <summary>Delivery and header access only. No schema is resolved.</summary>
         [Benchmark]
-        public void PowerShell_Metadata()
+        public void Dns_Metadata()
         {
-            _psMetadataProxy.PushEvent(_psRecord);
+            _dnsMetadataProxy.PushEvent(_dnsRecord);
         }
 
         /// <summary>
@@ -468,26 +487,27 @@ namespace Krabs.Benchmarks
         /// handler without one.
         /// </summary>
         [Benchmark]
-        public void PowerShell_Dispatch()
+        public void Dns_Dispatch()
         {
-            _psDispatchProxy.PushEvent(_psRecord);
+            _dnsDispatchProxy.PushEvent(_dnsRecord);
         }
 
         /// <summary>
-        /// Reads three string properties. This is the path most consumers are on, and the
-        /// one where the C++/CLI wrapper pays for a double copy.
+        /// Reads the two strings and the integer HostIDS reads, in its order. QueryResults
+        /// is the last of the five properties, so reaching it walks the offsets of every
+        /// preceding one -- which is the realistic cost, not a best case.
         /// </summary>
         [Benchmark]
-        public void PowerShell_Decode()
+        public void Dns_Decode()
         {
-            _psDecodeProxy.PushEvent(_psRecord);
+            _dnsDecodeProxy.PushEvent(_dnsRecord);
         }
 
         /// <summary>A string predicate that matches, so the comparison runs to completion.</summary>
         [Benchmark]
-        public void PowerShell_FilterMatch()
+        public void Dns_FilterMatch()
         {
-            _psMatchProxy.PushEvent(_psRecord);
+            _dnsMatchProxy.PushEvent(_dnsRecord);
         }
 
         /// <summary>
@@ -495,9 +515,9 @@ namespace Krabs.Benchmarks
         /// exist precisely to discard most events.
         /// </summary>
         [Benchmark]
-        public void PowerShell_FilterReject()
+        public void Dns_FilterReject()
         {
-            _psRejectProxy.PushEvent(_psRecord);
+            _dnsRejectProxy.PushEvent(_dnsRecord);
         }
 
         // ---- Network shape --------------------------------------------------------
@@ -546,16 +566,16 @@ namespace Krabs.Benchmarks
         /// what a consumer that never decodes saves.
         /// </summary>
         [Benchmark]
-        public void PowerShell_DispatchRef()
+        public void Dns_DispatchRef()
         {
-            _psDispatchRefProxy.PushEvent(_psRecord);
+            _dnsDispatchRefProxy.PushEvent(_dnsRecord);
         }
 
-        /// <summary>The same three strings, read as spans rather than materialised.</summary>
+        /// <summary>The same properties, read as spans rather than materialised.</summary>
         [Benchmark]
-        public void PowerShell_DecodeRef()
+        public void Dns_DecodeRef()
         {
-            _psDecodeRefProxy.PushEvent(_psRecord);
+            _dnsDecodeRefProxy.PushEvent(_dnsRecord);
         }
 
         /// <summary>
@@ -563,9 +583,9 @@ namespace Krabs.Benchmarks
         /// way. Only the handler surface differs.
         /// </summary>
         [Benchmark]
-        public void PowerShell_FilterMatchRef()
+        public void Dns_FilterMatchRef()
         {
-            _psMatchRefProxy.PushEvent(_psRecord);
+            _dnsMatchRefProxy.PushEvent(_dnsRecord);
         }
 
         /// <summary>
@@ -573,9 +593,9 @@ namespace Krabs.Benchmarks
         /// the compat arm; it is here to show that, not because it can differ.
         /// </summary>
         [Benchmark]
-        public void PowerShell_FilterRejectRef()
+        public void Dns_FilterRejectRef()
         {
-            _psRejectRefProxy.PushEvent(_psRecord);
+            _dnsRejectRefProxy.PushEvent(_dnsRecord);
         }
 
         [Benchmark]
@@ -612,9 +632,9 @@ namespace Krabs.Benchmarks
         /// consumer would otherwise do.
         /// </summary>
         [Benchmark]
-        public void PowerShell_InlineFilterMatchRef()
+        public void Dns_InlineFilterMatchRef()
         {
-            _psInlineMatchRefProxy.PushEvent(_psRecord);
+            _dnsInlineMatchRefProxy.PushEvent(_dnsRecord);
         }
 
         /// <summary>
@@ -623,9 +643,9 @@ namespace Krabs.Benchmarks
         /// keeping on the ref path.
         /// </summary>
         [Benchmark]
-        public void PowerShell_InlineFilterRejectRef()
+        public void Dns_InlineFilterRejectRef()
         {
-            _psInlineRejectRefProxy.PushEvent(_psRecord);
+            _dnsInlineRejectRefProxy.PushEvent(_dnsRecord);
         }
 
         [Benchmark]
