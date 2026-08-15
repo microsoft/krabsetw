@@ -23,11 +23,11 @@ namespace Krabs.Benchmarks
 
             Console.WriteLine("{0,-32} {1,12} {2,14} {3,12}", "Method", "ns/event", "bytes/event", "sink/event");
 
-            Time(bench, "PowerShell_Metadata", bench.PowerShell_Metadata);
-            Time(bench, "PowerShell_Dispatch", bench.PowerShell_Dispatch);
-            Time(bench, "PowerShell_Decode", bench.PowerShell_Decode);
-            Time(bench, "PowerShell_FilterMatch", bench.PowerShell_FilterMatch);
-            Time(bench, "PowerShell_FilterReject", bench.PowerShell_FilterReject);
+            Time(bench, "Dns_Metadata", bench.Dns_Metadata);
+            Time(bench, "Dns_Dispatch", bench.Dns_Dispatch);
+            Time(bench, "Dns_Decode", bench.Dns_Decode);
+            Time(bench, "Dns_FilterMatch", bench.Dns_FilterMatch);
+            Time(bench, "Dns_FilterReject", bench.Dns_FilterReject);
 
             Time(bench, "Network_Metadata", bench.Network_Metadata);
             Time(bench, "Network_Dispatch", bench.Network_Dispatch);
@@ -35,12 +35,12 @@ namespace Krabs.Benchmarks
             Time(bench, "Network_FilterMatch", bench.Network_FilterMatch);
             Time(bench, "Network_FilterReject", bench.Network_FilterReject);
 #if PURE
-            Time(bench, "PowerShell_DispatchRef", bench.PowerShell_DispatchRef);
-            Time(bench, "PowerShell_DecodeRef", bench.PowerShell_DecodeRef);
-            Time(bench, "PowerShell_FilterMatchRef", bench.PowerShell_FilterMatchRef);
-            Time(bench, "PowerShell_FilterRejectRef", bench.PowerShell_FilterRejectRef);
-            Time(bench, "PowerShell_InlineMatchRef", bench.PowerShell_InlineFilterMatchRef);
-            Time(bench, "PowerShell_InlineRejectRef", bench.PowerShell_InlineFilterRejectRef);
+            Time(bench, "Dns_DispatchRef", bench.Dns_DispatchRef);
+            Time(bench, "Dns_DecodeRef", bench.Dns_DecodeRef);
+            Time(bench, "Dns_FilterMatchRef", bench.Dns_FilterMatchRef);
+            Time(bench, "Dns_FilterRejectRef", bench.Dns_FilterRejectRef);
+            Time(bench, "Dns_InlineMatchRef", bench.Dns_InlineFilterMatchRef);
+            Time(bench, "Dns_InlineRejectRef", bench.Dns_InlineFilterRejectRef);
 
             Time(bench, "Network_DispatchRef", bench.Network_DispatchRef);
             Time(bench, "Network_DecodeRef", bench.Network_DecodeRef);
@@ -89,8 +89,10 @@ namespace Krabs.Benchmarks
                 sinkDelta / (double)Iterations);
 
             // A benchmark whose handler never ran measures nothing. Say so rather than
-            // printing a number that looks like a very good result.
-            if (sinkDelta == 0 && name != "FilterReject")
+            // printing a number that looks like a very good result. The reject arms are the
+            // exception: their whole point is that the predicate discards the event, so a
+            // zero sink is the expected outcome rather than a broken measurement.
+            if (sinkDelta == 0 && name.IndexOf("Reject", StringComparison.Ordinal) < 0)
             {
                 throw new InvalidOperationException(
                     name + " measured nothing: the handler did not run during the loop.");

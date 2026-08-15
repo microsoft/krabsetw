@@ -68,13 +68,37 @@ Two event shapes are measured, because the shape dominates the result:
 
 | Shape | Provider | Event | Payload |
 | --- | --- | --- | --- |
-| **PowerShell** | `Microsoft-Windows-PowerShell` | 7937 v1 | 3 Unicode strings |
+| **DNS** | `Microsoft-Windows-DNS-Client` | 3008 v0 | 2 Unicode strings + 3 integers |
 | **Network** | `Microsoft-Windows-Kernel-Network` | 11 v0 | 8 fixed-width integers |
 
-Both are real providers with real schemas resolved through TDH. The Network shape is the
-one HostIDS's `UserModeNetworkTraceProducer` consumes, and it is the interesting case for a
-zero-allocation port: an all-integer payload means even the `IEventRecord` path allocates
-nothing, so the comparison is pure CPU.
+Both are real providers with real schemas resolved through TDH, and both are shapes HostIDS
+actually consumes. The Network shape is what `UserModeNetworkTraceProducer` reads, and it is
+the interesting case for a zero-allocation port: an all-integer payload means even the
+`IEventRecord` path allocates nothing, so the comparison is pure CPU. The DNS shape is what
+`DnsResolutionProducer` reads, and it is the mixed case — two strings, so decoding it
+allocates on the compat surface and not on the ref one.
+
+The DNS event is modelled property-for-property on a live capture of the provider rather
+than on its manifest, which ships no templates. Event 3008 carries five properties in this
+order:
+
+| # | Property | In-type | Read by HostIDS |
+| ---: | --- | --- | :---: |
+| 0 | `QueryName` | UnicodeString | yes |
+| 1 | `QueryType` | UInt32 | yes |
+| 2 | `QueryOptions` | UInt64 | |
+| 3 | `QueryStatus` | UInt32 | |
+| 4 | `QueryResults` | UnicodeString | yes |
+
+The decode arms read exactly the three `DnsResolutionProducer.OnDnsResolutionEvent` reads,
+which is deliberately the awkward set: `QueryResults` is the last property, so reaching it
+walks the offsets of the four before it, including a variable-length string.
+
+The values are anonymised, but sized from the capture. Across 789 real 3008 records
+`QueryName` ran 11–76 characters (median 31, mean 30.6), and `QueryResults` was empty on 46%
+of them and otherwise ran 10–390 characters (median 10, mean 27.1). The benchmark uses a
+successful single-address A lookup — the modal non-empty case, and the only one that does
+any work in `DnsResolutionProducer`, which returns early when `QueryResults` is blank.
 
 `ref` is the `OnEventRef`/`EventRecordRef` path. The C++/CLI wrapper has no equivalent API,
 so those columns are the port's alone.
@@ -86,10 +110,12 @@ schema was resolved. This is the floor of the dispatch path.
 
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net10 |
 | --- | ---: | ---: | ---: | ---: |
-| PowerShell | 57.5 ns | 37.8 ns | 41.0 ns | **14.9 ns** |
-| Network | 57.4 ns | 38.4 ns | 40.5 ns | **14.8 ns** |
+| DNS | 58.5 ns | 37.6 ns | 40.6 ns | **14.5 ns** |
+| Network | 58.7 ns | 37.6 ns | 40.2 ns | **14.6 ns** |
 
-1.4x faster on .NET Framework, 2.5x on .NET 10.
+1.4x faster on .NET Framework, 2.6x on .NET 10. The two shapes agree to within 0.3 ns on
+every implementation, which is the expected result: a metadata subscription reads no
+payload, so nothing here can depend on the shape.
 
 An earlier revision of this file reported the port *losing* this row on .NET Framework, at
 69.7 and 76.9 ns. Two of those three figures were wrong. The gap between the two shapes was
@@ -105,35 +131,38 @@ it. Both are fixed; the standard deviation is now 0.04 ns.
 
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell | 275.8 ns | 247.9 ns | 63.4 ns | 64.0 ns | 33.7 ns | **32.4 ns** |
-| Network | 290.8 ns | 256.9 ns | 64.2 ns | 64.1 ns | 33.7 ns | **34.0 ns** |
+| DNS | 283.8 ns | 251.3 ns | 62.9 ns | 62.6 ns | 26.2 ns | **25.7 ns** |
+| Network | 290.2 ns | 254.3 ns | 62.8 ns | 62.7 ns | 26.1 ns | **26.5 ns** |
 
-4.4x faster on .NET Framework, 7.4x on .NET 10. `ref` and compat are the same here because
+4.5x faster on .NET Framework, 9.6x on .NET 10. `ref` and compat are the same here because
 neither materialises a value.
 
 ### Decode — every property read
 
+The DNS rows read the three properties HostIDS reads; the Network rows read four integers.
+
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell (3 strings) | 1491.5 ns | 1251.7 ns | 473.8 ns | 377.9 ns | 272.5 ns | **189.4 ns** |
-| Network (8 integers) | 941.3 ns | 808.2 ns | 242.7 ns | 193.0 ns | 148.2 ns | **112.9 ns** |
+| DNS (2 strings, 1 int) | 1348.8 ns | 1194.3 ns | 451.8 ns | 382.6 ns | 204.5 ns | **154.9 ns** |
+| Network (8 integers) | 942.5 ns | 791.6 ns | 240.2 ns | 195.2 ns | 116.4 ns | **90.2 ns** |
 
 Allocation, same rows:
 
 | Shape | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell | 281 B | 256 B | 281 B | **0 B** | 256 B | **0 B** |
+| DNS | 152 B | 152 B | 152 B | **0 B** | 152 B | **0 B** |
 | Network | 0 B | 0 B | 0 B | **0 B** | 0 B | **0 B** |
 
 The Network row allocates nothing anywhere: an all-integer payload returns value types, so
-there is nothing for either implementation to put on the heap. Its speedup — 8.3x from
+there is nothing for either implementation to put on the heap. Its speedup — 10.4x from
 C++/CLI net462 to the port's net10 ref path — is entirely decode cost.
 
-The PowerShell row is where the ref path earns its existence. Both implementations allocate
-identically through `IEventRecord`, because those bytes *are* the three `System.String`s the
-contract returns and neither can avoid them. Only `EventRecordRef` removes them, which is
-the difference between a busy trace producing garbage proportional to its event rate and
-producing none.
+The DNS row is where the ref path earns its existence. Both implementations allocate an
+identical 152 B through `IEventRecord`, because those bytes *are* the two `System.String`s
+the contract returns and neither can avoid them. Only `EventRecordRef` removes them, which
+is the difference between a busy trace producing garbage proportional to its event rate and
+producing none. On the DNS shape that is 8.7x faster and 152 B/event cheaper than the
+C++/CLI wrapper it replaces.
 
 ### Filters
 
@@ -142,23 +171,22 @@ evaluated directly in an `OnEventRef` handler.
 
 | Shape | | C++/CLI net462 | C++/CLI net10 | pure net48 | pure net48 ref | pure net10 | pure net10 ref |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| PowerShell | match | 676.3 ns | 601.2 ns | 264.0 ns | 263.6 ns | 146.7 ns | **149.0 ns** |
-| PowerShell | reject | 380.2 ns | 343.2 ns | 251.3 ns | 252.3 ns | 142.8 ns | **143.2 ns** |
-| Network | match | 536.6 ns | 480.6 ns | 108.0 ns | 106.8 ns | 59.9 ns | **61.2 ns** |
-| Network | reject | 278.6 ns | 245.7 ns | 104.4 ns | 106.1 ns | 58.7 ns | **58.5 ns** |
+| DNS | match | 579.3 ns | 509.0 ns | 207.5 ns | 207.8 ns | 69.9 ns | **70.9 ns** |
+| DNS | reject | 293.4 ns | 265.4 ns | 192.7 ns | 193.4 ns | 67.7 ns | **67.3 ns** |
+| Network | match | 545.0 ns | 480.3 ns | 106.4 ns | 106.4 ns | 50.8 ns | **50.6 ns** |
+| Network | reject | 275.4 ns | 246.1 ns | 102.9 ns | 103.1 ns | 48.4 ns | **49.0 ns** |
 
 Inline, port only:
 
 | Shape | | pure net48 | pure net10 |
 | --- | --- | ---: | ---: |
-| PowerShell | match | 243.4 ns | 140.4 ns |
-| PowerShell | reject | 235.9 ns | 136.1 ns |
-| Network | match | 101.0 ns | 51.4 ns |
-| Network | reject | 107.2 ns | 51.4 ns |
+| DNS | match | 186.6 ns | 60.8 ns |
+| DNS | reject | 176.5 ns | 60.3 ns |
+| Network | match | 99.3 ns | 41.8 ns |
+| Network | reject | 100.2 ns | 41.8 ns |
 
-Inline is 0–16% faster than `EventFilter` — the cost of the filter object is the virtual
-predicate call and the id check, and it is small. The .NET Framework reject rows are level
-with each other to within their standard deviation, so read the gap there as nothing.
+Inline is 0–13% faster than `EventFilter` — the cost of the filter object is the virtual
+predicate call and the id check, and it is small.
 
 **This understates `EventFilter` in production.** `Proxy` drives the dispatch path directly
 and therefore cannot exercise **event-id pushdown**: when a provider carries only filters,
@@ -167,16 +195,22 @@ and therefore cannot exercise **event-id pushdown**: when a provider carries onl
 optimisation is disabled for the whole provider GUID as soon as any provider-level handler
 is attached (`UserTrace.cs:795`) — which is exactly what the inline arms do. So the `reject`
 rows above measure the *worst* case for `EventFilter` and the *best* case for inline; with
-pushdown active a rejected event costs nothing rather than 60–110 ns. Prefer `EventFilter`.
+pushdown active a rejected event costs nothing rather than 48–193 ns. Prefer `EventFilter`.
+
+This matters most for the DNS shape, because pushdown is precisely how HostIDS subscribes to
+it: `DnsResolutionProducer` attaches a single `EventFilter(List<ushort>)` for events 1016,
+3008 and 3020 and no provider-level handler, so every other event this provider emits is
+dropped in the kernel. The filter rows here use a payload predicate instead, which is the
+comparable measurement against the Network shape but a pessimistic model of that producer.
 
 ### Reading it
 
 The port wins every cell on both runtimes, by 1.4x at the narrowest (metadata on .NET
-Framework) and 8.3x at the widest (Network decode, C++/CLI net462 against the port's net10
+Framework) and 10.4x at the widest (Network decode, C++/CLI net462 against the port's net10
 ref path).
 
 The port also gains more from the modern runtime than the C++/CLI wrapper does. Dispatch
-goes 63.4 → 33.7 ns (1.9x) for the port against 275.8 → 247.9 ns (1.1x) for C++/CLI. That
+goes 62.9 → 26.2 ns (2.4x) for the port against 283.8 → 251.3 ns (1.1x) for C++/CLI. That
 asymmetry is expected: the C++/CLI hot path is native code the JIT never sees, so runtime
 improvements largely bypass it, while the port is managed end to end and collects them in
 full.
@@ -186,7 +220,7 @@ An earlier revision of this file claimed C++/CLI got *slower* on .NET 10 — dis
 cell is faster on .NET 10, by 10–20%. The claim was an artefact of comparing arms collected
 at different times, which is why the matrix is now regenerated as a set.
 
-The narrowest margin is metadata on .NET Framework (40.5 vs 57.4 ns). It is also the row
+The narrowest margin is metadata on .NET Framework (40.2 vs 58.7 ns). It is also the row
 most sensitive to the port's inlining, so treat it as the cell to re-measure first after any
 change to `EventRecordAdapter` or `TraceContext.OnEvent`.
 
