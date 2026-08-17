@@ -247,6 +247,31 @@ everything after it in the payload, is unreadable. krabs does not decode structs
 fails worse, so nothing that worked before stops working — but the failure mode changes from
 silent corruption to a visible failure.
 
+**A handler exception stops the trace and leaves `Start()`.** This restores the C++/CLI
+outcome — there, a managed exception thrown in a handler unwinds the native `ProcessTrace`
+frames and exits `Start()`, because neither `base_provider::on_event` nor
+`ExecuteAndConvertExceptions` catches anything that matches it. An intermediate revision of
+the port caught it and continued silently, which left a consumer polling healthy-looking
+counters on a trace that was delivering nothing. The port now captures the first exception,
+reports it, stops the session, and rethrows it — with its original stack — out of `Start()`.
+
+```csharp
+provider.OnUnhandledException += e => Log(e.Exception, e.Record.ProviderId, e.Stopping);
+trace.DefaultUnhandledException += e => Log(e.Exception);   // also fires for unattributed ones
+
+var stats = trace.QueryStats();
+Console.WriteLine(stats.UnhandledExceptions);
+```
+
+If one noisy provider must not take down the rest, opt out — the exception is still reported
+and still counted, and dispatch continues:
+
+```csharp
+trace.StopOnHandlerException = false;
+```
+
+A trace stopped this way can be restarted; the state is cleared by `Start()`.
+
 **`Stop` no longer releases the trace's resources — `Dispose` does.** `Stop` signals the
 session to stop and returns, which is what the C++/CLI `Stop` does too. What changed is that
 the port used to release its callback registration and logger name inside `Stop`; it now
@@ -287,6 +312,10 @@ These require no action, but they explain why some call sites can be made faster
   `All`/`RundownEnabled`, `UserTrace.Name`/`MOFEventProcessingEnabled`/
   `WPPEventProcessingEnabled`, `KernelTrace.Name`, `KernelProvider.Flags`/`GroupMask`.
 - `TraceException` with a `Status`, replacing bare failures.
+- Handler-exception reporting — `Provider.OnUnhandledException` /
+  `KernelProvider.OnUnhandledException`, `UserTrace.DefaultUnhandledException` /
+  `KernelTrace.DefaultUnhandledException`, the `IEventRecordException` they carry,
+  `TraceStats.UnhandledExceptions`, and `StopOnHandlerException`. See above.
 
 ---
 

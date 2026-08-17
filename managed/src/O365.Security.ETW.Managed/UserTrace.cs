@@ -71,7 +71,8 @@ namespace Microsoft.O365.Security.ETW
             uint buffersLost,
             ulong eventsTotal,
             ulong eventsHandled,
-            uint eventsLost)
+            uint eventsLost,
+            ulong unhandledExceptions)
         {
             BuffersCount = buffersCount;
             BuffersFree = buffersFree;
@@ -80,6 +81,7 @@ namespace Microsoft.O365.Security.ETW
             EventsTotal = eventsTotal;
             EventsHandled = eventsHandled;
             EventsLost = eventsLost;
+            UnhandledExceptions = unhandledExceptions;
         }
 
         public readonly uint BuffersCount;
@@ -89,6 +91,12 @@ namespace Microsoft.O365.Security.ETW
         public readonly ulong EventsTotal;
         public readonly ulong EventsHandled;
         public readonly uint EventsLost;
+
+        /// <summary>
+        /// How many times a consumer's handler threw. Nonzero means events were dropped by
+        /// the consumer's own code rather than by ETW, which no other counter here reveals.
+        /// </summary>
+        public readonly ulong UnhandledExceptions;
     }
 
     /// <summary>
@@ -183,6 +191,7 @@ namespace Microsoft.O365.Security.ETW
         {
             _name = name ?? throw new ArgumentNullException(nameof(name));
             _context = new TraceContext();
+            _context.RequestStop = Stop;
             _processTraceMode = NativeConstants.PROCESS_TRACE_MODE_REAL_TIME
                 | NativeConstants.PROCESS_TRACE_MODE_EVENT_RECORD;
         }
@@ -196,6 +205,12 @@ namespace Microsoft.O365.Security.ETW
         public ulong BuffersProcessed
         {
             get { return _context.BuffersProcessed; }
+        }
+
+        /// <inheritdoc cref="TraceStats.UnhandledExceptions"/>
+        public ulong UnhandledExceptions
+        {
+            get { return _context.UnhandledExceptions; }
         }
 
         /// <summary>
@@ -216,6 +231,40 @@ namespace Microsoft.O365.Security.ETW
         {
             get { return _context.WppEventsEnabled; }
             set { _context.WppEventsEnabled = value; }
+        }
+
+        /// <summary>
+        /// Whether an exception thrown by one of the consumer's handlers stops the trace,
+        /// which it does by default. <see cref="Start"/> then rethrows it with its original
+        /// stack once ETW has finished draining.
+        /// </summary>
+        /// <remarks>
+        /// On is the safe default. Left running, a handler that throws for every event turns
+        /// the trace into a silent no-op: the session stays up, buffers keep flowing and
+        /// <see cref="QueryStats"/> keeps reporting events handled, while nothing reaches the
+        /// consumer. Stopping surfaces the fault to whoever called <see cref="Start"/>.
+        ///
+        /// Set false only where a throwing handler is genuinely survivable and the trace must
+        /// keep delivering to its other providers. Subscribe to
+        /// <see cref="Provider.OnUnhandledException"/> or <see cref="DefaultUnhandledException"/>
+        /// if you do, or the failure is invisible again; <see cref="TraceStats.UnhandledExceptions"/>
+        /// counts them either way.
+        /// </remarks>
+        public bool StopOnHandlerException
+        {
+            get { return _context.StopOnHandlerException; }
+            set { _context.StopOnHandlerException = value; }
+        }
+
+        /// <summary>
+        /// Invoked for every exception thrown by a handler, including those raised outside
+        /// any provider's dispatch. <see cref="Provider.OnUnhandledException"/> fires first
+        /// where the event was routed to a provider.
+        /// </summary>
+        public EventRecordExceptionDelegate DefaultUnhandledException
+        {
+            get { return _context.DefaultException; }
+            set { _context.DefaultException = value; }
         }
 
         /// <summary>
@@ -327,6 +376,11 @@ namespace Microsoft.O365.Security.ETW
             _context.EndEvent();
         }
 
+        internal void HandleDispatchException(EVENT_RECORD* record, Exception ex)
+        {
+            _context.HandleDispatchException(record, ex);
+        }
+
         /// <summary>
         /// Creates the session and opens it for consumption, without beginning to process
         /// events. Lets a caller enable providers and know the session exists before
@@ -407,6 +461,14 @@ namespace Microsoft.O365.Security.ETW
                 _processingThread = Thread.CurrentThread;
                 _processingStopped.Reset();
 
+                // A trace may be restarted after a handler brought the previous run down.
+                // Left set, the flag would short circuit every event of the new run and the
+                // stale exception would be rethrown the moment it finished, so a restarted
+                // trace would silently deliver nothing. Cleared under the lock, before any
+                // event can arrive.
+                _context.Stopping = false;
+                _context.PendingException = null;
+
                 try
                 {
                     // Immediately before ProcessTrace, per krabs: any later and the rundown
@@ -442,6 +504,12 @@ namespace Microsoft.O365.Security.ETW
             {
                 throw new TraceException("ProcessTrace failed.", status);
             }
+
+            // A handler threw and StopOnHandlerException brought the session down. Rethrow it
+            // here, on the thread that called Start, so the failure lands where a consumer can
+            // act on it instead of being lost in a callback. Read after ProcessTrace returns,
+            // which is the point the callback thread is guaranteed to be done writing it.
+            _context.PendingException?.Throw();
         }
 
         /// <summary>
@@ -524,7 +592,8 @@ namespace Microsoft.O365.Security.ETW
                 properties->RealTimeBuffersLost,
                 _context.EventsHandled + properties->EventsLost,
                 _context.EventsHandled,
-                properties->EventsLost);
+                properties->EventsLost,
+                _context.UnhandledExceptions);
         }
 
         #region Session setup
