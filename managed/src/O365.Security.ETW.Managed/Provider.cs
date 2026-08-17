@@ -47,6 +47,15 @@ namespace Microsoft.O365.Security.ETW
     /// <summary>
     /// An ETW provider to enable on a trace, together with the filters applied to its events.
     /// </summary>
+    /// <remarks>
+    /// A provider belongs to one trace. Nothing enforces this — <see cref="UserTrace.Enable(Provider)"/>
+    /// will accept the same instance on a second trace, exactly as krabs does — but each trace
+    /// processes its events on its own <c>ProcessTrace</c> thread, so a shared provider has its
+    /// handlers and filters invoked concurrently from both. Everything reachable from a trace
+    /// is otherwise single threaded and unsynchronised, so this is the one way a consumer can
+    /// introduce a data race without writing any threading code of its own. Construct a
+    /// provider per trace.
+    /// </remarks>
     public sealed class Provider
     {
         /// <summary>A keyword mask with every bit set.</summary>

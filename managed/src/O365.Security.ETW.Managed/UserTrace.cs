@@ -300,6 +300,15 @@ namespace Microsoft.O365.Security.ETW
             _properties = properties ?? throw new ArgumentNullException(nameof(properties));
         }
 
+        /// <summary>
+        /// Enables a provider for the given trace. May be called before or after
+        /// <see cref="Open"/>.
+        /// </summary>
+        /// <remarks>
+        /// The provider is expected to belong to this trace alone. Enabling one instance on
+        /// two traces is not supported and is not detected; see the remarks on
+        /// <see cref="Provider"/>.
+        /// </remarks>
         public void Enable(Provider provider)
         {
             if (provider == null) throw new ArgumentNullException(nameof(provider));
