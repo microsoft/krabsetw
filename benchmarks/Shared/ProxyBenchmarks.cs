@@ -196,11 +196,10 @@ namespace Krabs.Benchmarks
 
             _dnsDecodeRefProxy = MakeRefTraceProxy(DnsProviderId, (in EventRecordRef record) =>
             {
-                // The ref surface has no throwing Get* for fixed-width types, only TryGet*.
-                _sink += record.GetUnicodeString("QueryName".AsSpan()).Length;
-                record.TryGetUInt32("QueryType".AsSpan(), out uint queryType);
-                _sink += (int)queryType;
-                _sink += record.GetUnicodeString("QueryResults".AsSpan()).Length;
+                // No accessor on the ref surface throws; the Get* forms take a default.
+                _sink += record.GetUnicodeString("QueryName".AsSpan(), default).Length;
+                _sink += (int)record.GetUInt32("QueryType".AsSpan(), 0);
+                _sink += record.GetUnicodeString("QueryResults".AsSpan(), default).Length;
             });
 
             _dnsMatchRefProxy = MakeRefFilterProxy(
@@ -214,16 +213,11 @@ namespace Krabs.Benchmarks
 
             _netDecodeRefProxy = MakeRefTraceProxy(NetworkProviderId, (in EventRecordRef record) =>
             {
-                // The ref surface has no throwing Get* for fixed-width types, only TryGet*.
-                record.TryGetUInt32("PID".AsSpan(), out uint pid);
-                record.TryGetUInt32("size".AsSpan(), out uint size);
-                record.TryGetUInt32("daddr".AsSpan(), out uint daddr);
-                record.TryGetUInt16("dport".AsSpan(), out ushort dport);
-
-                _sink += (int)pid;
-                _sink += (int)size;
-                _sink += (int)daddr;
-                _sink += dport;
+                // No accessor on the ref surface throws; the Get* forms take a default.
+                _sink += (int)record.GetUInt32("PID".AsSpan(), 0);
+                _sink += (int)record.GetUInt32("size".AsSpan(), 0);
+                _sink += (int)record.GetUInt32("daddr".AsSpan(), 0);
+                _sink += record.GetUInt16("dport".AsSpan(), 0);
             });
 
             _netMatchRefProxy = MakeRefFilterProxy(
@@ -237,7 +231,7 @@ namespace Krabs.Benchmarks
             _dnsInlineMatchRefProxy = MakeRefTraceProxy(
                 DnsProviderId, (in EventRecordRef record) =>
                 {
-                    if (record.GetUnicodeString("QueryName".AsSpan())
+                    if (record.GetUnicodeString("QueryName".AsSpan(), default)
                         .SequenceEqual(QueryNameText.AsSpan()))
                     {
                         _sink++;
@@ -247,7 +241,7 @@ namespace Krabs.Benchmarks
             _dnsInlineRejectRefProxy = MakeRefTraceProxy(
                 DnsProviderId, (in EventRecordRef record) =>
                 {
-                    if (record.GetUnicodeString("QueryName".AsSpan())
+                    if (record.GetUnicodeString("QueryName".AsSpan(), default)
                         .SequenceEqual(NoMatchNameText.AsSpan()))
                     {
                         _sink++;

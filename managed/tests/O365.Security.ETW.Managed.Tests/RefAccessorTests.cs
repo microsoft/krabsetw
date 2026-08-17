@@ -43,7 +43,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                     Assert.True(record.TryGetUnicodeString("Payload", out ReadOnlySpan<char> value));
                     viaRef = value.ToString();
 
-                    Assert.True(record.GetUnicodeString("Payload").SequenceEqual(value));
+                    Assert.True(record.GetUnicodeString("Payload", default).SequenceEqual(value));
                 },
                 record =>
                 {
@@ -61,16 +61,10 @@ namespace Microsoft.O365.Security.ETW.Tests
                     Assert.False(record.TryGetUnicodeString("Missing", out ReadOnlySpan<char> value));
                     Assert.True(value.IsEmpty);
 
-                    // The record cannot be captured, so the throwing case is asserted inline
-                    // rather than through Assert.Throws.
-                    try
-                    {
-                        _ = record.GetUnicodeString("Missing").Length;
-                        Assert.Fail("GetUnicodeString should have thrown for an absent property.");
-                    }
-                    catch (ParserException)
-                    {
-                    }
+                    // No accessor throws; the default-value form substitutes instead, and
+                    // the substitution is distinguishable from a genuinely empty property.
+                    Assert.True(record.GetUnicodeString("Missing", "fallback").SequenceEqual("fallback".AsSpan()));
+                    Assert.True(record.GetUnicodeString("Missing", default).IsEmpty);
                 });
         }
 
@@ -89,7 +83,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                     Assert.True(record.TryGetCountedString("Payload", out ReadOnlySpan<char> value));
                     viaRef = value.ToString();
 
-                    Assert.True(record.GetCountedString("Payload").SequenceEqual(value));
+                    Assert.True(record.GetCountedString("Payload", default).SequenceEqual(value));
                 },
                 record =>
                 {
@@ -108,14 +102,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                     Assert.False(record.TryGetCountedString("Missing", out ReadOnlySpan<char> value));
                     Assert.True(value.IsEmpty);
 
-                    try
-                    {
-                        _ = record.GetCountedString("Missing").Length;
-                        Assert.Fail("GetCountedString should have thrown for an absent property.");
-                    }
-                    catch (ParserException)
-                    {
-                    }
+                    Assert.True(record.GetCountedString("Missing", "fallback").SequenceEqual("fallback".AsSpan()));
                 });
         }
 
@@ -184,7 +171,7 @@ namespace Microsoft.O365.Security.ETW.Tests
 
                     for (int i = 0; i < 64; i++)
                     {
-                        consumed += record.GetCountedString("URL").Length;
+                        consumed += record.GetCountedString("URL", default).Length;
                         record.TryGetAnsiStringBytes("Verb", out ReadOnlySpan<byte> verb);
                         consumed += verb.Length;
                         record.TryGetAnsiStringBytes("URL", out ReadOnlySpan<byte> url);

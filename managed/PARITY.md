@@ -275,6 +275,16 @@ because transcoding from the provider's ANSI code page is what forces the alloca
 `AsnDecoder.TryReadPrimitiveCharacterStringBytes`); and no `Properties` enumeration. A
 handler that needs those stays on `IEventRecord`.
 
+**No `EventRecordRef` accessor throws.** C++/CLI exposes three forms per type — `Get(name)`,
+`Get(name, defaultValue)` and `TryGet(name, out value)`. The ref surface exposes the latter
+two, uniformly, for every type it supports. The throwing form is dropped because a missing
+property is an ordinary condition on a per-event path rather than an exceptional one, and
+because an escaping handler exception now stops the trace, which would make a single mistyped
+property name fatal to the session. The default-value form covers what the throwing form was
+wanted for — `record.GetUnicodeString(name, default).SequenceEqual(other)` is a single
+expression — while `TryGet*` remains the only form that separates absent from empty, since a
+returned `ReadOnlySpan<char>` cannot express absence. `IEventRecord` keeps all three forms.
+
 ### Schema resolution failures are reported once, on the provider
 
 An event whose schema cannot be resolved is reported through `Provider.OnError` and nothing

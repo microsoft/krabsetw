@@ -547,24 +547,32 @@ A handler that needs any of these stays on `IEventRecord`:
 - **IP-address and socket-address accessors**, because `IPAddress` and `SocketAddress` are
   classes.
 - **`Properties` enumeration.**
-- **Throwing `Get*` accessors for scalars.** There is no `GetUInt32`, `GetGuid` or
-  `GetBinary` on `EventRecordRef` — those are `TryGet*` only. A missing or wrongly typed
-  property is an ordinary condition on a hot path, and the ref surface exists to avoid
-  per-event costs; a throwing accessor invites exceptions as control flow. Handle the `false`
-  return, or use `IEventRecord`, which keeps both forms for every type.
-
-  The two span-returning string accessors are the exception: `GetUnicodeString` and
-  `GetCountedString` do exist and do throw `ParserException` when the property is missing.
-  A returned `ReadOnlySpan<char>` cannot express "absent" — an empty span is exactly what a
-  genuinely empty string property yields — so the `TryGet*` form is the only one that can
-  distinguish them, and the throwing form is what makes the comparison read in one
-  expression:
+- **Throwing `Get*` accessors.** Nothing on `EventRecordRef` throws for a missing or
+  wrongly typed property. Where C++/CLI offers three forms per type, the ref surface offers
+  the two that cannot throw, uniformly, for every type it supports:
 
   ```csharp
-  if (record.GetUnicodeString("QueryName".AsSpan()).SequenceEqual("host.example.com".AsSpan()))
+  bool TryGetUInt32(ReadOnlySpan<char> name, out uint value);        // distinguishes absent
+  uint GetUInt32(ReadOnlySpan<char> name, uint defaultValue);        // substitutes instead
   ```
 
-  Use `TryGetUnicodeString` where a property may legitimately be absent.
+  A missing property is an ordinary condition on a hot path, not an exceptional one, and the
+  ref surface exists to avoid per-event costs; a throwing accessor invites exceptions as
+  control flow, and — since the port stops the trace when a handler exception escapes — makes
+  one mistyped property name fatal to the session.
+
+  The default-value form is what keeps a comparison readable in a single expression, which is
+  the reason a throwing form is usually wanted:
+
+  ```csharp
+  if (record.GetUnicodeString("QueryName".AsSpan(), default)
+            .SequenceEqual("host.example.com".AsSpan()))
+  ```
+
+  Use the `TryGet*` form wherever absent has to be distinguished from empty. A returned
+  `ReadOnlySpan<char>` cannot express "absent" — an empty span is exactly what a genuinely
+  empty string property yields — so `TryGet*` is the only form that separates the two.
+  `IEventRecord` keeps all three forms, including the throwing one, for every type.
 
 ---
 
@@ -646,8 +654,14 @@ Four constraints on `RecordBuilder` are easily overlooked:
   the provider would emit.
 
 Assertions inside a ref handler carry one further constraint: the record cannot be captured,
-so `Assert.Throws(() => record.GetUnicodeString("Missing".AsSpan()))` does not compile. Use an
-inline `try`/`catch` instead.
+so nothing about it can be asserted through a lambda-taking overload such as `Assert.Throws`.
+Assert inline instead. No ref accessor throws, so the case that most often wants that shape —
+a missing property — is asserted on the returned default rather than on an exception:
+
+```csharp
+Assert.False(record.TryGetUnicodeString("Missing", out var value));
+Assert.True(record.GetUnicodeString("Missing", "fallback").SequenceEqual("fallback".AsSpan()));
+```
 
 To verify that a handler does not allocate, measure inside the callback. This works on .NET
 Framework as well as modern .NET, provided the schema and property caches are warmed by an
