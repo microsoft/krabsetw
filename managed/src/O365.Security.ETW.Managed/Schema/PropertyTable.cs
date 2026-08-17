@@ -135,10 +135,12 @@ namespace Microsoft.O365.Security.ETW.Schema
                         p.CountOrCountPropertyIndex,
                         pointerSize);
 
-                    if (size < 0)
+                    if (size < 0 || runningOffset + size > ushort.MaxValue)
                     {
-                        // This property's size depends on the payload, so every subsequent
-                        // offset must be resolved by walking the event at runtime.
+                        // Either this property's size depends on the payload, or the fixed
+                        // layout has already run past the largest offset a payload can
+                        // reach. Both mean every subsequent offset must be resolved by
+                        // walking the event at runtime, where reads are bounds-checked.
                         stillFixed = false;
                         firstDynamic = i + 1;
                     }

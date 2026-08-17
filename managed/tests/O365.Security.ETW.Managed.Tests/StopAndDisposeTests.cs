@@ -92,6 +92,61 @@ namespace Microsoft.O365.Security.ETW.Tests
         }
 
         /// <summary>
+        /// A second Start while the first is inside ProcessTrace would share the one thread
+        /// slot and the one drain event, so the first call's exit would tell Dispose the
+        /// trace had quiesced while the second was still consuming -- and Dispose would then
+        /// free the schema blobs and logger name that ETW still reaches through.
+        /// </summary>
+        [Fact]
+        public void ASecondStartIsRejectedWhileTheFirstIsProcessing()
+        {
+            var provider = new Provider(TestTraceLoggingSource.ProviderGuid) { Any = 0 };
+
+            using (var processing = new ManualResetEventSlim(false))
+            using (var trace = new UserTrace("Krabs-DoubleStart-" + Guid.NewGuid().ToString("N")))
+            {
+                var filter = new EventFilter(EtwHarness.ThisProcess);
+                filter.OnEvent += record => processing.Set();
+
+                provider.AddFilter(filter);
+                trace.Enable(provider);
+                trace.Open();
+
+                var first = new Thread(trace.Start) { IsBackground = true };
+                first.Start();
+
+                var emitting = new Thread(() =>
+                {
+                    while (!processing.IsSet)
+                    {
+                        TestTraceLoggingSource.Log.Interesting("a", 1);
+                        Thread.Sleep(50);
+                    }
+                })
+                { IsBackground = true };
+                emitting.Start();
+
+                try
+                {
+                    // Waiting for a delivered event is what makes this deterministic: it
+                    // proves the first Start is inside ProcessTrace, so the second one is
+                    // racing a live processor rather than an unstarted trace.
+                    Assert.True(
+                        processing.Wait(TimeSpan.FromSeconds(30)),
+                        "The trace never began processing.");
+
+                    Assert.Throws<InvalidOperationException>(() => trace.Start());
+                }
+                finally
+                {
+                    trace.Stop();
+                    emitting.Join(TimeSpan.FromSeconds(10));
+                    first.Join(TimeSpan.FromSeconds(30));
+                }
+            }
+        }
+
+        /// <summary>
         /// Deferring the release to Dispose must not turn every Open/Stop cycle into a leaked
         /// registration, which is what would happen if Open registered unconditionally.
         /// </summary>

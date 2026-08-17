@@ -38,11 +38,17 @@ namespace Microsoft.O365.Security.ETW
 
         public ulong BuffersProcessed;
 
-        /// <summary>Whether MOF (WBEM) events are routed to providers by schema provider GUID.</summary>
-        public bool MofEventsEnabled;
+        /// <summary>
+        /// Whether MOF (WBEM) events are routed to providers by schema provider GUID. On by
+        /// default, matching krabs::trace::mof_events_enabled_.
+        /// </summary>
+        public bool MofEventsEnabled = true;
 
-        /// <summary>Whether WPP events are routed to providers by schema provider GUID.</summary>
-        public bool WppEventsEnabled;
+        /// <summary>
+        /// Whether WPP events are routed to providers by schema provider GUID. On by
+        /// default, matching krabs::trace::wpp_events_enabled_.
+        /// </summary>
+        public bool WppEventsEnabled = true;
 
         public EventRecordDelegate DefaultEventRef = null!;
         public IEventRecordDelegate DefaultEvent = null!;
