@@ -199,8 +199,11 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <summary>
-        /// Routes MOF (classic/WBEM) events to providers. Off by default because it forces a
-        /// TDH lookup on every classic event in the session.
+        /// Routes MOF (classic/WBEM) events to providers. On by default, as in krabs: these
+        /// events carry the real provider GUID only in their schema, so routing them costs a
+        /// TDH lookup per classic event. Set false to skip that when no enabled provider is
+        /// classic -- but note that events from a classic provider then reach only the
+        /// trace-level default handler.
         /// </summary>
         public bool MOFEventProcessingEnabled
         {
@@ -208,7 +211,7 @@ namespace Microsoft.O365.Security.ETW
             set { _context.MofEventsEnabled = value; }
         }
 
-        /// <summary>Routes WPP events to providers. Off by default, for the same reason.</summary>
+        /// <summary>Routes WPP events to providers. On by default, for the same reason.</summary>
         public bool WPPEventProcessingEnabled
         {
             get { return _context.WppEventsEnabled; }
@@ -383,15 +386,40 @@ namespace Microsoft.O365.Security.ETW
                     return;
                 }
 
+                // One processor at a time. Both the thread slot and the drain event track a
+                // single call, so a second concurrent Start would let the first one's exit
+                // signal "drained" while this one is still inside ProcessTrace, and Dispose
+                // would then free memory ETW can still reach.
+                if (_processingThread != null)
+                {
+                    throw new InvalidOperationException(
+                        "The trace is already processing events. Start blocks until Stop, " +
+                        "and may only be called from one thread at a time.");
+                }
+
                 handle = _traceHandle.Value;
 
-                // Immediately before ProcessTrace, per krabs: any later and the rundown
-                // events are emitted while nothing is consuming them.
-                EnableRundown();
-            }
+                // Published under the same lock Stop takes, so a Dispose racing this either
+                // sees no processor and finds the handle already closed, or sees this one
+                // and waits for it. Publishing after the lock would leave a window where the
+                // drain event still reads "stopped" and Dispose frees the schema blobs and
+                // logger name out from under the ProcessTrace below.
+                _processingThread = Thread.CurrentThread;
+                _processingStopped.Reset();
 
-            _processingThread = Thread.CurrentThread;
-            _processingStopped.Reset();
+                try
+                {
+                    // Immediately before ProcessTrace, per krabs: any later and the rundown
+                    // events are emitted while nothing is consuming them.
+                    EnableRundown();
+                }
+                catch
+                {
+                    _processingThread = null;
+                    _processingStopped.Set();
+                    throw;
+                }
+            }
 
             int status;
             try

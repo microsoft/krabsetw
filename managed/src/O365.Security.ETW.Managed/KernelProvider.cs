@@ -53,7 +53,9 @@ namespace Microsoft.O365.Security.ETW
         public event IEventRecordDelegate? OnEvent;
 
         /// <summary>
-        /// Allocation-free counterpart to <see cref="OnEvent"/>. Not gated on a schema.
+        /// Allocation-free counterpart to <see cref="OnEvent"/>. Gated on a resolved schema,
+        /// exactly as <see cref="OnEvent"/> is; events whose schema will not resolve reach
+        /// <see cref="OnMetadata"/> and <see cref="OnError"/> instead.
         /// </summary>
         /// <inheritdoc cref="Provider.OnEventRef" path="/remarks"/>
         public event EventRecordDelegate? OnEventRef;

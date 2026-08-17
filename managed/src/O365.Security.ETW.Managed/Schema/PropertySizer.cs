@@ -54,7 +54,20 @@ namespace Microsoft.O365.Security.ETW.Schema
             }
 
             int elements = count == 0 ? 1 : count;
-            return elementSize * elements;
+            long size = (long)elementSize * elements;
+
+            // EVENT_RECORD.UserDataLength is a ushort, so nothing at or past 64 KiB is ever
+            // readable from a payload. Rejecting an oversized product here rather than
+            // letting it truncate to int is what stops a pathological schema -- say a 32769
+            // char string with a count of 65535 -- from wrapping to a small, in-range offset
+            // and silently decoding later properties from the wrong bytes. Returning -1
+            // instead sends them down the runtime walk, which bounds every read.
+            if (size > ushort.MaxValue)
+            {
+                return -1;
+            }
+
+            return (int)size;
         }
 
         /// <summary>

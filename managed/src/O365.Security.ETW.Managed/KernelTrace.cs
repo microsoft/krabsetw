@@ -220,11 +220,23 @@ namespace Microsoft.O365.Security.ETW
                     return;
                 }
 
-                handle = _traceHandle.Value;
-            }
+                // One processor at a time; see UserTrace.Start for why a second concurrent
+                // call would defeat the drain barrier Dispose relies on.
+                if (_processingThread != null)
+                {
+                    throw new InvalidOperationException(
+                        "The trace is already processing events. Start blocks until Stop, " +
+                        "and may only be called from one thread at a time.");
+                }
 
-            _processingThread = Thread.CurrentThread;
-            _processingStopped.Reset();
+                handle = _traceHandle.Value;
+
+                // Published under the same lock Stop takes, so Dispose cannot observe a gap
+                // between "handle live" and "processor running" and free memory ETW still
+                // reaches.
+                _processingThread = Thread.CurrentThread;
+                _processingStopped.Reset();
+            }
 
             int status;
             try
