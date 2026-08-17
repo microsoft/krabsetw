@@ -785,6 +785,16 @@ The key is now the hash of the whole metadata block, and collisions are resolved
 comparing the block rather than the name. Each distinct field layout gets its own entry.
 Covered by `TraceLoggingSchemaKeyTests`; reverting to the name fails two of its three cases.
 
+An entry that loses the comparison used to be *replaced* by the one that won, which was safe
+— nothing can be misdecoded when the whole block is compared before an entry is returned —
+but degenerate. Two blocks colliding on a 64-bit FNV hash under one descriptor would thrash:
+a TDH lookup on every event, and a schema blob appended to the cache's allocation list on
+every event, unbounded, for the life of the trace. Entries sharing a key are now chained
+instead. The chain is only walked after an exact comparison has already failed, which is the
+miss path either way, so the hot path is unchanged. `TwoShapesWhoseMetadataCollidesOnHashGetSeparateEntries`
+covers it with a real FNV collision — two structurally valid metadata blocks found by a Brent
+cycle search over the cache's own hash — rather than a mocked one.
+
 This matters most for a provider whose emitters can be different versions at once. HostIDS's
 Detours provider injects into other processes, so an old injected binary can outlive an agent
 upgrade by as long as the host process runs.
