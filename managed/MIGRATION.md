@@ -205,7 +205,8 @@ If you subscribed `EventFilter.OnError` to learn that events were undecodable, m
 subscription to the provider. If you already subscribe `Provider.OnError`, you will begin
 seeing errors from filtered providers that were previously silent — one per event rather than
 one per filter. `EventFilter.OnError` still fires when a filter is driven directly through
-`Proxy(EventFilter)`, where there is no provider above it.
+`Proxy(EventFilter)`, where there is no provider above it. See *Error handling flow, before
+and after* below for how this fits with the other two failure kinds.
 
 Unchanged: `OnMetadata` fires before anything resolves a schema, so a metadata-only consumer
 neither pays for resolution nor sees these errors. Also unchanged: a predicate naming a
@@ -270,7 +271,9 @@ and still counted, and dispatch continues:
 trace.StopOnHandlerException = false;
 ```
 
-A trace stopped this way can be restarted; the state is cleared by `Start()`.
+A trace stopped this way can be restarted; the state is cleared by `Start()`. See *Error
+handling flow, before and after* below for the exact ordering and how this relates to decode
+failures.
 
 **`Stop` no longer releases the trace's resources — `Dispose` does.** `Stop` signals the
 session to stop and returns, which is what the C++/CLI `Stop` does too. What changed is that
@@ -296,6 +299,81 @@ where it previously received none. `TryGet*` carries `[MaybeNullWhen(false)]`, w
 allows `if (record.TryGetUnicodeString(name, out var s))` to narrow `s` to non-null in the
 true branch. Annotations are metadata only and cannot break a compile that was not already
 opted in.
+
+### Error handling flow, before and after
+
+Three different things can go wrong while a trace is running, and they were previously
+reported in three inconsistent ways. This is the whole picture in one place.
+
+| What failed | C++/CLI | Port |
+| --- | --- | --- |
+| The library cannot decode an event | `EventFilter.OnError`, once **per filter**. `Provider.OnError` never fires for a filtered provider | `Provider.OnError`, once **per event**. Filters and handlers are skipped |
+| Your handler throws | Nothing fires. The exception unwinds native `ProcessTrace` and leaves `Start()` | `Provider.OnUnhandledException`, then `DefaultUnhandledException`, then the trace stops and `Start()` rethrows it |
+| `Open`/`Start`/`Enable` fails | An exception out of the call | `TraceException` with a `Status`, out of the same call |
+
+**Before — what a consumer had to write:**
+
+```csharp
+// Decode failures: had to be hung off every filter, because the provider never saw them.
+filter.OnError += e => Log(e.Message);
+provider.AddFilter(filter);
+
+// Handler failures: nothing to subscribe. The only signal was Start() throwing,
+// from a background thread, with the session already gone.
+try
+{
+    trace.Start();
+}
+catch (Exception ex)
+{
+    Log(ex);          // could be a trace failure or any handler's bug -- indistinguishable
+}
+```
+
+**After:**
+
+```csharp
+// Decode failures: one subscription, on the provider, covering filtered providers too.
+provider.OnError += e => Log(e.Message);
+
+// Handler failures: reported where the fault is, before the trace unwinds.
+provider.OnUnhandledException += e => Log(e.Exception, e.Record.ProviderId, e.Record.Id);
+trace.DefaultUnhandledException += e => Log(e.Exception);
+
+try
+{
+    trace.Start();
+}
+catch (TraceException ex)
+{
+    Log(ex.Status);   // the session itself failed
+}
+catch (Exception ex)
+{
+    Log(ex);          // a handler threw; already reported above, with the event that caused it
+}
+```
+
+The ordering guarantees, for the handler-exception path:
+
+1. The exception is counted — `QueryStats().UnhandledExceptions`.
+2. `Stopping` is set, so no further event is dispatched.
+3. `Provider.OnUnhandledException` fires for the provider whose dispatch threw. If **that**
+   handler throws too, it is swallowed so it cannot deny step 4.
+4. `DefaultUnhandledException` fires on the trace, for every exception — including ones with
+   no provider to attribute, such as a throw from the trace-level default handler.
+5. The session is stopped.
+6. `Start()` rethrows the **first** exception, with its original stack.
+
+Set `trace.StopOnHandlerException = false` to keep steps 1, 3 and 4 and drop 2, 5 and 6: the
+exception is still counted and still reported, with `e.Stopping` false, and dispatch carries
+on. That is what you want when one provider's handler must not take down the others. Neither
+implementation offered it before.
+
+Two things worth knowing. `OnMetadata` is **not** gated on a schema, so a metadata-only
+consumer never triggers a decode failure and never pays for resolution. And
+`EventFilter.OnError` still exists and still fires when a filter is driven directly through
+`Proxy(EventFilter)`, where there is no provider above it to report to.
 
 ### New surface
 
@@ -469,11 +547,24 @@ A handler that needs any of these stays on `IEventRecord`:
 - **IP-address and socket-address accessors**, because `IPAddress` and `SocketAddress` are
   classes.
 - **`Properties` enumeration.**
-- **Throwing `Get*` accessors.** The surface is `TryGet*` only, uniformly — there is no
-  `GetUInt32` or `GetUnicodeString` on `EventRecordRef`. `IEventRecord` keeps both forms.
-  A missing or wrongly typed property is an ordinary condition on a hot path, and the ref
-  surface exists to avoid per-event costs; a throwing accessor invites exceptions as control
-  flow. Handle the `false` return, or use `IEventRecord` if you want the throwing form.
+- **Throwing `Get*` accessors for scalars.** There is no `GetUInt32`, `GetGuid` or
+  `GetBinary` on `EventRecordRef` — those are `TryGet*` only. A missing or wrongly typed
+  property is an ordinary condition on a hot path, and the ref surface exists to avoid
+  per-event costs; a throwing accessor invites exceptions as control flow. Handle the `false`
+  return, or use `IEventRecord`, which keeps both forms for every type.
+
+  The two span-returning string accessors are the exception: `GetUnicodeString` and
+  `GetCountedString` do exist and do throw `ParserException` when the property is missing.
+  A returned `ReadOnlySpan<char>` cannot express "absent" — an empty span is exactly what a
+  genuinely empty string property yields — so the `TryGet*` form is the only one that can
+  distinguish them, and the throwing form is what makes the comparison read in one
+  expression:
+
+  ```csharp
+  if (record.GetUnicodeString("QueryName".AsSpan()).SequenceEqual("host.example.com".AsSpan()))
+  ```
+
+  Use `TryGetUnicodeString` where a property may legitimately be absent.
 
 ---
 
