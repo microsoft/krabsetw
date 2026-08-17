@@ -61,12 +61,18 @@ namespace Microsoft.O365.Security.ETW.Testing
                     {
                         _userTrace.PushEvent(record.Record);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // What TraceCallbacks.Dispatch does when a handler throws. Costs
-                        // nothing when one does not, which is why the invalidation lives here
-                        // and not in a finally inside the dispatch path.
-                        _userTrace.EndEvent();
+                        // Exactly what TraceCallbacks.Dispatch does when a handler throws:
+                        // count it, report it to the provider and trace surfaces, stop the
+                        // trace if configured to, and invalidate the adapter. Doing less
+                        // would make this proxy an unfaithful stand-in for ProcessTrace on
+                        // the one path where faithfulness matters most.
+                        _userTrace.HandleDispatchException(record.Record, ex);
+
+                        // Then rethrow, which the real callback cannot do -- there is native
+                        // code above it. A test whose handler threw unintentionally sees the
+                        // failure instead of a silently green run.
                         throw;
                     }
 
@@ -79,9 +85,9 @@ namespace Microsoft.O365.Security.ETW.Testing
                     {
                         _kernelTrace.PushEvent(record.Record);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        _kernelTrace.EndEvent();
+                        _kernelTrace.HandleDispatchException(record.Record, ex);
                         throw;
                     }
 

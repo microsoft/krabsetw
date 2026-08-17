@@ -63,6 +63,18 @@ namespace Microsoft.O365.Security.ETW
         /// <summary>Fired when an event arrives but cannot be handled.</summary>
         public event EventRecordErrorDelegate? OnError;
 
+        /// <summary>
+        /// Invoked when one of this provider's handlers threw. By default the trace then
+        /// stops and rethrows out of Start; see <see cref="KernelTrace.StopOnHandlerException"/>.
+        /// </summary>
+        /// <inheritdoc cref="Provider.OnUnhandledException" path="/remarks"/>
+        public event EventRecordExceptionDelegate? OnUnhandledException;
+
+        internal void RaiseUnhandledException(IEventRecordException exception)
+        {
+            OnUnhandledException?.Invoke(exception);
+        }
+
         /// <summary>Adds a filter to the provider.</summary>
         public void AddFilter(EventFilter filter)
         {

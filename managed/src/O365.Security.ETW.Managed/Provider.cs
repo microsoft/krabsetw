@@ -133,6 +133,22 @@ namespace Microsoft.O365.Security.ETW
         public event EventRecordErrorDelegate? OnError;
 
         /// <summary>
+        /// Invoked when one of this provider's handlers threw. By default the trace then
+        /// stops and rethrows out of Start; see <see cref="UserTrace.StopOnHandlerException"/>.
+        /// </summary>
+        /// <remarks>
+        /// Raised from the trace's callback after the throwing handler has unwound, so a
+        /// handler here runs outside the failed dispatch and its own filters and callbacks
+        /// are not re-entered.
+        /// </remarks>
+        public event EventRecordExceptionDelegate? OnUnhandledException;
+
+        internal void RaiseUnhandledException(IEventRecordException exception)
+        {
+            OnUnhandledException?.Invoke(exception);
+        }
+
+        /// <summary>
         /// Requests that the provider log its state information when enabled.
         /// </summary>
         public void EnableRundownEvents()

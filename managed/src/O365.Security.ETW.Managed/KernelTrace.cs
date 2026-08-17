@@ -70,6 +70,7 @@ namespace Microsoft.O365.Security.ETW
         {
             _name = name ?? throw new ArgumentNullException(nameof(name));
             _context = new TraceContext();
+            _context.RequestStop = Stop;
         }
 
         public string Name
@@ -81,6 +82,12 @@ namespace Microsoft.O365.Security.ETW
         public ulong BuffersProcessed
         {
             get { return _context.BuffersProcessed; }
+        }
+
+        /// <inheritdoc cref="TraceStats.UnhandledExceptions"/>
+        public ulong UnhandledExceptions
+        {
+            get { return _context.UnhandledExceptions; }
         }
 
         /// <summary>Fired for an event that has no corresponding provider.</summary>
@@ -110,6 +117,20 @@ namespace Microsoft.O365.Security.ETW
         {
             get { return _context.DefaultError; }
             set { _context.DefaultError = value; }
+        }
+
+        /// <inheritdoc cref="UserTrace.StopOnHandlerException"/>
+        public bool StopOnHandlerException
+        {
+            get { return _context.StopOnHandlerException; }
+            set { _context.StopOnHandlerException = value; }
+        }
+
+        /// <inheritdoc cref="UserTrace.DefaultUnhandledException"/>
+        public EventRecordExceptionDelegate DefaultUnhandledException
+        {
+            get { return _context.DefaultException; }
+            set { _context.DefaultException = value; }
         }
 
         [Obsolete("This method is deprecated. Use the DefaultMetadata/DefaultEvent/DefaultError event instead.")]
@@ -174,6 +195,11 @@ namespace Microsoft.O365.Security.ETW
             _context.EndEvent();
         }
 
+        internal void HandleDispatchException(EVENT_RECORD* record, Exception ex)
+        {
+            _context.HandleDispatchException(record, ex);
+        }
+
         public void Open()
         {
             lock (_gate)
@@ -236,6 +262,11 @@ namespace Microsoft.O365.Security.ETW
                 // reaches.
                 _processingThread = Thread.CurrentThread;
                 _processingStopped.Reset();
+
+                // See UserTrace.Start: cleared so a restart after a handler brought the
+                // previous run down is not born stopped, holding a stale exception.
+                _context.Stopping = false;
+                _context.PendingException = null;
             }
 
             int status;
@@ -257,6 +288,10 @@ namespace Microsoft.O365.Security.ETW
             {
                 throw new TraceException("ProcessTrace failed.", status);
             }
+
+            // See UserTrace.Start: a handler threw and brought the session down, so it is
+            // rethrown here rather than lost in the callback.
+            _context.PendingException?.Throw();
         }
 
         /// <summary>
@@ -350,7 +385,8 @@ namespace Microsoft.O365.Security.ETW
                 properties->RealTimeBuffersLost,
                 _context.EventsHandled + properties->EventsLost,
                 _context.EventsHandled,
-                properties->EventsLost);
+                properties->EventsLost,
+                _context.UnhandledExceptions);
         }
 
         #region Session setup

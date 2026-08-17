@@ -316,6 +316,56 @@ event is treated as a non-match and nothing is reported. Surfacing that as an er
 tracked separately; it would need a tri-state predicate result to distinguish "did not match"
 from "could not be evaluated".
 
+### A handler exception stops the trace and is reported
+
+An exception thrown by a consumer's event handler cannot be allowed to unwind out of
+`TraceCallbacks.Dispatch` — the frame above it is native `ProcessTrace`, and a managed
+exception crossing that boundary is undefined behaviour rather than a clean crash. The catch
+is therefore mandatory. What the port does with the caught exception is the part that had to
+be chosen.
+
+C++/CLI has no such catch. `base_provider::on_event` catches only `could_not_find_schema`
+(`krabs/provider.hpp:485-505`) and `ExecuteAndConvertExceptions` catches only the eight krabs
+C++ exception types (`Errors.hpp:69-101`), so a managed handler exception matches neither: it
+unwinds the native `ProcessTrace` frames and leaves `UserTrace::Start()`. The session is gone
+and the caller is told, loudly.
+
+An intermediate revision of the port caught the exception, stored it in a `LastException`
+field nobody read, and carried on. That is not availability — `EventsHandled` is incremented
+before routing, so every counter a consumer polls keeps climbing while the module delivers
+nothing, indefinitely and across restarts. Silence was the defect, not the catch.
+
+The port now reproduces the C++/CLI outcome without the undefined behaviour:
+
+| | C++/CLI | Port |
+| --- | --- | --- |
+| Exception leaves `Start()` | yes, by unwinding native frames | yes, rethrown after `ProcessTrace` returns |
+| Original stack preserved | yes | yes, via `ExceptionDispatchInfo` |
+| Session torn down | yes | yes, `CloseTrace` from the callback thread |
+| Reported before the throw | no | `Provider.OnUnhandledException` and `UserTrace.DefaultUnhandledException` |
+| Counted | no | `TraceStats.UnhandledExceptions` |
+| Opt-out | no | `StopOnHandlerException = false` |
+
+The first exception is captured with `ExceptionDispatchInfo`, further dispatch is
+short-circuited, `Stop()` is called from the callback thread — safe because `Dispose` waits
+outside `_gate` (`UserTrace.cs:897-901`), so nothing holds the lock the callback would need —
+and `ProcessTrace` returns `ERROR_CANCELLED`, which `Start()` already treated as a clean stop.
+`Start()` then rethrows. Both flags are per-run state and are cleared inside `Start()` under
+`_gate`, so a trace stopped this way can be restarted.
+
+Setting `StopOnHandlerException = false` keeps the trace running and still reports and counts,
+which is the behaviour a consumer wants when one noisy provider must not take down the others.
+No implementation has ever offered that, so it is additive rather than divergent.
+
+Attribution to a provider runs on the exception path only, by re-deriving the match with the
+same `TryGetRoutingId` helper the hot path uses. Nothing is stored per event to make it
+possible. A provider set mutated concurrently could in principle misattribute a diagnostic,
+which is the whole cost of the choice.
+
+`Testing.Proxy.PushEvent` routes through the same `HandleDispatchException`, so the synthetic
+path and the real callback agree, and then rethrows — which the real callback cannot do. A
+test whose handler throws by accident fails rather than running green.
+
 ### Public surface that was removed
 
 `MIGRATION.md` lists what was removed and what replaces it. The rationale, in each case,

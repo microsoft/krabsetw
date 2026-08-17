@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.O365.Security.ETW.Interop;
@@ -54,6 +56,38 @@ namespace Microsoft.O365.Security.ETW
         public IEventRecordDelegate DefaultEvent = null!;
         public IEventRecordMetadataDelegate DefaultMetadata = null!;
         public EventRecordErrorDelegate DefaultError = null!;
+        public EventRecordExceptionDelegate DefaultException = null!;
+
+        /// <summary>
+        /// How many handler exceptions have been caught. Cumulative for the life of the trace.
+        /// </summary>
+        public ulong UnhandledExceptions;
+
+        /// <summary>
+        /// Whether an exception out of a consumer's handler stops the trace. On by default:
+        /// the alternative is a session that stays up and reports healthy while delivering
+        /// nothing, which is the worst failure mode for a sensor.
+        /// </summary>
+        public bool StopOnHandlerException = true;
+
+        /// <summary>
+        /// Set once a handler exception has asked the trace to stop, so the events ETW is
+        /// still draining are not fed to a handler already known to be broken.
+        /// </summary>
+        public bool Stopping;
+
+        /// <summary>
+        /// The first handler exception, kept so <see cref="UserTrace.Start"/> can rethrow it
+        /// with its original stack once ProcessTrace returns. First one wins: it is the one
+        /// with the real cause, and the rest are usually the same fault repeating.
+        /// </summary>
+        public ExceptionDispatchInfo? PendingException;
+
+        /// <summary>
+        /// Stops the owning trace. Set by the trace, because the context has no other way to
+        /// reach it, and called only from the cold path after a handler threw.
+        /// </summary>
+        public Action? RequestStop;
 
         public void SetProviders(List<Provider> providers)
         {
@@ -115,6 +149,15 @@ namespace Microsoft.O365.Security.ETW
         {
             EventsHandled++;
 
+            // One predicted-not-taken branch on a field that shares a cache line with the
+            // counter just incremented. Once a handler has thrown and the trace is winding
+            // down, ETW goes on delivering what it had already buffered; feeding those to a
+            // handler known to be broken produces nothing but a flood of repeat exceptions.
+            if (Stopping)
+            {
+                return;
+            }
+
             _scratch.Begin(record);
             _adapter.Begin(record, _scratch);
 
@@ -138,6 +181,93 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <summary>
+        /// Handles an exception that escaped a consumer's handler: counts it, reports it, and
+        /// by default asks the trace to stop so the failure cannot pass unnoticed.
+        /// </summary>
+        /// <remarks>
+        /// Runs inside the catch in <see cref="TraceCallbacks.Dispatch"/>, so the adapter is
+        /// still valid and the reporting surfaces below can hand it out. It is invalidated on
+        /// the way out, which is what <see cref="OnEvent"/> would have done had it got there.
+        ///
+        /// Nothing here may throw. This is the last frame before native code, so an exception
+        /// raised while reporting an exception would be the one that reached ETW.
+        /// </remarks>
+        public void HandleDispatchException(EVENT_RECORD* record, Exception ex)
+        {
+            try
+            {
+                UnhandledExceptions++;
+
+                bool stopping = StopOnHandlerException;
+
+                if (stopping)
+                {
+                    // First one wins: it is the one that carries the original cause, and the
+                    // events still draining behind it tend to repeat the same fault.
+                    if (PendingException == null)
+                    {
+                        PendingException = ExceptionDispatchInfo.Capture(ex);
+                    }
+
+                    // Set before the callbacks below, so a handler that inspects the trace
+                    // sees it winding down, and so a reporting callback that throws in turn
+                    // cannot leave the trace running.
+                    Stopping = true;
+                }
+
+                Report(record, ex, stopping);
+
+                if (stopping)
+                {
+                    // Safe from this thread: Stop takes the trace's gate and returns without
+                    // waiting, and the one call that does wait -- Dispose -- waits outside
+                    // that gate. CloseTrace from inside the callback is how ETW is told to
+                    // end processing, and ProcessTrace returns ERROR_CANCELLED, which Start
+                    // already treats as a clean stop.
+                    RequestStop?.Invoke();
+                }
+            }
+            catch
+            {
+                // A reporting callback threw. There is nowhere left to report it.
+            }
+            finally
+            {
+                EndEvent();
+            }
+        }
+
+        private void Report(EVENT_RECORD* record, Exception ex, bool stopping)
+        {
+            var view = new EventRecordRef(record, _scratch);
+            var reported = new EventRecordException(ex, _adapter, stopping);
+
+            // Attributed to a provider where one claimed the event. Exceptions raised
+            // outside provider dispatch -- in the trace-level default handler, or while
+            // resolving a schema to route on -- have no provider and reach only the
+            // trace-level surface below.
+            object? provider = MatchProvider(view, record);
+
+            try
+            {
+                (provider as Provider)?.RaiseUnhandledException(reported);
+                (provider as KernelProvider)?.RaiseUnhandledException(reported);
+            }
+            catch (Exception nested)
+            {
+                // The provider-level surface must not deny the trace-level one its report.
+                LastReportingException = nested;
+            }
+
+            DefaultException?.Invoke(reported);
+        }
+
+        /// <summary>
+        /// The last exception thrown by an exception-reporting callback. Diagnostics only.
+        /// </summary>
+        internal static Exception? LastReportingException;
+
+        /// <summary>
         /// Delivers the event to the first provider that claims it, mirroring
         /// krabs::details::ut::forward_events.
         /// </summary>
@@ -159,15 +289,12 @@ namespace Microsoft.O365.Security.ETW
                 // krabs::details::kt::forward_events matches on the header GUID alone: the
                 // kernel logger stamps the real provider GUID there even though its events
                 // are classic MOF, so no schema lookup is needed to route them.
-                Guid kernelId = record->EventHeader.ProviderId;
+                int k = IndexOf(kernel.Ids, record->EventHeader.ProviderId);
 
-                for (int i = 0; i < kernel.Ids.Length; i++)
+                if (k >= 0)
                 {
-                    if (Blit.GuidEquals(kernel.Ids[i], kernelId))
-                    {
-                        kernel.Handlers[i].Dispatch(view, _adapter);
-                        return true;
-                    }
+                    kernel.Handlers[k].Dispatch(view, _adapter);
+                    return true;
                 }
 
                 return false;
@@ -175,42 +302,102 @@ namespace Microsoft.O365.Security.ETW
 
             Routes<Provider> providers = Volatile.Read(ref _providers);
 
+            if (!TryGetRoutingId(view, record, out Guid providerId))
+            {
+                return false;
+            }
+
+            int i = IndexOf(providers.Ids, providerId);
+
+            if (i < 0)
+            {
+                return false;
+            }
+
+            providers.Handlers[i].Dispatch(view, _adapter);
+            return true;
+        }
+
+        /// <summary>
+        /// The GUID a non-kernel event routes on, or false if it cannot be routed at all.
+        /// </summary>
+        /// <remarks>
+        /// Split out of <see cref="Route"/> so that <see cref="MatchProvider"/> can reuse it
+        /// rather than restate it. Small enough to inline, so the hot path is unchanged.
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryGetRoutingId(in EventRecordRef view, EVENT_RECORD* record, out Guid id)
+        {
             DecodingSource type = EventRecordRef.GetEventType(record);
 
             if (type == DecodingSource.XMLFile || type == DecodingSource.Tlg)
             {
-                Guid providerId = record->EventHeader.ProviderId;
-
-                for (int i = 0; i < providers.Ids.Length; i++)
-                {
-                    if (Blit.GuidEquals(providers.Ids[i], providerId))
-                    {
-                        providers.Handlers[i].Dispatch(view, _adapter);
-                        return true;
-                    }
-                }
+                id = record->EventHeader.ProviderId;
+                return true;
             }
-            else if ((type == DecodingSource.Wbem && MofEventsEnabled)
+
+            if ((type == DecodingSource.Wbem && MofEventsEnabled)
                 || (type == DecodingSource.WPP && WppEventsEnabled))
             {
                 SchemaEntry schema = view.SchemaEntry;
 
                 if (schema.Status == NativeConstants.ERROR_SUCCESS)
                 {
-                    Guid providerId = schema.Info->ProviderGuid;
-
-                    for (int i = 0; i < providers.Ids.Length; i++)
-                    {
-                        if (Blit.GuidEquals(providers.Ids[i], providerId))
-                        {
-                            providers.Handlers[i].Dispatch(view, _adapter);
-                            return true;
-                        }
-                    }
+                    id = schema.Info->ProviderGuid;
+                    return true;
                 }
             }
 
+            id = default;
             return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int IndexOf(Guid[] ids, in Guid id)
+        {
+            for (int i = 0; i < ids.Length; i++)
+            {
+                if (Blit.GuidEquals(ids[i], id))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// The provider <see cref="Route"/> delivered this event to, or null if none did.
+        /// </summary>
+        /// <remarks>
+        /// Cold path only: it exists to attribute a handler exception to a provider, and
+        /// runs once per exception rather than once per event. Recording the provider during
+        /// dispatch instead would put a store on the hot path for a value almost never read.
+        ///
+        /// Reached only from the catch in <see cref="TraceCallbacks.Dispatch"/>, on the same
+        /// thread and the same record, so it re-derives the same answer the routing loop
+        /// already reached. A provider enabled concurrently could in principle change it,
+        /// which would misattribute a diagnostic and nothing more.
+        /// </remarks>
+        private object? MatchProvider(in EventRecordRef view, EVENT_RECORD* record)
+        {
+            Routes<KernelProvider> kernel = Volatile.Read(ref _kernelProviders);
+
+            if (kernel.Ids.Length != 0)
+            {
+                int k = IndexOf(kernel.Ids, record->EventHeader.ProviderId);
+                return k >= 0 ? kernel.Handlers[k] : null;
+            }
+
+            Routes<Provider> providers = Volatile.Read(ref _providers);
+
+            if (!TryGetRoutingId(view, record, out Guid providerId))
+            {
+                return null;
+            }
+
+            int i = IndexOf(providers.Ids, providerId);
+            return i >= 0 ? providers.Handlers[i] : null;
         }
 
         private void DispatchDefault(in EventRecordRef view)
@@ -504,10 +691,11 @@ namespace Microsoft.O365.Security.ETW
             {
                 LastException = ex;
 
-                // OnEvent invalidates the adapter on its way out and never got there. Doing it
-                // here rather than in a finally inside OnEvent keeps the hot path free of an
-                // EH region, at no cost to the guarantee: this catch already exists.
-                context?.EndEvent();
+                // Counts, reports and (by default) stops the trace, and invalidates the
+                // adapter on the way out -- OnEvent never got there. Doing it here rather
+                // than in a finally inside OnEvent keeps the hot path free of an EH region,
+                // at no cost to the guarantee: this catch already exists.
+                context?.HandleDispatchException(record, ex);
             }
         }
     }
