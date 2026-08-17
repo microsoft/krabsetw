@@ -34,14 +34,13 @@ namespace Microsoft.O365.Security.ETW
             return true;
         }
 
-        public ReadOnlySpan<char> GetUnicodeString(ReadOnlySpan<char> name)
+        /// <summary>
+        /// As <see cref="TryGetUnicodeString"/>, substituting <paramref name="defaultValue"/>
+        /// when the property is absent.
+        /// </summary>
+        public ReadOnlySpan<char> GetUnicodeString(ReadOnlySpan<char> name, ReadOnlySpan<char> defaultValue)
         {
-            if (!TryGetUnicodeString(name, out ReadOnlySpan<char> value))
-            {
-                ThrowMissing(name);
-            }
-
-            return value;
+            return TryGetUnicodeString(name, out ReadOnlySpan<char> value) ? value : defaultValue;
         }
 
         /// <summary>
@@ -69,6 +68,15 @@ namespace Microsoft.O365.Security.ETW
 
             value = DecodeAnsi(raw, inType);
             return true;
+        }
+
+        /// <summary>
+        /// As <see cref="TryGetAnsiStringBytes(ReadOnlySpan{char}, out ReadOnlySpan{byte})"/>,
+        /// substituting <paramref name="defaultValue"/> when the property is absent.
+        /// </summary>
+        public ReadOnlySpan<byte> GetAnsiStringBytes(ReadOnlySpan<char> name, ReadOnlySpan<byte> defaultValue)
+        {
+            return TryGetAnsiStringBytes(name, out ReadOnlySpan<byte> value) ? value : defaultValue;
         }
 
         /// <summary>
@@ -105,14 +113,13 @@ namespace Microsoft.O365.Security.ETW
             return true;
         }
 
-        public ReadOnlySpan<char> GetCountedString(ReadOnlySpan<char> name)
+        /// <summary>
+        /// As <see cref="TryGetCountedString"/>, substituting <paramref name="defaultValue"/>
+        /// when the property is absent.
+        /// </summary>
+        public ReadOnlySpan<char> GetCountedString(ReadOnlySpan<char> name, ReadOnlySpan<char> defaultValue)
         {
-            if (!TryGetCountedString(name, out ReadOnlySpan<char> value))
-            {
-                ThrowMissing(name);
-            }
-
-            return value;
+            return TryGetCountedString(name, out ReadOnlySpan<char> value) ? value : defaultValue;
         }
 
         private static ReadOnlySpan<char> DecodeUnicode(ReadOnlySpan<byte> raw, ushort inType)
@@ -193,6 +200,11 @@ namespace Microsoft.O365.Security.ETW
             return true;
         }
 
+        public byte GetUInt8(ReadOnlySpan<char> name, byte defaultValue)
+        {
+            return TryGetUInt8(name, out byte value) ? value : defaultValue;
+        }
+
         public bool TryGetInt8(ReadOnlySpan<char> name, out sbyte value)
         {
             AssertInType(name, TdhInType.Int8);
@@ -204,6 +216,11 @@ namespace Microsoft.O365.Security.ETW
 
             value = (sbyte)*p;
             return true;
+        }
+
+        public sbyte GetInt8(ReadOnlySpan<char> name, sbyte defaultValue)
+        {
+            return TryGetInt8(name, out sbyte value) ? value : defaultValue;
         }
 
         public bool TryGetUInt16(ReadOnlySpan<char> name, out ushort value)
@@ -219,6 +236,11 @@ namespace Microsoft.O365.Security.ETW
             return true;
         }
 
+        public ushort GetUInt16(ReadOnlySpan<char> name, ushort defaultValue)
+        {
+            return TryGetUInt16(name, out ushort value) ? value : defaultValue;
+        }
+
         public bool TryGetInt16(ReadOnlySpan<char> name, out short value)
         {
             AssertInType(name, TdhInType.Int16);
@@ -230,6 +252,11 @@ namespace Microsoft.O365.Security.ETW
 
             value = Unsafe.ReadUnaligned<short>(p);
             return true;
+        }
+
+        public short GetInt16(ReadOnlySpan<char> name, short defaultValue)
+        {
+            return TryGetInt16(name, out short value) ? value : defaultValue;
         }
 
         public bool TryGetUInt32(ReadOnlySpan<char> name, out uint value)
@@ -245,6 +272,11 @@ namespace Microsoft.O365.Security.ETW
             return true;
         }
 
+        public uint GetUInt32(ReadOnlySpan<char> name, uint defaultValue)
+        {
+            return TryGetUInt32(name, out uint value) ? value : defaultValue;
+        }
+
         public bool TryGetInt32(ReadOnlySpan<char> name, out int value)
         {
             AssertInType(name, TdhInType.Int32);
@@ -256,6 +288,11 @@ namespace Microsoft.O365.Security.ETW
 
             value = Unsafe.ReadUnaligned<int>(p);
             return true;
+        }
+
+        public int GetInt32(ReadOnlySpan<char> name, int defaultValue)
+        {
+            return TryGetInt32(name, out int value) ? value : defaultValue;
         }
 
         public bool TryGetUInt64(ReadOnlySpan<char> name, out ulong value)
@@ -271,6 +308,11 @@ namespace Microsoft.O365.Security.ETW
             return true;
         }
 
+        public ulong GetUInt64(ReadOnlySpan<char> name, ulong defaultValue)
+        {
+            return TryGetUInt64(name, out ulong value) ? value : defaultValue;
+        }
+
         public bool TryGetInt64(ReadOnlySpan<char> name, out long value)
         {
             AssertInType(name, TdhInType.Int64);
@@ -282,6 +324,11 @@ namespace Microsoft.O365.Security.ETW
 
             value = Unsafe.ReadUnaligned<long>(p);
             return true;
+        }
+
+        public long GetInt64(ReadOnlySpan<char> name, long defaultValue)
+        {
+            return TryGetInt64(name, out long value) ? value : defaultValue;
         }
 
         public bool TryGetGuid(ReadOnlySpan<char> name, out Guid value)
@@ -296,6 +343,11 @@ namespace Microsoft.O365.Security.ETW
             return true;
         }
 
+        public Guid GetGuid(ReadOnlySpan<char> name, Guid defaultValue)
+        {
+            return TryGetGuid(name, out Guid value) ? value : defaultValue;
+        }
+
         public bool TryGetBoolean(ReadOnlySpan<char> name, out bool value)
         {
             // Deliberately not type-asserted: krabs excludes bool because ETW's
@@ -308,6 +360,11 @@ namespace Microsoft.O365.Security.ETW
 
             value = Unsafe.ReadUnaligned<uint>(p) != 0;
             return true;
+        }
+
+        public bool GetBoolean(ReadOnlySpan<char> name, bool defaultValue)
+        {
+            return TryGetBoolean(name, out bool value) ? value : defaultValue;
         }
 
         public bool TryGetPointer(ReadOnlySpan<char> name, out ulong value)
@@ -337,9 +394,19 @@ namespace Microsoft.O365.Security.ETW
             return false;
         }
 
+        public ulong GetPointer(ReadOnlySpan<char> name, ulong defaultValue)
+        {
+            return TryGetPointer(name, out ulong value) ? value : defaultValue;
+        }
+
         public bool TryGetBinary(ReadOnlySpan<char> name, out ReadOnlySpan<byte> value)
         {
             return TryGetRaw(name, out value);
+        }
+
+        public ReadOnlySpan<byte> GetBinary(ReadOnlySpan<char> name, ReadOnlySpan<byte> defaultValue)
+        {
+            return TryGetBinary(name, out ReadOnlySpan<byte> value) ? value : defaultValue;
         }
 
         private bool TryGetFixed(ReadOnlySpan<char> name, int size, out byte* pointer)
@@ -424,12 +491,5 @@ namespace Microsoft.O365.Security.ETW
 
         #endregion
 
-        private static void ThrowMissing(ReadOnlySpan<char> name)
-        {
-            // C++/CLI wraps every parse failure as ParserException, and callers written
-            // against it match on that exact type, so the port raises it directly rather
-            // than a subclass.
-            throw new ParserException("Could not find property in event schema: " + name.ToString());
-        }
     }
 }
