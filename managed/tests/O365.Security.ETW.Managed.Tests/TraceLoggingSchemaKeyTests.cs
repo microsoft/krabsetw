@@ -53,10 +53,11 @@ namespace Microsoft.O365.Security.ETW.Tests
         }
 
         /// <summary>
-        /// Pushes a record carrying <paramref name="metadata"/> through the cache. The
-        /// descriptor is identical for every call, exactly as native TraceLogging emits it.
+        /// Pushes a record carrying <paramref name="metadata"/> through the cache and returns
+        /// the entry it resolved to. The descriptor is identical for every call, exactly as
+        /// native TraceLogging emits it.
         /// </summary>
-        private static void Push(SchemaCache cache, byte[] metadata)
+        private static SchemaEntry Push(SchemaCache cache, byte[] metadata)
         {
             fixed (byte* block = metadata)
             {
@@ -73,7 +74,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                 record.ExtendedData = (IntPtr)(&item);
                 record.ExtendedDataCount = 1;
 
-                cache.Get(&record);
+                return cache.Get(&record);
             }
         }
 
@@ -129,6 +130,65 @@ namespace Microsoft.O365.Security.ETW.Tests
                 }
 
                 Assert.Equal(1, cache.Misses);
+            }
+        }
+
+        /// <summary>
+        /// Two metadata blocks that hash to the same 64-bit value, found by a Brent cycle
+        /// search over the cache's own FNV-1a. Both are structurally valid: the leading UINT16
+        /// is the block's own size, byte 2 is a terminating extension byte, and the rest is an
+        /// opaque name-and-fields tail.
+        /// </summary>
+        /// <remarks>
+        /// Hardcoded because finding them cost about eight minutes of CPU. Regenerating them
+        /// means iterating x -> Fnv1A(block(x)) over the eight state bytes and taking the two
+        /// distinct predecessors of the cycle entry point.
+        /// </remarks>
+        private static readonly byte[] CollidingShapeA =
+        {
+            0x10, 0x00, 0x00, 0x3F, 0x37, 0xDD, 0x8B, 0x9B,
+            0x07, 0xCF, 0x69, 0x00, 0x00, 0x00, 0x00, 0x00,
+        };
+
+        private static readonly byte[] CollidingShapeB =
+        {
+            0x10, 0x00, 0x00, 0xF2, 0x90, 0x33, 0x93, 0x11,
+            0xDA, 0x2C, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00,
+        };
+
+        /// <summary>
+        /// The hash is a bucket selector, not an identity, so two blocks landing in one bucket
+        /// must both survive.
+        /// </summary>
+        /// <remarks>
+        /// Neither could ever be misdecoded -- the whole block is compared before an entry is
+        /// returned -- but the cache used to replace one with the other on a collision. The
+        /// pair then thrashed: a TDH lookup on every event, and a schema blob appended to the
+        /// cache's allocation list on every event, for the life of the trace. So this asserts
+        /// the miss count stops at two, which is what distinguishes keeping both from
+        /// overwriting.
+        /// </remarks>
+        [Fact]
+        public void TwoShapesWhoseMetadataCollidesOnHashGetSeparateEntries()
+        {
+            Assert.NotEqual(CollidingShapeA, CollidingShapeB);
+            Assert.Equal(SchemaCache.HashName(CollidingShapeA), SchemaCache.HashName(CollidingShapeB));
+
+            using (var cache = new SchemaCache())
+            {
+                SchemaEntry a = Push(cache, CollidingShapeA);
+                SchemaEntry b = Push(cache, CollidingShapeB);
+
+                Assert.NotSame(a, b);
+                Assert.Equal(2, cache.Misses);
+
+                for (int i = 0; i < 8; i++)
+                {
+                    Assert.Same(a, Push(cache, CollidingShapeA));
+                    Assert.Same(b, Push(cache, CollidingShapeB));
+                }
+
+                Assert.Equal(2, cache.Misses);
             }
         }
     }

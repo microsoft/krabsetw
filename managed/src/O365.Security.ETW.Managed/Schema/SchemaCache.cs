@@ -28,6 +28,21 @@ namespace Microsoft.O365.Security.ETW.Schema
         /// </summary>
         private readonly byte[]? _traceLoggingMetadata;
 
+        /// <summary>
+        /// The next entry sharing this entry's key, or null -- which is every entry in a trace
+        /// whose schemas do not collide, meaning almost all of them.
+        /// </summary>
+        /// <remarks>
+        /// Two TraceLogging events with the same descriptor whose metadata blocks collide on a
+        /// 64-bit FNV hash land on one key. Neither can be misdecoded -- <see cref="MetadataMatches"/>
+        /// compares the whole block before any entry is returned -- but replacing one with the
+        /// other would make the pair thrash: a TDH lookup per event, and a schema blob added to
+        /// the cache's allocation list per event, for the life of the trace. Keeping both costs
+        /// a reference nobody follows unless the exact comparison has already failed, which is
+        /// the miss path either way.
+        /// </remarks>
+        public SchemaEntry? Next;
+
         public SchemaEntry(IntPtr blob, int blobSize, PropertyTable table, byte[]? traceLoggingMetadata)
         {
             Blob = blob;
@@ -217,14 +232,40 @@ namespace Microsoft.O365.Security.ETW.Schema
                 descriptor.Level,
                 pointerSize);
 
-            if (_cache.TryGetValue(key, out SchemaEntry? entry) && entry.MetadataMatches(tlMetadata))
+            if (_cache.TryGetValue(key, out SchemaEntry? head))
             {
+                if (head.MetadataMatches(tlMetadata))
+                {
+                    _lastKey = key;
+                    _lastEntry = head;
+                    return head;
+                }
+
+                // Only reachable when two distinct metadata blocks hash to the same key, so
+                // the walk is off the path every well-behaved trace takes.
+                for (SchemaEntry? candidate = head.Next; candidate != null; candidate = candidate.Next)
+                {
+                    if (candidate.MetadataMatches(tlMetadata))
+                    {
+                        _lastKey = key;
+                        _lastEntry = candidate;
+                        return candidate;
+                    }
+                }
+
+                SchemaEntry collided = Load(record, tlMetadata);
+                Misses++;
+
+                // Prepend: the entry just resolved is the one the next event is likeliest to
+                // want, and the chain is only ever walked after an exact comparison failed.
+                collided.Next = head;
+                _cache[key] = collided;
                 _lastKey = key;
-                _lastEntry = entry;
-                return entry;
+                _lastEntry = collided;
+                return collided;
             }
 
-            entry = Load(record, tlMetadata);
+            SchemaEntry entry = Load(record, tlMetadata);
             Misses++;
             _cache[key] = entry;
             _lastKey = key;
