@@ -48,6 +48,7 @@ namespace Microsoft.O365.Security.ETW.Tests
         }
 
         [DllImport("kernel32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static extern uint GetACP();
 
         /// <summary>

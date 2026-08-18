@@ -22,6 +22,10 @@ namespace Microsoft.O365.Security.ETW.Tests
     /// memoises as well -- it is simply the definition of what the cache is supposed to
     /// preserve.
     /// </remarks>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Security",
+        "CA5394:Do not use insecure randomness",
+        Justification = "The randomness shapes test inputs, so reproducibility is the requirement and a cryptographic generator would defeat it. The seeds are fixed and enumerated below.")]
     public unsafe class OffsetResolverDifferentialTests
     {
         /// <summary>
