@@ -100,6 +100,48 @@ namespace EtwTestsCS
                     data, String.Empty, 200));
             }
 
+            [TestMethod]
+            public void it_should_parse_ansi_strings_outside_of_ascii()
+            {
+                // ETW providers emit TDH_OUTTYPE_STRING payloads in the ANSI code
+                // page, not UTF-8. Anything above U+007F is where the two disagree,
+                // so ASCII round-trip tests cannot tell them apart.
+                // Encoding.Default is not usable as the machine's ANSI code page here: it is
+                // CP_ACP on .NET Framework but always UTF-8 on .NET. Ask the OS instead.
+                if (MachineAnsiCodePage() == 65001)
+                {
+                    Assert.Inconclusive("System ANSI code page is UTF-8; nothing to distinguish.");
+                }
+
+                var data = "http://caf\u00e9.example.com/r\u00e9sum\u00e9";
+                var prop = WinINetEvent.URL;
+                var observed = 0;
+
+                var provider = new Provider(WinINetEvent.ProviderId);
+                provider.OnEvent += e =>
+                {
+                    observed++;
+                    Assert.AreEqual(data, e.GetAnsiString(prop));
+                };
+
+                trace.Enable(provider);
+                proxy.PushEvent(WinINetEvent.CreateRecord(
+                    data, String.Empty, 200));
+
+                Assert.AreEqual(1, observed, "the event never reached the callback");
+            }
+
+            private static int MachineAnsiCodePage()
+            {
+#pragma warning disable CA1416 // krabsetw is Windows-only by construction.
+                return int.Parse(
+                    Microsoft.Win32.Registry.GetValue(
+                        @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Nls\CodePage",
+                        "ACP",
+                        "1252").ToString());
+#pragma warning restore CA1416
+            }
+
             //[TestMethod]
             //public void it_should_parse_counted_strings()
             //{

@@ -1,0 +1,5 @@
+BenchmarkDotNet.Artifacts/
+
+# Captured console output from a benchmark run. The numbers that matter are
+# transcribed into README.md; the raw logs are per-machine and regenerated.
+results/

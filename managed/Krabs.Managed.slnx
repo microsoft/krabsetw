@@ -1,0 +1,34 @@
+<Solution>
+  <!-- Every project here builds x64: managed/Directory.Build.props sets Platforms, and the
+       test host has to be 64-bit because LayoutFacts asserts the native struct offsets. The
+       shipped library is still AnyCPU IL - O365.Security.ETW.Managed.csproj overrides
+       PlatformTarget - so this is about which configuration the projects expose, not about
+       what lands in the package.
+
+       Both halves are needed. Without <Configurations> the solution platform is inferred as
+       "Any CPU", which no project defines; without the per-project <Platform> rules the
+       solution maps each project to AnyCPU regardless, which is the same mismatch one level
+       down. Visual Studio reports either as "the solution specifies a project configuration
+       that does not exist for that project". -->
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/O365.Security.ETW.Managed.Benchmarks/O365.Security.ETW.Managed.Benchmarks.csproj">
+      <Platform Project="x64" />
+    </Project>
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/O365.Security.ETW.Managed/O365.Security.ETW.Managed.csproj">
+      <Platform Project="x64" />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/O365.Security.ETW.Managed.Tests/O365.Security.ETW.Managed.Tests.csproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="../tests/ManagedETWTests.PureDotNet/EtwTestsCS.PureDotNet.csproj">
+      <Platform Project="x64" />
+    </Project>
+  </Folder>
+</Solution>

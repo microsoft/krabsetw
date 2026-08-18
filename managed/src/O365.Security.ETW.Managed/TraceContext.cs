@@ -1,0 +1,702 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
+using System.Threading;
+using Microsoft.O365.Security.ETW.Interop;
+using Microsoft.O365.Security.ETW.Schema;
+
+namespace Microsoft.O365.Security.ETW
+{
+    /// <summary>
+    /// Per-trace state and the entry point ETW calls for each event.
+    /// </summary>
+    /// <remarks>
+    /// ProcessTrace delivers a trace's events on a single thread, so everything reachable from
+    /// here is single threaded and needs no locking. Each trace owns its own scratch, schema
+    /// cache and adapter for exactly that reason: sharing them per provider would break as soon
+    /// as one provider were enabled on two traces.
+    ///
+    /// The one exception is the provider list, which a caller may replace from another thread
+    /// by enabling a provider on a running trace. It is therefore held as an immutable
+    /// snapshot and swapped in a single reference write, so the processing thread either sees
+    /// the whole of the old set or the whole of the new one.
+    /// </remarks>
+    internal sealed unsafe class TraceContext
+    {
+        private readonly EventScratch _scratch = new EventScratch();
+        private readonly EventRecordAdapter _adapter = new EventRecordAdapter();
+
+        private Routes<Provider> _providers = Routes<Provider>.Empty;
+        private Routes<KernelProvider> _kernelProviders = Routes<KernelProvider>.Empty;
+
+        /// <summary>
+        /// Every event delivered to the consumer, whether or not a provider claimed it. This
+        /// matches krabs::trace::on_event, which increments before forwarding, so
+        /// <see cref="TraceStats.EventsTotal"/> is this count plus the events ETW reports lost.
+        /// </summary>
+        public ulong EventsHandled;
+
+        public ulong BuffersProcessed;
+
+        /// <summary>
+        /// Whether MOF (WBEM) events are routed to providers by schema provider GUID. On by
+        /// default, matching krabs::trace::mof_events_enabled_.
+        /// </summary>
+        public bool MofEventsEnabled = true;
+
+        /// <summary>
+        /// Whether WPP events are routed to providers by schema provider GUID. On by
+        /// default, matching krabs::trace::wpp_events_enabled_.
+        /// </summary>
+        public bool WppEventsEnabled = true;
+
+        public EventRecordDelegate DefaultEventRef = null!;
+        public IEventRecordDelegate DefaultEvent = null!;
+        public IEventRecordMetadataDelegate DefaultMetadata = null!;
+        public EventRecordErrorDelegate DefaultError = null!;
+        public EventRecordExceptionDelegate DefaultException = null!;
+
+        /// <summary>
+        /// How many handler exceptions have been caught. Cumulative for the life of the trace.
+        /// </summary>
+        public ulong UnhandledExceptions;
+
+        /// <summary>
+        /// Whether an exception out of a consumer's handler stops the trace. On by default:
+        /// the alternative is a session that stays up and reports healthy while delivering
+        /// nothing, which is the worst failure mode for a sensor.
+        /// </summary>
+        public bool StopOnHandlerException = true;
+
+        /// <summary>
+        /// Set once a handler exception has asked the trace to stop, so the events ETW is
+        /// still draining are not fed to a handler already known to be broken.
+        /// </summary>
+        public bool Stopping;
+
+        /// <summary>
+        /// The first handler exception, kept so <see cref="UserTrace.Start"/> can rethrow it
+        /// with its original stack once ProcessTrace returns. First one wins: it is the one
+        /// with the real cause, and the rest are usually the same fault repeating.
+        /// </summary>
+        public ExceptionDispatchInfo? PendingException;
+
+        /// <summary>
+        /// Stops the owning trace. Set by the trace, because the context has no other way to
+        /// reach it, and called only from the cold path after a handler threw.
+        /// </summary>
+        public Action? RequestStop;
+
+        public void SetProviders(List<Provider> providers)
+        {
+            Volatile.Write(ref _providers, new Routes<Provider>(providers, p => p.Id));
+        }
+
+        public void SetKernelProviders(List<KernelProvider> providers)
+        {
+            Volatile.Write(ref _kernelProviders, new Routes<KernelProvider>(providers, p => p.Id));
+        }
+
+        /// <summary>
+        /// An immutable provider set: the providers and their GUIDs, indexed alike.
+        /// </summary>
+        /// <remarks>
+        /// The GUIDs are kept in their own array so that the routing loop scans them without
+        /// touching a Provider, which keeps the common "not this provider" case to a linear
+        /// scan of contiguous memory.
+        ///
+        /// The pairing is what makes this a type rather than two fields. Published separately,
+        /// the processing thread could see a new GUID array against the old provider array and
+        /// index past its end; one reference write cannot be seen half-applied.
+        /// </remarks>
+        private sealed class Routes<T>
+        {
+            public static readonly Routes<T> Empty = new Routes<T>();
+
+            public readonly T[] Handlers;
+            public readonly Guid[] Ids;
+
+            private Routes()
+            {
+                Handlers = Array.Empty<T>();
+                Ids = Array.Empty<Guid>();
+            }
+
+            public Routes(List<T> handlers, Func<T, Guid> id)
+            {
+                Handlers = handlers.ToArray();
+                Ids = new Guid[Handlers.Length];
+
+                for (int i = 0; i < Handlers.Length; i++)
+                {
+                    Ids[i] = id(Handlers[i]);
+                }
+            }
+        }
+
+        /// <remarks>
+        /// Deliberately free of exception handling. A try/finally here costs ~14ns per event
+        /// on .NET Framework -- measurably more than everything this method does -- because
+        /// the JIT will neither inline into an EH region nor keep values in registers across
+        /// one. The adapter is invalidated on the way out below, and every caller invalidates
+        /// it on the exceptional path from inside an EH region it already has, so the
+        /// guarantee is unchanged: a stashed IEventRecord throws rather than reading a buffer
+        /// ETW has taken back.
+        /// </remarks>
+        public void OnEvent(EVENT_RECORD* record)
+        {
+            EventsHandled++;
+
+            // One predicted-not-taken branch on a field that shares a cache line with the
+            // counter just incremented. Once a handler has thrown and the trace is winding
+            // down, ETW goes on delivering what it had already buffered; feeding those to a
+            // handler known to be broken produces nothing but a flood of repeat exceptions.
+            if (Stopping)
+            {
+                return;
+            }
+
+            _scratch.Begin(record);
+            _adapter.Begin(record, _scratch);
+
+            var view = new EventRecordRef(record, _scratch);
+
+            if (!Route(view, record))
+            {
+                DispatchDefault(view);
+            }
+
+            _adapter.End();
+        }
+
+        /// <summary>
+        /// Invalidates the reused adapter. Called by <see cref="OnEvent"/> on the way out, and
+        /// by callers when a handler threw and it did not get there.
+        /// </summary>
+        public void EndEvent()
+        {
+            _adapter.End();
+        }
+
+        /// <summary>
+        /// Handles an exception that escaped a consumer's handler: counts it, reports it, and
+        /// by default asks the trace to stop so the failure cannot pass unnoticed.
+        /// </summary>
+        /// <remarks>
+        /// Runs inside the catch in <see cref="TraceCallbacks.Dispatch"/>, so the adapter is
+        /// still valid and the reporting surfaces below can hand it out. It is invalidated on
+        /// the way out, which is what <see cref="OnEvent"/> would have done had it got there.
+        ///
+        /// Nothing here may throw. This is the last frame before native code, so an exception
+        /// raised while reporting an exception would be the one that reached ETW.
+        /// </remarks>
+        public void HandleDispatchException(EVENT_RECORD* record, Exception ex)
+        {
+            try
+            {
+                UnhandledExceptions++;
+
+                bool stopping = StopOnHandlerException;
+
+                if (stopping)
+                {
+                    // First one wins: it is the one that carries the original cause, and the
+                    // events still draining behind it tend to repeat the same fault.
+                    if (PendingException == null)
+                    {
+                        PendingException = ExceptionDispatchInfo.Capture(ex);
+                    }
+
+                    // Set before the callbacks below, so a handler that inspects the trace
+                    // sees it winding down, and so a reporting callback that throws in turn
+                    // cannot leave the trace running.
+                    Stopping = true;
+                }
+
+                Report(record, ex, stopping);
+
+                if (stopping)
+                {
+                    // Safe from this thread: Stop takes the trace's gate and returns without
+                    // waiting, and the one call that does wait -- Dispose -- waits outside
+                    // that gate. CloseTrace from inside the callback is how ETW is told to
+                    // end processing, and ProcessTrace returns ERROR_CANCELLED, which Start
+                    // already treats as a clean stop.
+                    RequestStop?.Invoke();
+                }
+            }
+            catch
+            {
+                // A reporting callback threw. There is nowhere left to report it.
+            }
+            finally
+            {
+                EndEvent();
+            }
+        }
+
+        private void Report(EVENT_RECORD* record, Exception ex, bool stopping)
+        {
+            var view = new EventRecordRef(record, _scratch);
+            var reported = new EventRecordException(ex, _adapter, stopping);
+
+            // Attributed to a provider where one claimed the event. Exceptions raised
+            // outside provider dispatch -- in the trace-level default handler, or while
+            // resolving a schema to route on -- have no provider and reach only the
+            // trace-level surface below.
+            object? provider = MatchProvider(view, record);
+
+            try
+            {
+                (provider as Provider)?.RaiseUnhandledException(reported);
+                (provider as KernelProvider)?.RaiseUnhandledException(reported);
+            }
+            catch (Exception nested)
+            {
+                // The provider-level surface must not deny the trace-level one its report.
+                LastReportingException = nested;
+            }
+
+            DefaultException?.Invoke(reported);
+        }
+
+        /// <summary>
+        /// The last exception thrown by an exception-reporting callback. Diagnostics only.
+        /// </summary>
+        internal static Exception? LastReportingException;
+
+        /// <summary>
+        /// Delivers the event to the first provider that claims it, mirroring
+        /// krabs::details::ut::forward_events.
+        /// </summary>
+        /// <remarks>
+        /// For manifest and TraceLogging events the header carries the provider GUID. For MOF
+        /// and WPP events it carries the *message* GUID instead, so the only way to find the
+        /// owning provider is to resolve the schema and read TRACE_EVENT_INFO.ProviderGuid.
+        /// That lookup is gated on the trace opting in, because it forces a TDH call for
+        /// every classic event whether or not anyone wants them.
+        /// </remarks>
+        private bool Route(in EventRecordRef view, EVENT_RECORD* record)
+        {
+            // Read each set once: enabling a provider on a running trace replaces it, and a
+            // second read could return a different set from the one already scanned.
+            Routes<KernelProvider> kernel = Volatile.Read(ref _kernelProviders);
+
+            if (kernel.Ids.Length != 0)
+            {
+                // krabs::details::kt::forward_events matches on the header GUID alone: the
+                // kernel logger stamps the real provider GUID there even though its events
+                // are classic MOF, so no schema lookup is needed to route them.
+                int k = IndexOf(kernel.Ids, record->EventHeader.ProviderId);
+
+                if (k >= 0)
+                {
+                    kernel.Handlers[k].Dispatch(view, _adapter);
+                    return true;
+                }
+
+                return false;
+            }
+
+            Routes<Provider> providers = Volatile.Read(ref _providers);
+
+            if (!TryGetRoutingId(view, record, out Guid providerId))
+            {
+                return false;
+            }
+
+            int i = IndexOf(providers.Ids, providerId);
+
+            if (i < 0)
+            {
+                return false;
+            }
+
+            providers.Handlers[i].Dispatch(view, _adapter);
+            return true;
+        }
+
+        /// <summary>
+        /// The GUID a non-kernel event routes on, or false if it cannot be routed at all.
+        /// </summary>
+        /// <remarks>
+        /// Split out of <see cref="Route"/> so that <see cref="MatchProvider"/> can reuse it
+        /// rather than restate it. Small enough to inline, so the hot path is unchanged.
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryGetRoutingId(in EventRecordRef view, EVENT_RECORD* record, out Guid id)
+        {
+            DecodingSource type = EventRecordRef.GetEventType(record);
+
+            if (type == DecodingSource.XMLFile || type == DecodingSource.Tlg)
+            {
+                id = record->EventHeader.ProviderId;
+                return true;
+            }
+
+            if ((type == DecodingSource.Wbem && MofEventsEnabled)
+                || (type == DecodingSource.WPP && WppEventsEnabled))
+            {
+                SchemaEntry schema = view.SchemaEntry;
+
+                if (schema.Status == NativeConstants.ERROR_SUCCESS)
+                {
+                    id = schema.Info->ProviderGuid;
+                    return true;
+                }
+            }
+
+            id = default;
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int IndexOf(Guid[] ids, in Guid id)
+        {
+            for (int i = 0; i < ids.Length; i++)
+            {
+                if (Blit.GuidEquals(ids[i], id))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// The provider <see cref="Route"/> delivered this event to, or null if none did.
+        /// </summary>
+        /// <remarks>
+        /// Cold path only: it exists to attribute a handler exception to a provider, and
+        /// runs once per exception rather than once per event. Recording the provider during
+        /// dispatch instead would put a store on the hot path for a value almost never read.
+        ///
+        /// Reached only from the catch in <see cref="TraceCallbacks.Dispatch"/>, on the same
+        /// thread and the same record, so it re-derives the same answer the routing loop
+        /// already reached. A provider enabled concurrently could in principle change it,
+        /// which would misattribute a diagnostic and nothing more.
+        /// </remarks>
+        private object? MatchProvider(in EventRecordRef view, EVENT_RECORD* record)
+        {
+            Routes<KernelProvider> kernel = Volatile.Read(ref _kernelProviders);
+
+            if (kernel.Ids.Length != 0)
+            {
+                int k = IndexOf(kernel.Ids, record->EventHeader.ProviderId);
+                return k >= 0 ? kernel.Handlers[k] : null;
+            }
+
+            Routes<Provider> providers = Volatile.Read(ref _providers);
+
+            if (!TryGetRoutingId(view, record, out Guid providerId))
+            {
+                return null;
+            }
+
+            int i = IndexOf(providers.Ids, providerId);
+            return i >= 0 ? providers.Handlers[i] : null;
+        }
+
+        private void DispatchDefault(in EventRecordRef view)
+        {
+            // Same shape as Provider.Dispatch: the native default callback is the very same
+            // CallbackBridge, so metadata fires unconditionally and first.
+            DefaultMetadata?.Invoke(_adapter);
+
+            var handler = DefaultEventRef;
+            var compat = DefaultEvent;
+
+            if (handler == null && compat == null)
+            {
+                return;
+            }
+
+            // The ref surface reads the record header without a schema, so it is not gated
+            // on one. The compat IEventRecord surface mirrors C++/CLI.
+            handler?.Invoke(view);
+
+            if (compat == null)
+            {
+                return;
+            }
+
+            SchemaEntry schema = view.SchemaEntry;
+
+            if (schema.Status != NativeConstants.ERROR_SUCCESS)
+            {
+                var errorHandler = DefaultError;
+                errorHandler?.Invoke(new EventRecordError(
+                    ErrorMessages.StatusAndRecordContext(schema.Status, view.ProviderId, view.Id),
+                    _adapter));
+                return;
+            }
+
+            compat(_adapter);
+        }
+
+        public void Dispose()
+        {
+            _scratch.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Maps the opaque context ETW echoes back on every event to its trace.
+    /// </summary>
+    /// <remarks>
+    /// An index into a static array rather than a GCHandle: a managed reference cannot be
+    /// stored in the native context field because the GC would relocate the object out from
+    /// under it.
+    ///
+    /// The references are *weak*, and that is load-bearing rather than an optimisation. A
+    /// trace context reaches the providers enabled on it, which reach the consumer's event
+    /// handlers, which routinely close over the trace itself. Held strongly, this static
+    /// array would root that whole graph: the trace would stay reachable, so its finalizer
+    /// would never run, so it would never unregister — a cycle nothing could break for the
+    /// life of the process. Held weakly, the only strong reference is the trace's own field,
+    /// and the callback path is safe because a trace cannot be collected while it is inside
+    /// ProcessTrace.
+    ///
+    /// The cost is one weak dereference per event in place of an array load: measured at
+    /// 0.9 ns on .NET 8 and 3.8 ns on .NET Framework, against a decode of roughly 250 ns.
+    /// </remarks>
+    internal static class TraceRegistry
+    {
+        private static readonly object Gate = new object();
+        private static WeakReference<TraceContext>?[] _contexts = new WeakReference<TraceContext>?[8];
+
+        public static int Register(TraceContext context)
+        {
+            lock (Gate)
+            {
+                var slot = new WeakReference<TraceContext>(context);
+
+                for (int i = 0; i < _contexts.Length; i++)
+                {
+                    // A slot whose target has been collected belongs to a trace that no
+                    // longer exists, so it can be handed out again.
+                    if (_contexts[i] == null || !_contexts[i]!.TryGetTarget(out _))
+                    {
+                        Volatile.Write(ref _contexts[i], slot);
+                        return i;
+                    }
+                }
+
+                int index = _contexts.Length;
+
+                // Grow into a fresh array and publish it only once fully populated, so a
+                // callback thread reading the field concurrently sees either the old array
+                // or a complete new one.
+                var grown = new WeakReference<TraceContext>?[_contexts.Length * 2];
+                Array.Copy(_contexts, grown, _contexts.Length);
+                grown[index] = slot;
+                Volatile.Write(ref _contexts, grown);
+
+                return index;
+            }
+        }
+
+        /// <summary>
+        /// Releases a slot, but only if it still holds <paramref name="context"/>.
+        /// </summary>
+        /// <remarks>
+        /// The check matters because slots are reused. A trace being finalized still holds
+        /// its own context — it is a field of the object being finalized — so a slot holding
+        /// anything else, or nothing, belongs to a trace that took the index afterwards and
+        /// must not be cleared.
+        /// </remarks>
+        public static void Unregister(int index, TraceContext context)
+        {
+            lock (Gate)
+            {
+                WeakReference<TraceContext>?[] contexts = _contexts;
+
+                if (index < 0 || index >= contexts.Length)
+                {
+                    return;
+                }
+
+                WeakReference<TraceContext>? slot = contexts[index];
+
+                if (slot != null && slot.TryGetTarget(out TraceContext? current) && ReferenceEquals(current, context))
+                {
+                    Volatile.Write(ref contexts[index], null);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Resolves a context without locking. The array reference is only ever replaced by a
+        /// fully populated copy, so a torn read is not possible.
+        /// </summary>
+        public static TraceContext? Get(int index)
+        {
+            WeakReference<TraceContext>?[] contexts = Volatile.Read(ref _contexts);
+
+            if ((uint)index >= (uint)contexts.Length)
+            {
+                return null;
+            }
+
+            WeakReference<TraceContext>? slot = Volatile.Read(ref contexts[index]);
+
+            return slot != null && slot.TryGetTarget(out TraceContext? context) ? context : null;
+        }
+
+        /// <summary>
+        /// How many slots are currently registered. Exists so a test can show that repeated
+        /// Open/Stop cycles do not accumulate registrations now that only Dispose releases
+        /// them.
+        /// </summary>
+        internal static int InUse
+        {
+            get
+            {
+                lock (Gate)
+                {
+                    int count = 0;
+
+                    for (int i = 0; i < _contexts.Length; i++)
+                    {
+                        if (_contexts[i] != null && _contexts[i]!.TryGetTarget(out _))
+                        {
+                            count++;
+                        }
+                    }
+
+                    return count;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The native entry points ETW calls. Kept static so the same dispatch path is used on
+    /// every target framework.
+    /// </summary>
+    internal static unsafe class TraceCallbacks
+    {
+#if NET
+        public static IntPtr EventRecordCallback
+        {
+            get { return (IntPtr)(delegate* unmanaged<EVENT_RECORD*, void>)&OnEventRecord; }
+        }
+
+        public static IntPtr BufferCallback
+        {
+            get { return (IntPtr)(delegate* unmanaged<IntPtr, uint>)&OnBuffer; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static void OnEventRecord(EVENT_RECORD* record)
+        {
+            Dispatch(record);
+        }
+
+        [UnmanagedCallersOnly]
+        private static uint OnBuffer(IntPtr logfile)
+        {
+            CountBuffer(logfile);
+            return 1;
+        }
+#else
+        // The parameters are declared as IntPtr rather than typed pointers: EVENT_TRACE_LOGFILE
+        // is not blittable, and the CLR refuses to build a thunk for a pointer to a marshalled
+        // structure. The pointers are cast back to their real types inside the thunk.
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate void EventRecordCallbackDelegate(IntPtr record);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate uint BufferCallbackDelegate(IntPtr logfile);
+
+        // Held in static fields so the delegates outlive every trace; a collected delegate
+        // would leave ETW calling into freed thunk memory.
+        private static readonly EventRecordCallbackDelegate EventRecordThunk =
+            record => Dispatch((EVENT_RECORD*)record);
+
+        private static readonly BufferCallbackDelegate BufferThunk =
+            logfile =>
+            {
+                CountBuffer(logfile);
+                return 1;
+            };
+
+        private static readonly IntPtr EventRecordThunkPointer =
+            Marshal.GetFunctionPointerForDelegate(EventRecordThunk);
+
+        private static readonly IntPtr BufferThunkPointer =
+            Marshal.GetFunctionPointerForDelegate(BufferThunk);
+
+        public static IntPtr EventRecordCallback
+        {
+            get { return EventRecordThunkPointer; }
+        }
+
+        public static IntPtr BufferCallback
+        {
+            get { return BufferThunkPointer; }
+        }
+#endif
+
+        internal static Exception? LastException;
+
+        // EVENT_TRACE_LOGFILE is not blittable, so the buffer callback receives it as an
+        // opaque pointer. Only the Context and BuffersRead fields are needed, and their
+        // offsets are taken from the declared layout rather than hard coded.
+        private static readonly int ContextOffset =
+            (int)Marshal.OffsetOf(typeof(EVENT_TRACE_LOGFILE), nameof(EVENT_TRACE_LOGFILE.Context));
+
+        private static readonly int BuffersReadOffset =
+            (int)Marshal.OffsetOf(typeof(EVENT_TRACE_LOGFILE), nameof(EVENT_TRACE_LOGFILE.BuffersRead));
+
+        private static void CountBuffer(IntPtr logfile)
+        {
+            try
+            {
+                if (logfile == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                var index = (int)*(IntPtr*)((byte*)logfile + ContextOffset);
+                TraceContext? context = TraceRegistry.Get(index);
+
+                if (context != null)
+                {
+                    // krabs assigns ETW's own cumulative count rather than tallying callbacks.
+                    context.BuffersProcessed = *(uint*)((byte*)logfile + BuffersReadOffset);
+                }
+            }
+            catch (Exception ex)
+            {
+                LastException = ex;
+            }
+        }
+
+        private static void Dispatch(EVENT_RECORD* record)
+        {
+            // Nothing may propagate into native code: ETW has no way to handle it and the
+            // process would be torn down.
+            TraceContext? context = null;
+
+            try
+            {
+                context = TraceRegistry.Get((int)record->UserContext);
+                context?.OnEvent(record);
+            }
+            catch (Exception ex)
+            {
+                LastException = ex;
+
+                // Counts, reports and (by default) stops the trace, and invalidates the
+                // adapter on the way out -- OnEvent never got there. Doing it here rather
+                // than in a finally inside OnEvent keeps the hot path free of an EH region,
+                // at no cost to the guarantee: this catch already exists.
+                context?.HandleDispatchException(record, ex);
+            }
+        }
+    }
+}

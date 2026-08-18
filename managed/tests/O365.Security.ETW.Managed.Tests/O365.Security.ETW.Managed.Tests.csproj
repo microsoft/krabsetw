@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net48;net8.0-windows;net10.0-windows</TargetFrameworks>
+    <AssemblyName>O365.Security.ETW.Managed.Tests</AssemblyName>
+    <RootNamespace>O365.Security.ETW.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- See the note in O365.Security.ETW.Managed.csproj: pinned so the vendored copy keeps
+         building on the .NET 9 SDK. -->
+    <LangVersion>13</LangVersion>
+  </PropertyGroup>
+
+  <!--
+    Binding redirects are generated from the versions that actually resolve, rather than
+    written out by hand: the sources are vendored into repositories that pin different
+    versions of System.Memory and friends, where a hardcoded redirect is both wrong and
+    reported as MSB3836. Redirects only mean anything on .NET Framework, so generation is
+    left off for the other frameworks, where enabling it makes MSBuild compare against the
+    shared framework and warn for every one.
+  -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\O365.Security.ETW.Managed\O365.Security.ETW.Managed.csproj" />
+  </ItemGroup>
+
+</Project>
