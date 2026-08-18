@@ -159,6 +159,7 @@ namespace Microsoft.O365.Security.ETW
 
         private TraceContext _context;
         private int _contextIndex = -1;
+
         /// <remarks>
         /// Written by the processing thread and read by whichever thread calls
         /// <see cref="Stop"/>, so it is volatile: a stale read would make Stop believe it is
