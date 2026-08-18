@@ -11,9 +11,12 @@
   </PropertyGroup>
 
   <!--
-    app.config carries binding redirects that only mean anything on .NET Framework. Leaving
-    redirect generation on for the .NET TFMs makes MSBuild compare them against the shared
-    framework and report MSB3836 for every one of them.
+    Binding redirects are generated from the versions that actually resolve, rather than
+    written out by hand: the sources are vendored into repositories that pin different
+    versions of System.Memory and friends, where a hardcoded redirect is both wrong and
+    reported as MSB3836. Redirects only mean anything on .NET Framework, so generation is
+    left off for the other frameworks, where enabling it makes MSBuild compare against the
+    shared framework and warn for every one.
   -->
   <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
