@@ -11,6 +11,11 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <Nullable>enable</Nullable>
+    <!-- Pinned rather than inheriting `latest`. These sources are vendored into consumer
+         repositories that build on older SDKs, so a C# 14 convenience creeping in here
+         breaks them somewhere this repository's CI would never see. C# 13 is the floor the
+         .NET 9 SDK supports. -->
+    <LangVersion>13</LangVersion>
   </PropertyGroup>
 
   <PropertyGroup>
