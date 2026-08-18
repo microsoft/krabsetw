@@ -5,6 +5,9 @@
     <AssemblyName>O365.Security.ETW.Managed.Tests</AssemblyName>
     <RootNamespace>O365.Security.ETW.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
+    <!-- See the note in O365.Security.ETW.Managed.csproj: pinned so the vendored copy keeps
+         building on the .NET 9 SDK. -->
+    <LangVersion>13</LangVersion>
   </PropertyGroup>
 
   <!--

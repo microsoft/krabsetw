@@ -40,10 +40,10 @@ namespace Microsoft.O365.Security.ETW.Tests
                 @"C:\Windows\System32\cmd.exe",
                 (in EventRecordRef record) =>
                 {
-                    Assert.True(record.TryGetUnicodeString("Payload", out ReadOnlySpan<char> value));
+                    Assert.True(record.TryGetUnicodeString("Payload".AsSpan(), out ReadOnlySpan<char> value));
                     viaRef = value.ToString();
 
-                    Assert.True(record.GetUnicodeString("Payload", default).SequenceEqual(value));
+                    Assert.True(record.GetUnicodeString("Payload".AsSpan(), default).SequenceEqual(value));
                 },
                 record =>
                 {
@@ -58,13 +58,13 @@ namespace Microsoft.O365.Security.ETW.Tests
                 "value",
                 (in EventRecordRef record) =>
                 {
-                    Assert.False(record.TryGetUnicodeString("Missing", out ReadOnlySpan<char> value));
+                    Assert.False(record.TryGetUnicodeString("Missing".AsSpan(), out ReadOnlySpan<char> value));
                     Assert.True(value.IsEmpty);
 
                     // No accessor throws; the default-value form substitutes instead, and
                     // the substitution is distinguishable from a genuinely empty property.
-                    Assert.True(record.GetUnicodeString("Missing", "fallback").SequenceEqual("fallback".AsSpan()));
-                    Assert.True(record.GetUnicodeString("Missing", default).IsEmpty);
+                    Assert.True(record.GetUnicodeString("Missing".AsSpan(), "fallback".AsSpan()).SequenceEqual("fallback".AsSpan()));
+                    Assert.True(record.GetUnicodeString("Missing".AsSpan(), default).IsEmpty);
                 });
         }
 
@@ -80,10 +80,10 @@ namespace Microsoft.O365.Security.ETW.Tests
                 "\u0008abcd",
                 (in EventRecordRef record) =>
                 {
-                    Assert.True(record.TryGetCountedString("Payload", out ReadOnlySpan<char> value));
+                    Assert.True(record.TryGetCountedString("Payload".AsSpan(), out ReadOnlySpan<char> value));
                     viaRef = value.ToString();
 
-                    Assert.True(record.GetCountedString("Payload", default).SequenceEqual(value));
+                    Assert.True(record.GetCountedString("Payload".AsSpan(), default).SequenceEqual(value));
                 },
                 record =>
                 {
@@ -99,10 +99,10 @@ namespace Microsoft.O365.Security.ETW.Tests
                 "\u0008abcd",
                 (in EventRecordRef record) =>
                 {
-                    Assert.False(record.TryGetCountedString("Missing", out ReadOnlySpan<char> value));
+                    Assert.False(record.TryGetCountedString("Missing".AsSpan(), out ReadOnlySpan<char> value));
                     Assert.True(value.IsEmpty);
 
-                    Assert.True(record.GetCountedString("Missing", "fallback").SequenceEqual("fallback".AsSpan()));
+                    Assert.True(record.GetCountedString("Missing".AsSpan(), "fallback".AsSpan()).SequenceEqual("fallback".AsSpan()));
                 });
         }
 
@@ -114,10 +114,10 @@ namespace Microsoft.O365.Security.ETW.Tests
             WithWinINetRecord(
                 (in EventRecordRef record) =>
                 {
-                    Assert.True(record.TryGetAnsiStringBytes("Verb", out ReadOnlySpan<byte> value));
+                    Assert.True(record.TryGetAnsiStringBytes("Verb".AsSpan(), out ReadOnlySpan<byte> value));
                     viaRef = value.ToArray();
 
-                    Assert.False(record.TryGetAnsiStringBytes("Missing", out ReadOnlySpan<byte> missing));
+                    Assert.False(record.TryGetAnsiStringBytes("Missing".AsSpan(), out ReadOnlySpan<byte> missing));
                     Assert.True(missing.IsEmpty);
                 },
                 record =>
@@ -143,10 +143,10 @@ namespace Microsoft.O365.Security.ETW.Tests
             WithWinINetRecord(
                 (in EventRecordRef record) =>
                 {
-                    Assert.True(record.TryGetBinary("Status", out ReadOnlySpan<byte> value));
+                    Assert.True(record.TryGetBinary("Status".AsSpan(), out ReadOnlySpan<byte> value));
                     viaRef = value.ToArray();
 
-                    Assert.False(record.TryGetBinary("Missing", out ReadOnlySpan<byte> missing));
+                    Assert.False(record.TryGetBinary("Missing".AsSpan(), out ReadOnlySpan<byte> missing));
                     Assert.True(missing.IsEmpty);
                 },
                 record =>
@@ -171,12 +171,12 @@ namespace Microsoft.O365.Security.ETW.Tests
 
                     for (int i = 0; i < 64; i++)
                     {
-                        consumed += record.GetCountedString("URL", default).Length;
-                        record.TryGetAnsiStringBytes("Verb", out ReadOnlySpan<byte> verb);
+                        consumed += record.GetCountedString("URL".AsSpan(), default).Length;
+                        record.TryGetAnsiStringBytes("Verb".AsSpan(), out ReadOnlySpan<byte> verb);
                         consumed += verb.Length;
-                        record.TryGetAnsiStringBytes("URL", out ReadOnlySpan<byte> url);
+                        record.TryGetAnsiStringBytes("URL".AsSpan(), out ReadOnlySpan<byte> url);
                         consumed += url.Length;
-                        record.TryGetBinary("Status", out ReadOnlySpan<byte> status);
+                        record.TryGetBinary("Status".AsSpan(), out ReadOnlySpan<byte> status);
                         consumed += status.Length;
                     }
 
