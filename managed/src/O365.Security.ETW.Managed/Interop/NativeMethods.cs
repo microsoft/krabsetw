@@ -12,12 +12,14 @@ namespace Microsoft.O365.Security.ETW.Interop
         private const string Advapi32 = "advapi32.dll";
         private const string Tdh = "tdh.dll";
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport(Advapi32, EntryPoint = "StartTraceW", CharSet = CharSet.Unicode, SetLastError = false)]
         public static extern int StartTrace(
             out ulong sessionHandle,
             [MarshalAs(UnmanagedType.LPWStr)] string sessionName,
             EVENT_TRACE_PROPERTIES* properties);
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport(Advapi32, EntryPoint = "ControlTraceW", CharSet = CharSet.Unicode, SetLastError = false)]
         public static extern int ControlTrace(
             ulong sessionHandle,
@@ -25,6 +27,7 @@ namespace Microsoft.O365.Security.ETW.Interop
             EVENT_TRACE_PROPERTIES* properties,
             uint controlCode);
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport(Advapi32, EntryPoint = "EnableTraceEx2", CharSet = CharSet.Unicode, SetLastError = false)]
         public static extern int EnableTraceEx2(
             ulong sessionHandle,
@@ -36,9 +39,11 @@ namespace Microsoft.O365.Security.ETW.Interop
             uint timeout,
             ENABLE_TRACE_PARAMETERS* enableParameters);
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport(Advapi32, EntryPoint = "OpenTraceW", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern ulong OpenTrace(EVENT_TRACE_LOGFILE* logfile);
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport(Advapi32, EntryPoint = "ProcessTrace", SetLastError = false)]
         public static extern int ProcessTrace(
             ulong* handleArray,
@@ -46,9 +51,11 @@ namespace Microsoft.O365.Security.ETW.Interop
             IntPtr startTime,
             IntPtr endTime);
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport(Advapi32, EntryPoint = "CloseTrace", SetLastError = false)]
         public static extern int CloseTrace(ulong traceHandle);
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport(Tdh, EntryPoint = "TdhGetEventInformation", SetLastError = false)]
         public static extern int TdhGetEventInformation(
             EVENT_RECORD* eventRecord,
@@ -57,11 +64,13 @@ namespace Microsoft.O365.Security.ETW.Interop
             TRACE_EVENT_INFO* buffer,
             uint* bufferSize);
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport(Tdh, EntryPoint = "TdhEnumerateProviders", SetLastError = false)]
         public static extern int TdhEnumerateProviders(
             byte* buffer,
             uint* bufferSize);
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport("ntdll.dll", EntryPoint = "NtQuerySystemInformation", SetLastError = false)]
         public static extern int NtQuerySystemInformation(
             int systemInformationClass,
@@ -69,6 +78,7 @@ namespace Microsoft.O365.Security.ETW.Interop
             uint systemInformationLength,
             uint* returnLength);
 
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         [DllImport("ntdll.dll", EntryPoint = "NtSetSystemInformation", SetLastError = false)]
         public static extern int NtSetSystemInformation(
             int systemInformationClass,
