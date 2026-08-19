@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Microsoft.O365.Security.ETW.Tests
 {
@@ -80,7 +79,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                     while (DateTime.UtcNow < deadline && !signal.IsSet)
                     {
                         TestTraceLoggingSource.Log.Interesting("diagnostic", 7);
-                        signal.Wait(TimeSpan.FromMilliseconds(250));
+                        signal.Wait(TimeSpan.FromMilliseconds(250), TestContext.Current.CancellationToken);
                     }
                 }
                 finally

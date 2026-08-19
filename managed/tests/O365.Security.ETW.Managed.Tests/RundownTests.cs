@@ -57,7 +57,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                 try
                 {
                     Assert.True(
-                        seen.Wait(EtwHarness.Timeout),
+                        seen.Wait(EtwHarness.Timeout, TestContext.Current.CancellationToken),
                         "No ProcessRundown event arrived within the timeout.");
                 }
                 finally

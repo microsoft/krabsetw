@@ -73,7 +73,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                 { IsBackground = true };
                 emitting.Start();
 
-                Assert.True(inHandler.Wait(TimeSpan.FromSeconds(30)), "The handler never ran.");
+                Assert.True(inHandler.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "The handler never ran.");
 
                 var elapsed = Stopwatch.StartNew();
                 trace.Stop();
@@ -132,7 +132,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                     // proves the first Start is inside ProcessTrace, so the second one is
                     // racing a live processor rather than an unstarted trace.
                     Assert.True(
-                        processing.Wait(TimeSpan.FromSeconds(30)),
+                        processing.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken),
                         "The trace never began processing.");
 
                     Assert.Throws<InvalidOperationException>(() => trace.Start());

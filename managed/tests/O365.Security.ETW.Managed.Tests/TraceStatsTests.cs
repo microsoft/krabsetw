@@ -67,7 +67,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                         while (DateTime.UtcNow < deadline && !seen.IsSet)
                         {
                             TestTraceLoggingSource.Log.Interesting("a", 1);
-                            seen.Wait(TimeSpan.FromMilliseconds(250));
+                            seen.Wait(TimeSpan.FromMilliseconds(250), TestContext.Current.CancellationToken);
                         }
 
                         Assert.True(seen.IsSet, "The provider never delivered an event.");
