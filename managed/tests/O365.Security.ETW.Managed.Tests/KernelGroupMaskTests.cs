@@ -16,6 +16,7 @@ namespace Microsoft.O365.Security.ETW.Tests
     ///
     /// Needs an elevated process, because starting a system logger does.
     /// </remarks>
+    [Collection("etw")]
     public class KernelGroupMaskTests
     {
         [Fact]
