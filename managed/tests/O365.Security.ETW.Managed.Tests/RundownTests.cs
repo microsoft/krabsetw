@@ -16,6 +16,7 @@ namespace Microsoft.O365.Security.ETW.Tests
     ///
     /// Needs an elevated process, because starting a session does.
     /// </remarks>
+    [Collection("etw")]
     public class RundownTests
     {
         /// <summary>Microsoft-Windows-Kernel-Process.</summary>
