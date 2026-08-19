@@ -196,9 +196,19 @@ namespace Microsoft.O365.Security.ETW.Kernel
     }
 
     /// <summary>A provider that enables system call events.</summary>
+    /// <remarks>
+    /// Uses PerfInfo, as native krabs does, rather than the SystemTrace GUID the C++/CLI
+    /// wrapper carries. SysCall enter and exit events are stamped with the PerfInfo GUID,
+    /// and kernel events route on the header GUID alone, so a SystemTrace provider enables
+    /// the flag and then matches nothing. Native krabs fixed this in 7e2dc32 ("guid for
+    /// system_call_provider should be PerfInfo not SystemTraceControl"); the wrapper was
+    /// updated afterwards, in 396d8cc, but picked up only that commit's new providers and
+    /// not the fix. This is the one place the port deliberately declines to reproduce the
+    /// wrapper, because reproducing it means the provider cannot work.
+    /// </remarks>
     public sealed class SystemCallProvider : KernelProvider
     {
-        public SystemCallProvider() : base(KernelTraceFlags.Systemcall, KernelGuids.SystemTrace) { }
+        public SystemCallProvider() : base(KernelTraceFlags.Systemcall, KernelGuids.PerfInfo) { }
     }
 
     /// <summary>A provider that enables thread start and stop events.</summary>

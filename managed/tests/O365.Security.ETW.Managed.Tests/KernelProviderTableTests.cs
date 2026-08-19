@@ -61,18 +61,21 @@ namespace Microsoft.O365.Security.ETW.Tests
         }
 
         [Fact]
-        public void SystemCallProviderMatchesTheCppCliWrapperNotTheNativeHeader()
+        public void SystemCallProviderMatchesNativeKrabsRatherThanTheCppCliWrapper()
         {
             var provider = new SystemCallProvider();
 
-            // Native krabs uses perf_info (ce1dbfb4-...) for system_call_provider, which
-            // matches the GUID stamped on SysCall enter/exit events. The C++/CLI wrapper
-            // changed this to system_trace (9e814aad-...), and the managed port preserves
-            // that wrapper behavior for compatibility. Consumers that match SysCall events
-            // on provider.Id will therefore match nothing until the compatibility break is
-            // intentional.
+            // The one place the port deliberately declines to reproduce the C++/CLI wrapper.
+            // Native krabs uses perf_info, which is the GUID stamped on SysCall enter and
+            // exit events; the wrapper carries system_trace (9e814aad-...), which is the NT
+            // Kernel Logger's session control GUID and appears on no event record. Since
+            // kernel events route on the header GUID alone, the wrapper's provider enables
+            // the SysCall flag and then matches nothing. Native fixed this in 7e2dc32; the
+            // wrapper was edited afterwards in 396d8cc and took only that commit's new
+            // providers, not the fix.
             Assert.Equal(0x00000080u, provider.Flags);
-            Assert.Equal(Guid.Parse("9e814aad-3204-11d2-9a82-006008a86939"), provider.Id);
+            Assert.Equal(Guid.Parse("ce1dbfb4-137e-4da6-87b0-3f59aa102cbc"), provider.Id);
+            Assert.NotEqual(Guid.Parse("9e814aad-3204-11d2-9a82-006008a86939"), provider.Id);
         }
 
         private static object[] Row(Type providerType, uint flags, Guid id)

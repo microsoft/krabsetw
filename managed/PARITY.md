@@ -488,6 +488,30 @@ earlier note claiming the port truncated was stale.
 
 ## Known defects
 
+### SystemCallProvider matches no events in C++/CLI (fixed in the port, open in C++/CLI)
+
+`SystemCallProvider` enables `EVENT_TRACE_FLAG_SYSTEMCALL` and then routes on the
+`SystemTrace` GUID, `9e814aad-3204-11d2-9a82-006008a86939`. That is
+`SystemTraceControlGuid`, the NT Kernel Logger's session control GUID: it goes in
+`EVENT_TRACE_PROPERTIES.Wnode.Guid` to control the logger and appears on no event record.
+SysCall enter and exit events are stamped with `PerfInfo`,
+`ce1dbfb4-137e-4da6-87b0-3f59aa102cbc`, alongside DPC, ISR and profile events, whose
+providers all use `PerfInfo` already. Kernel events route on the header GUID alone
+(`krabs::details::kt::forward_events`, `TraceContext.Route` in the port), so the provider
+enables the flag correctly, the session does the work, and the handler is never called.
+
+Both implementations started here. Native krabs fixed it in 7e2dc32, whose commit message
+reads "guid for system_call_provider should be PerfInfo not SystemTraceControl". The
+C++/CLI wrapper was edited afterwards, in 396d8cc, and took that commit's new FileIo
+providers -- and other `perf_info`-based providers -- but not the one-line fix.
+
+The port uses `PerfInfo`. This is the only place it deliberately declines to reproduce the
+wrapper, because reproducing the wrapper means the provider cannot work at all. A consumer
+migrating off C++/CLI sees SysCall handlers begin to fire where they previously never did;
+nothing that worked before changes. Coverage is
+`KernelProviderTableTests.SystemCallProviderMatchesNativeKrabsRatherThanTheCppCliWrapper`,
+which asserts the correct GUID and, as a regression guard, that it is not the wrapper's.
+
 ### krabs halves fixed-length Unicode strings (fixed in the port, open in C++/CLI)
 
 Tracked internally.
