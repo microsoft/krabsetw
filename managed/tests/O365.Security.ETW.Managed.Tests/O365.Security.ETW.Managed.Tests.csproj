@@ -5,6 +5,13 @@
     <AssemblyName>O365.Security.ETW.Managed.Tests</AssemblyName>
     <RootNamespace>O365.Security.ETW.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
+    <!--
+      xUnit v3 runs a test project as its own process rather than loading it into a runner,
+      so the project has to produce an executable. On .NET Framework that means the test
+      assembly is O365.Security.ETW.Managed.Tests.exe and no test .dll is produced at all,
+      which matters to any runner or CI glob that looks for *Tests.dll.
+    -->
+    <OutputType>Exe</OutputType>
     <!-- See the note in O365.Security.ETW.Managed.csproj: pinned so the vendored copy keeps
          building on the .NET 9 SDK. -->
     <LangVersion>13</LangVersion>
@@ -25,8 +32,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="xunit" Version="2.9.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
 
   <ItemGroup>

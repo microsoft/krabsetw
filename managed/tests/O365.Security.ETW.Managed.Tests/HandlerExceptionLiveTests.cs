@@ -158,7 +158,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                     // Repeated reports prove the trace went on dispatching after the first
                     // throw rather than quietly winding down.
                     Assert.True(
-                        reported.Wait(TimeSpan.FromSeconds(30)),
+                        reported.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken),
                         "The trace stopped dispatching after a handler threw.");
 
                     Assert.Null(thrown);
@@ -229,7 +229,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                 try
                 {
                     Assert.True(
-                        delivered.Wait(TimeSpan.FromSeconds(30)),
+                        delivered.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken),
                         "The restarted trace delivered nothing, so it was born stopped.");
                 }
                 finally
