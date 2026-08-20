@@ -490,6 +490,8 @@ earlier note claiming the port truncated was stale.
 
 ### SystemCallProvider matches no events in C++/CLI (fixed in the port, open in C++/CLI)
 
+Tracked internally.
+
 `SystemCallProvider` enables `EVENT_TRACE_FLAG_SYSTEMCALL` and then routes on the
 `SystemTrace` GUID, `9e814aad-3204-11d2-9a82-006008a86939`. That is
 `SystemTraceControlGuid`, the NT Kernel Logger's session control GUID: it goes in
