@@ -605,8 +605,11 @@ Values are now spelled out explicitly.
 ### C++/CLI truncates ANSI strings at an embedded NUL
 
 `EventRecord.hpp` decodes via `gcnew String(str.c_str())`, which stops at the first NUL.
-The port decodes the full property length. Only reachable for ANSI in-types that are not
-NUL-terminated, i.e. the counted and non-NUL-terminated variants.
+The port decodes the full property length. Only reachable where the length comes from
+somewhere other than the first NUL: the counted and non-NUL-terminated in-types, and a
+`win:AnsiString` whose length is carried by an earlier property. A plain NUL-terminated
+`win:AnsiString` has no length but the position of its first NUL, so there the port
+truncates exactly as C++/CLI does. Covered by `AnsiConsumerShapeTests`.
 
 ## Resolved
 

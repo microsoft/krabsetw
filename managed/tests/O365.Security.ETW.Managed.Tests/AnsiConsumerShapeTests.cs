@@ -204,25 +204,41 @@ namespace Microsoft.O365.Security.ETW.Tests
         /// C++/CLI decodes through <c>c_str()</c> and stops at the embedded NUL; the port
         /// uses the property's length, which is the divergence recorded in PARITY.md.
         /// </summary>
+        /// <remarks>
+        /// The shape matters. A plain NUL-terminated <c>win:AnsiString</c> has no length
+        /// other than the position of its first NUL, so there the port truncates exactly as
+        /// C++/CLI does and the divergence is unreachable by construction. It is only
+        /// reachable when the length comes from somewhere else -- here an earlier property,
+        /// as with the counted and non-NUL-terminated in-types.
+        /// </remarks>
         [Fact]
         public void AnAnsiStringIsDecodedByLengthNotByItsFirstNul()
         {
             var schema = EventSchema
                 .Create("Contoso-Ansi-Shapes", ShapeProviderId, id: 23, version: 0)
                 .Named("EmbeddedNul")
-                .AnsiString("Text")
+                .UInt16("TextLength")
+                .AnsiString("Text", lengthFrom: "TextLength")
                 .UInt32("Status");
 
             using (EventSchema.Use(schema))
             using (var builder = new RecordBuilder(ShapeProviderId, id: 23, version: 0))
             {
-                builder.AddAnsiString("Text", "abc");
+                builder.AddValue("TextLength", (ushort)5);
+                builder.AddAnsiString("Text", "ab\0cd");
                 builder.AddValue("Status", 1u);
 
                 Read(builder, record =>
                 {
                     Assert.True(record.TryGetAnsiString("Text", out string text));
-                    Assert.Equal("abc", text);
+
+                    // C++/CLI stops at the embedded NUL and yields "ab". The whole point of
+                    // the divergence is that this does not.
+                    Assert.Equal("ab\0cd", text);
+
+                    // The property after it must still be addressable: the embedded NUL does
+                    // not end the value, so it does not shift the layout either.
+                    Assert.Equal(1u, record.GetUInt32("Status"));
                 });
             }
         }
