@@ -21,6 +21,13 @@ namespace Microsoft.O365.Security.ETW
     /// </remarks>
     internal sealed unsafe class EventRecordAdapter : IEventRecord
     {
+        /// <summary>
+        /// The largest FILETIME <see cref="DateTime.FromFileTimeUtc"/> accepts:
+        /// <see cref="DateTime.MaxValue"/> expressed as ticks since 1601-01-01. Anything
+        /// above it throws rather than returning a time.
+        /// </summary>
+        private const long MaxRepresentableFileTime = 2650467743999999999;
+
         private EVENT_RECORD* _record;
         private EventScratch _scratch = null!;
 
@@ -467,8 +474,9 @@ namespace Microsoft.O365.Security.ETW
                 // Zero is a legitimate value: providers use it to mean "no time", and
                 // FromFileTimeUtc renders it as the FILETIME epoch, which is what the
                 // C++/CLI implementation returns. Only values it rejects outright are
-                // reported as unreadable.
-                if (fileTime < 0)
+                // reported as unreadable — negatives, and anything past 9999-12-31, which
+                // has no DateTime to map to. Both would otherwise throw out of a TryGet.
+                if (fileTime < 0 || fileTime > MaxRepresentableFileTime)
                 {
                     return false;
                 }

@@ -166,11 +166,12 @@ Three conversions on the compat surface behave differently from C++/CLI at input
 degenerate or out of range. All three are cases where C++/CLI's behaviour is hard to defend
 on its own terms, so the port did not reproduce it.
 
-**A negative FILETIME is reported as unreadable rather than throwing.** C++/CLI hands the
-raw value to `DateTime::FromFileTimeUtc` *outside* its try/catch (`EventRecord.hpp:441-480`),
-so a negative FILETIME — not a representable time — throws `ArgumentOutOfRangeException` out
-of `TryGetDateTime` as well as `GetDateTime`. A `TryGet` that throws defeats the point of
-the pattern, so the port's `TryGetDateTime` returns `false` and `GetDateTime` then throws
+**A FILETIME outside the DateTime range is reported as unreadable rather than throwing.**
+C++/CLI hands the raw value to `DateTime::FromFileTimeUtc` *outside* its try/catch
+(`EventRecord.hpp:441-480`), so a FILETIME that is negative or past 9999-12-31 — neither is a
+representable time — throws `ArgumentOutOfRangeException` out of `TryGetDateTime` as well as
+`GetDateTime`. A `TryGet` that throws defeats the point of the pattern, so the port's
+`TryGetDateTime` returns `false` and `GetDateTime` then throws
 `ParserException` like any other unreadable property. The exception type a caller sees
 changes; a caller using the `TryGet` form no longer needs a `try` around it.
 
@@ -982,9 +983,16 @@ rather than throwing, which is exactly what C++/CLI's
 property as unreadable, and `GetDateTime` raised `ParserException("Could not find property
 in event schema")` for a property that was present and well-formed.
 
-Now only genuinely negative values are refused — those are the ones `FromFileTimeUtc`
-rejects, and refusing them keeps `TryGetDateTime` non-throwing. Covered by
+Now only the values `FromFileTimeUtc` genuinely rejects are refused — negatives, and anything
+above 2650467743999999999, which is `DateTime.MaxValue` expressed as ticks since 1601-01-01.
+Refusing exactly those keeps `TryGetDateTime` non-throwing. Covered by
 `FileTimeBoundaryTests`.
+
+The upper bound was missed when this was first written: the guard read `fileTime < 0`, so a
+FILETIME past 9999-12-31 still threw `ArgumentOutOfRangeException` out of the `TryGet` form
+and, because that unwinds through the event handler, could stop the trace. Note the
+`SYSTEMTIME` branch immediately below had always caught `ArgumentOutOfRangeException`, so the
+two shapes disagreed about what an out-of-range time meant.
 
 ### `RecordBuilder` accepted a fixed-width binary of the wrong length
 
