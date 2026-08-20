@@ -23,6 +23,12 @@ namespace Microsoft.O365.Security.ETW.Tests
         private static readonly DateTime FileTimeEpoch =
             new DateTime(1601, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
+        /// <summary>
+        /// The largest FILETIME DateTime.FromFileTimeUtc accepts: DateTime.MaxValue expressed
+        /// as ticks since 1601-01-01, which is 9999-12-31T23:59:59.9999999Z.
+        /// </summary>
+        private const long LargestRepresentableFileTime = 2650467743999999999;
+
         [Fact]
         public void AZeroFileTimeReadsAsTheFileTimeEpoch()
         {
@@ -53,6 +59,45 @@ namespace Microsoft.O365.Security.ETW.Tests
             {
                 Assert.False(record.TryGetDateTime("CreateTime", out DateTime value));
                 Assert.Equal(default(DateTime), value);
+            });
+        }
+
+        /// <summary>
+        /// FromFileTimeUtc rejects the top of the long range as firmly as it rejects negatives:
+        /// anything past 9999-12-31 has no DateTime to map to. The TryGet form must report that
+        /// the same way it reports a negative, rather than throwing out of a handler.
+        /// </summary>
+        [Fact]
+        public void AFileTimeBeyondTheDateTimeRangeIsReportedAsUnreadable()
+        {
+            WithCreateTime(long.MaxValue, record =>
+            {
+                Assert.False(record.TryGetDateTime("CreateTime", out DateTime value));
+                Assert.Equal(default(DateTime), value);
+            });
+        }
+
+        [Fact]
+        public void OneTickPastTheLargestRepresentableFileTimeIsReportedAsUnreadable()
+        {
+            WithCreateTime(LargestRepresentableFileTime + 1, record =>
+            {
+                Assert.False(record.TryGetDateTime("CreateTime", out DateTime value));
+                Assert.Equal(default(DateTime), value);
+            });
+        }
+
+        /// <summary>
+        /// The guard has to stop at the boundary, not before it: the largest FILETIME that maps
+        /// to a DateTime is still a readable value.
+        /// </summary>
+        [Fact]
+        public void TheLargestRepresentableFileTimeIsReadable()
+        {
+            WithCreateTime(LargestRepresentableFileTime, record =>
+            {
+                Assert.True(record.TryGetDateTime("CreateTime", out DateTime value));
+                Assert.Equal(DateTime.MaxValue.Ticks, value.Ticks);
             });
         }
 
