@@ -12,13 +12,13 @@ jobs:
     runs-on: windows-2022
     
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-dotnet@v4
+    - uses: actions/checkout@0717577d45739eb3c851188b29f50ed6c0b2194e # v2.8.0
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
       with:
         global-json-file: global.json
-    - uses: microsoft/setup-msbuild@v1
-    - uses: NuGet/setup-nuget@v1.0.5
-    - uses: darenm/Setup-VSTest@v1
+    - uses: microsoft/setup-msbuild@ede762b26a2de8d110bb5a3db4d7e0e080c0e917 # v1.3.3
+    - uses: NuGet/setup-nuget@04b0c2b8d1b97922f67eca497d7cf0bf17b8ffe1 # v1.0.5
+    - uses: darenm/Setup-VSTest@fbb574e849d6225ce9702f86e64eb6cdc4b4e561 # v1.1.1
     - name: nuget restore
       run: nuget.exe restore krabs\krabs.sln
     - name: build release x64
