@@ -37,8 +37,10 @@ namespace krabs {
     class trace;
 
     typedef void(*c_provider_callback)(const EVENT_RECORD &, const krabs::trace_context &);
+    typedef bool(*c_enable_provider_error_callback)(const krabs::guid&, const std::exception&);
     typedef void(*c_provider_error_callback)(const EVENT_RECORD&, const std::string&);
     typedef std::function<void(const EVENT_RECORD &, const krabs::trace_context &)> provider_callback;
+    typedef std::function<bool(const krabs::guid&, const std::exception&)> enable_provider_error_callback;
     typedef std::function<void(const EVENT_RECORD&, const std::string&)> provider_error_callback;
 
     namespace details {

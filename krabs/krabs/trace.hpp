@@ -295,6 +295,29 @@ namespace krabs {
 
         /**
          * <summary>
+         * Sets a callback to handle errors encountered while enabling user-trace providers
+         * via EnableTraceEx2.
+         * The callback receives the provider GUID and the exception raised by the enable
+         * operation. Return true to handle the error and continue enabling the remaining
+         * providers; return false to rethrow the exception. If no callback is set, the
+         * exception is rethrown.
+         * </summary>
+         *
+         * <param name="callback">the function to call when a provider cannot be enabled</param>
+         * <example>
+         *    bool on_enable_error(const krabs::guid& id, const std::exception& error)
+         *    {
+         *        return true;
+         *    }
+         *
+         *    krabs::trace trace;
+         *    trace.set_enable_provider_error_callback(on_enable_error);
+         * </example>
+         */
+        void set_enable_provider_error_callback(c_enable_provider_error_callback callback);
+
+        /**
+         * <summary>
          * Sets whether to enable getting schema information for MOF events.
          * Default behavior is to get schema information for MOF events.
          * </summary>
@@ -346,6 +369,7 @@ namespace krabs {
         const trace_context context_;
 
         provider_callback default_callback_ = nullptr;
+        enable_provider_error_callback enable_error_callback_ = nullptr;
 
         bool mof_events_enabled_ = true;
         bool wpp_events_enabled_ = true;
@@ -505,6 +529,12 @@ namespace krabs {
     void trace<T>::set_default_event_callback(c_provider_callback callback)
     {
         default_callback_ = callback;
+    }
+
+    template <typename T>
+    void trace<T>::set_enable_provider_error_callback(c_enable_provider_error_callback callback)
+    {
+        enable_error_callback_ = callback;
     }
 
     template <typename T>

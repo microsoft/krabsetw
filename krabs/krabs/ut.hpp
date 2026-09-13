@@ -197,7 +197,15 @@ namespace krabs { namespace details {
                                           settings.filter_flags_.all_,
                                           0,
                                           &parameters);
-            error_check_common_conditions(status);
+                                          
+            try {
+                error_check_common_conditions(status);
+            }
+            catch (std::exception& e)
+            {
+                if (trace.enable_error_callback_ == nullptr || !trace.enable_error_callback_(provider.first, e))
+                    throw;
+            }
         }
     }
 
