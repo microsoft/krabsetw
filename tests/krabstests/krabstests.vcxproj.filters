@@ -52,6 +52,9 @@
     <ClCompile Include="test_schema_key.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="test_trace_logger_event_name.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="test_guid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
