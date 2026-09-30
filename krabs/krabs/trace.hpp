@@ -183,7 +183,7 @@ namespace krabs {
          * <remarks>
          * The provider's configuration is captured at this point for any setting
          * that the trace itself has to act on - currently
-         * enable_trace_logging_schema_disambiguation(). Configure the provider
+         * enable_trace_logging_full_schema_hashing(). Configure the provider
          * before enabling it.
          * </remarks>
          * <example>
@@ -487,8 +487,8 @@ namespace krabs {
         // Kernel providers never emit TraceLogging events, so there is nothing
         // for them to opt into.
         if constexpr (!std::is_same_v<typename T::provider_type, krabs::kernel_provider>) {
-            if (p.trace_logging_schema_disambiguation_enabled()) {
-                context_.schema_locator.enable_trace_logging_schema_disambiguation(p.guid_);
+            if (p.trace_logging_full_schema_hashing_enabled()) {
+                context_.schema_locator.enable_trace_logging_full_schema_hashing(p.guid_);
             }
         }
     }

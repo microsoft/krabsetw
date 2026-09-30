@@ -325,7 +325,7 @@ namespace krabstests
      * opt-in itself and its propagation from the provider to the trace's
      * schema_locator.
      */
-    TEST_CLASS(test_trace_logging_schema_disambiguation)
+    TEST_CLASS(test_trace_logging_full_schema_hashing)
     {
     private:
         const krabs::guid provider1;
@@ -333,12 +333,12 @@ namespace krabstests
 
         /**
          * Pushes a synthetic event through a trace and returns whether the
-         * schema_locator seen by the callback disambiguates the provider.
+         * schema_locator seen by the callback hashes the provider's full schema.
          *
          * The PowerShell provider is used because krabs::testing::record_builder
          * needs a schema that TDH can actually resolve.
          */
-        static bool ObserveDisambiguation(bool opt_in)
+        static bool ObserveFullSchemaHashing(bool opt_in)
         {
             const krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
 
@@ -346,17 +346,17 @@ namespace krabstests
             krabs::provider<> provider(powershell);
 
             if (opt_in) {
-                provider.enable_trace_logging_schema_disambiguation();
+                provider.enable_trace_logging_full_schema_hashing();
             }
 
             bool invoked = false;
-            bool disambiguated = false;
+            bool hashing = false;
 
             provider.add_on_event_callback(
                 [&](const EVENT_RECORD&, const krabs::trace_context& trace_context) {
                     invoked = true;
-                    disambiguated =
-                        trace_context.schema_locator.trace_logging_schema_disambiguation_enabled(
+                    hashing =
+                        trace_context.schema_locator.trace_logging_full_schema_hashing_enabled(
                             powershell);
                 });
 
@@ -372,64 +372,64 @@ namespace krabstests
             proxy.push_event(record);
 
             Assert::IsTrue(invoked, L"the provider callback was never invoked");
-            return disambiguated;
+            return hashing;
         }
 
     public:
-        test_trace_logging_schema_disambiguation()
+        test_trace_logging_full_schema_hashing()
             : provider1(L"{88154140-f63a-4028-8826-b0028614d67b}")
             , provider2(L"{41ee9f36-5a4e-4138-bc0e-2141a84eb089}")
         {
         }
 
-        TEST_METHOD(provider_should_not_disambiguate_by_default)
+        TEST_METHOD(provider_should_not_hash_full_schema_by_default)
         {
             const krabs::provider<> provider(provider1);
 
-            Assert::IsFalse(provider.trace_logging_schema_disambiguation_enabled());
+            Assert::IsFalse(provider.trace_logging_full_schema_hashing_enabled());
         }
 
-        TEST_METHOD(provider_should_disambiguate_once_opted_in)
+        TEST_METHOD(provider_should_hash_full_schema_once_opted_in)
         {
             krabs::provider<> provider(provider1);
-            provider.enable_trace_logging_schema_disambiguation();
+            provider.enable_trace_logging_full_schema_hashing();
 
-            Assert::IsTrue(provider.trace_logging_schema_disambiguation_enabled());
+            Assert::IsTrue(provider.trace_logging_full_schema_hashing_enabled());
         }
 
-        TEST_METHOD(locator_should_not_disambiguate_by_default)
+        TEST_METHOD(locator_should_not_hash_full_schema_by_default)
         {
             krabs::schema_locator locator;
 
-            Assert::IsFalse(locator.trace_logging_schema_disambiguation_enabled(provider1));
+            Assert::IsFalse(locator.trace_logging_full_schema_hashing_enabled(provider1));
         }
 
-        TEST_METHOD(locator_should_only_disambiguate_the_opted_in_provider)
+        TEST_METHOD(locator_should_only_hash_full_schema_for_the_opted_in_provider)
         {
             krabs::schema_locator locator;
-            locator.enable_trace_logging_schema_disambiguation(provider1);
+            locator.enable_trace_logging_full_schema_hashing(provider1);
 
-            Assert::IsTrue(locator.trace_logging_schema_disambiguation_enabled(provider1));
-            Assert::IsFalse(locator.trace_logging_schema_disambiguation_enabled(provider2));
+            Assert::IsTrue(locator.trace_logging_full_schema_hashing_enabled(provider1));
+            Assert::IsFalse(locator.trace_logging_full_schema_hashing_enabled(provider2));
         }
 
         TEST_METHOD(locator_opt_in_should_be_idempotent)
         {
             krabs::schema_locator locator;
-            locator.enable_trace_logging_schema_disambiguation(provider1);
-            locator.enable_trace_logging_schema_disambiguation(provider1);
+            locator.enable_trace_logging_full_schema_hashing(provider1);
+            locator.enable_trace_logging_full_schema_hashing(provider1);
 
-            Assert::IsTrue(locator.trace_logging_schema_disambiguation_enabled(provider1));
+            Assert::IsTrue(locator.trace_logging_full_schema_hashing_enabled(provider1));
         }
 
-        TEST_METHOD(trace_should_not_disambiguate_a_provider_that_did_not_opt_in)
+        TEST_METHOD(trace_should_not_hash_full_schema_for_a_provider_that_did_not_opt_in)
         {
-            Assert::IsFalse(ObserveDisambiguation(false));
+            Assert::IsFalse(ObserveFullSchemaHashing(false));
         }
 
-        TEST_METHOD(trace_should_disambiguate_a_provider_that_opted_in)
+        TEST_METHOD(trace_should_hash_full_schema_for_a_provider_that_opted_in)
         {
-            Assert::IsTrue(ObserveDisambiguation(true));
+            Assert::IsTrue(ObserveFullSchemaHashing(true));
         }
     };
 }

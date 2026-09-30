@@ -160,7 +160,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 
         /// <summary>
-        /// Opts this provider into TraceLogging schema disambiguation.
+        /// Opts this provider into full TraceLogging schema hashing.
         /// </summary>
         /// <remarks>
         /// TraceLogging events carry no meaningful event id, so schemas are cached
@@ -178,11 +178,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </remarks>
         /// <example>
         /// var provider = new Provider("Microsoft.Windows.AppLifeCycle.UI");
-        /// provider.EnableTraceLoggingSchemaDisambiguation();
+        /// provider.EnableTraceLoggingFullSchemaHashing();
         /// trace.Enable(provider);
         /// </example>
-        void EnableTraceLoggingSchemaDisambiguation() {
-            provider_->enable_trace_logging_schema_disambiguation();
+        void EnableTraceLoggingFullSchemaHashing() {
+            provider_->enable_trace_logging_full_schema_hashing();
         }
 
         /// <summary>

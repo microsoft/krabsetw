@@ -274,7 +274,7 @@ namespace krabs {
 
         /**
         * <summary>
-        * Opts this provider into TraceLogging schema disambiguation.
+        * Opts this provider into full TraceLogging schema hashing.
         *
         * TraceLogging events carry no meaningful event id, so krabs keys its
         * schema cache on the event name. A provider is free to log the same event
@@ -297,19 +297,19 @@ namespace krabs {
         *
         * <example>
         *    krabs::provider<> lifecycle(L"Microsoft.Windows.AppLifeCycle.UI");
-        *    lifecycle.enable_trace_logging_schema_disambiguation();
+        *    lifecycle.enable_trace_logging_full_schema_hashing();
         *    trace.enable(lifecycle);
         * </example>
         */
-        void enable_trace_logging_schema_disambiguation();
+        void enable_trace_logging_full_schema_hashing();
 
         /**
         * <summary>
-        * Returns true if TraceLogging schema disambiguation was enabled for this
+        * Returns true if full TraceLogging schema hashing was enabled for this
         * provider.
         * </summary>
         */
-        bool trace_logging_schema_disambiguation_enabled() const;
+        bool trace_logging_full_schema_hashing_enabled() const;
 
         /**
          * <summary>
@@ -332,7 +332,7 @@ namespace krabs {
         T level_;
         T trace_flags_;
         bool rundown_enabled_;
-        bool trace_logging_schema_disambiguation_;
+        bool trace_logging_full_schema_hashing_;
 
         GUID provider_name_to_guid(const std::wstring& name);
 
@@ -557,7 +557,7 @@ namespace krabs {
     , level_(5)
     , trace_flags_(0)
     , rundown_enabled_(false)
-    , trace_logging_schema_disambiguation_(false)
+    , trace_logging_full_schema_hashing_(false)
     {}
 
     template <typename T>
@@ -602,15 +602,15 @@ namespace krabs {
     }
 
     template <typename T>
-    void provider<T>::enable_trace_logging_schema_disambiguation()
+    void provider<T>::enable_trace_logging_full_schema_hashing()
     {
-        trace_logging_schema_disambiguation_ = true;
+        trace_logging_full_schema_hashing_ = true;
     }
 
     template <typename T>
-    bool provider<T>::trace_logging_schema_disambiguation_enabled() const
+    bool provider<T>::trace_logging_full_schema_hashing_enabled() const
     {
-        return trace_logging_schema_disambiguation_;
+        return trace_logging_full_schema_hashing_;
     }
 
     template <typename T>
@@ -622,7 +622,7 @@ namespace krabs {
         tmp.level_          = static_cast<UCHAR>(level_);
         tmp.trace_flags_    = static_cast<ULONG>(trace_flags_);
         tmp.callbacks_      = this->callbacks_;
-        tmp.trace_logging_schema_disambiguation_ = trace_logging_schema_disambiguation_;
+        tmp.trace_logging_full_schema_hashing_ = trace_logging_full_schema_hashing_;
 
         return tmp;
     }

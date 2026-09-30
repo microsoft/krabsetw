@@ -69,7 +69,7 @@ namespace krabs {
          *
          * Hashing walks the whole metadata blob, so its cost grows with the size
          * of the event. It is therefore opt-in per provider - see
-         * krabs::provider::enable_trace_logging_schema_disambiguation.
+         * krabs::provider::enable_trace_logging_full_schema_hashing.
          */
         uint64_t  schema_hash;
 
@@ -302,31 +302,31 @@ namespace krabs {
 
         /**
          * <summary>
-         * Opts a provider into TraceLogging schema disambiguation, so that the
+         * Opts a provider into full TraceLogging schema hashing, so that the
          * event's TraceLogging metadata is hashed into its schema cache key.
-         * See krabs::provider::enable_trace_logging_schema_disambiguation for
+         * See krabs::provider::enable_trace_logging_full_schema_hashing for
          * why this is opt-in.
          * </summary>
          */
-        void enable_trace_logging_schema_disambiguation(const krabs::guid& provider_id);
+        void enable_trace_logging_full_schema_hashing(const krabs::guid& provider_id);
 
         /**
          * <summary>
-         * Returns true if the given provider was opted into TraceLogging schema
-         * disambiguation.
+         * Returns true if the given provider was opted into full TraceLogging
+         * schema hashing.
          * </summary>
          */
-        bool trace_logging_schema_disambiguation_enabled(const GUID& provider_id) const;
+        bool trace_logging_full_schema_hashing_enabled(const GUID& provider_id) const;
 
     private:
         mutable std::unordered_map<schema_key, std::variant<std::unique_ptr<char[]>, TDHSTATUS>> cache_;
 
         /**
-         * Providers opted into TraceLogging schema disambiguation. A trace has a
+         * Providers opted into full TraceLogging schema hashing. A trace has a
          * handful of providers at most and this is empty unless someone opted in,
          * so a flat scan is cheaper than hashing the GUID on every event.
          */
-        std::vector<krabs::guid> disambiguated_providers_;
+        std::vector<krabs::guid> full_schema_hashing_providers_;
     };
 
     // Implementation
@@ -436,7 +436,7 @@ namespace krabs {
         // of the event. Only do it for providers that asked for it.
         uint64_t schema_hash = 0;
         if (metadata.data != nullptr &&
-            trace_logging_schema_disambiguation_enabled(record.EventHeader.ProviderId)) {
+            trace_logging_full_schema_hashing_enabled(record.EventHeader.ProviderId)) {
             schema_hash = hash_trace_logging_metadata(metadata.data, metadata.size);
         }
 
@@ -474,17 +474,17 @@ namespace krabs {
         return status == ERROR_SUCCESS;
     }
 
-    inline void schema_locator::enable_trace_logging_schema_disambiguation(const krabs::guid& provider_id)
+    inline void schema_locator::enable_trace_logging_full_schema_hashing(const krabs::guid& provider_id)
     {
-        if (!trace_logging_schema_disambiguation_enabled(provider_id)) {
-            disambiguated_providers_.push_back(provider_id);
+        if (!trace_logging_full_schema_hashing_enabled(provider_id)) {
+            full_schema_hashing_providers_.push_back(provider_id);
         }
     }
 
-    inline bool schema_locator::trace_logging_schema_disambiguation_enabled(const GUID& provider_id) const
+    inline bool schema_locator::trace_logging_full_schema_hashing_enabled(const GUID& provider_id) const
     {
-        for (size_t i = 0; i < disambiguated_providers_.size(); ++i) {
-            if (disambiguated_providers_[i] == provider_id) {
+        for (size_t i = 0; i < full_schema_hashing_providers_.size(); ++i) {
+            if (full_schema_hashing_providers_[i] == provider_id) {
                 return true;
             }
         }

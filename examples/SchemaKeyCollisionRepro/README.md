@@ -16,7 +16,7 @@ which costs time proportional to the size of the event. It is therefore **opt-in
 
 ```cpp
 krabs::provider<> provider(guid);
-provider.enable_trace_logging_schema_disambiguation();  // before trace.enable()
+provider.enable_trace_logging_full_schema_hashing();  // before trace.enable()
 trace.enable(provider);
 ```
 
@@ -50,7 +50,7 @@ Starting a real-time ETW session requires membership in **Administrators** or
 
 ## Expected output
 
-Without `enable_trace_logging_schema_disambiguation()` (exit code `1`):
+Without `enable_trace_logging_full_schema_hashing()` (exit code `1`):
 
 ```
 variant A -> entryPoint, appId
@@ -62,7 +62,7 @@ RESULT: FAIL - both variants decoded with the same schema (2 fields).
 Variant B is decoded with variant A's schema: `PartA_PrivTags` is missing entirely, and
 `entryPoint` reports `50331648` — the first four bytes of the `PartA_PrivTags` value.
 
-With `enable_trace_logging_schema_disambiguation()`, which is what this program does
+With `enable_trace_logging_full_schema_hashing()`, which is what this program does
 (exit code `0`):
 
 ```
