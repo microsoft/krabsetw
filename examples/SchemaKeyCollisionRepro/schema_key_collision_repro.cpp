@@ -9,6 +9,12 @@
 // keyword - so they collide in schema_locator's cache. The first schema decoded is then
 // reused for every variant, and the field values come out shifted.
 //
+// Telling the variants apart means hashing the event's TraceLogging metadata into the cache
+// key, which costs time proportional to the size of the event. That is why it is opt-in per
+// provider: call provider.enable_trace_logging_schema_disambiguation() before enabling the
+// provider on the trace. This program does exactly that; drop that one call and it reports
+// the original, broken behaviour.
+//
 // This program is self-contained: it registers its own TraceLogging provider, emits both
 // variants of one event name, consumes them with krabs, and reports PASS or FAIL. No external
 // provider or ETL file is required.
@@ -21,13 +27,13 @@
 //
 // Run elevated - real-time ETW sessions require Administrator.
 //
-// Expected output before the fix:
+// Expected output without enable_trace_logging_schema_disambiguation():
 //     variant A -> entryPoint, appId
 //     variant B -> entryPoint, appId                <-- wrong, 'PartA_PrivTags' is missing
 //                                                       and every value is shifted
 //     RESULT: FAIL
 //
-// Expected output after the fix:
+// Expected output with enable_trace_logging_schema_disambiguation():
 //     variant A -> entryPoint, appId
 //     variant B -> PartA_PrivTags, entryPoint, appId
 //     RESULT: PASS
@@ -111,6 +117,11 @@ int main()
     krabs::provider<> provider(kReproProviderGuid);
     provider.any(0xffffffffffffffff);
 
+    // Opt in: hash each event's TraceLogging metadata into its schema cache key so that the
+    // two variants of the shared event name don't share a schema. Comment this out to see
+    // the collision. It has to be set before trace.enable(provider) below.
+    provider.enable_trace_logging_schema_disambiguation();
+
     provider.add_on_event_callback([](const EVENT_RECORD& record, const krabs::trace_context& trace_context) {
         krabs::schema schema(record, trace_context.schema_locator);
 
@@ -180,7 +191,9 @@ int main()
                    << std::endl;
         std::wcout << L"every field of variant B is shifted. Expected variant B to expose"
                    << std::endl;
-        std::wcout << L"'PartA_PrivTags' as its first field." << std::endl;
+        std::wcout << L"'PartA_PrivTags' as its first field. Did you call"
+                   << std::endl;
+        std::wcout << L"provider.enable_trace_logging_schema_disambiguation()?" << std::endl;
         return 1;
     }
 

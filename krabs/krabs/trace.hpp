@@ -4,6 +4,7 @@
 #pragma once
 
 #include <deque>
+#include <type_traits>
 
 #include "compiler_check.hpp"
 #include "guid.hpp"
@@ -179,6 +180,12 @@ namespace krabs {
          * <summary>
          * Enables the provider on the given user trace.
          * </summary>
+         * <remarks>
+         * The provider's configuration is captured at this point for any setting
+         * that the trace itself has to act on - currently
+         * enable_trace_logging_schema_disambiguation(). Configure the provider
+         * before enabling it.
+         * </remarks>
          * <example>
          *    krabs::trace trace;
          *    krabs::guid id(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
@@ -366,7 +373,7 @@ namespace krabs {
 
         EVENT_TRACE_PROPERTIES properties_;
 
-        const trace_context context_;
+        trace_context context_;
 
         provider_callback default_callback_ = nullptr;
         enable_provider_error_callback enable_error_callback_ = nullptr;
@@ -476,6 +483,14 @@ namespace krabs {
     void trace<T>::enable(const typename T::provider_type &p)
     {
         providers_.push_back(std::ref(p));
+
+        // Kernel providers never emit TraceLogging events, so there is nothing
+        // for them to opt into.
+        if constexpr (!std::is_same_v<typename T::provider_type, krabs::kernel_provider>) {
+            if (p.trace_logging_schema_disambiguation_enabled()) {
+                context_.schema_locator.enable_trace_logging_schema_disambiguation(p.guid_);
+            }
+        }
     }
 
     template <typename T>

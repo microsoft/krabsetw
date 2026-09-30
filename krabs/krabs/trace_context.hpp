@@ -15,7 +15,12 @@ namespace krabs {
      */
     struct trace_context
     {
-        const schema_locator schema_locator;
+        /**
+         * NB: not const - krabs::trace configures the locator's per-provider
+         * policies when a provider is enabled. Callbacks only ever see this
+         * through a const trace_context&.
+         */
+        schema_locator schema_locator;
         /* Add additional trace context here. */
     };
 

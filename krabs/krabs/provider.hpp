@@ -273,6 +273,45 @@ namespace krabs {
         void enable_rundown_events();
 
         /**
+        * <summary>
+        * Opts this provider into TraceLogging schema disambiguation.
+        *
+        * TraceLogging events carry no meaningful event id, so krabs keys its
+        * schema cache on the event name. A provider is free to log the same event
+        * name from several call sites with different fields; those variants share
+        * every other part of the key, so they collide in the cache and the first
+        * schema seen is used to decode all of them - silently shifting every field.
+        *
+        * When this is enabled, the event's TraceLogging metadata - which *is* the
+        * schema - is hashed into the cache key, telling the variants apart. The
+        * hash walks the whole metadata blob, so it costs time proportional to the
+        * size of the event on every event from this provider. That is why it is
+        * off by default: only enable it for providers that are known to reuse an
+        * event name.
+        *
+        * Manifest, MOF and WPP events are unaffected; they carry no TraceLogging
+        * metadata and are already identified uniquely by their event id.
+        *
+        * Must be called before the provider is passed to krabs::trace::enable.
+        * </summary>
+        *
+        * <example>
+        *    krabs::provider<> lifecycle(L"Microsoft.Windows.AppLifeCycle.UI");
+        *    lifecycle.enable_trace_logging_schema_disambiguation();
+        *    trace.enable(lifecycle);
+        * </example>
+        */
+        void enable_trace_logging_schema_disambiguation();
+
+        /**
+        * <summary>
+        * Returns true if TraceLogging schema disambiguation was enabled for this
+        * provider.
+        * </summary>
+        */
+        bool trace_logging_schema_disambiguation_enabled() const;
+
+        /**
          * <summary>
          * Turns a strongly typed provider<T> to provider<> (useful for
          * creating collections of providers).
@@ -293,6 +332,7 @@ namespace krabs {
         T level_;
         T trace_flags_;
         bool rundown_enabled_;
+        bool trace_logging_schema_disambiguation_;
 
         GUID provider_name_to_guid(const std::wstring& name);
 
@@ -517,6 +557,7 @@ namespace krabs {
     , level_(5)
     , trace_flags_(0)
     , rundown_enabled_(false)
+    , trace_logging_schema_disambiguation_(false)
     {}
 
     template <typename T>
@@ -561,6 +602,18 @@ namespace krabs {
     }
 
     template <typename T>
+    void provider<T>::enable_trace_logging_schema_disambiguation()
+    {
+        trace_logging_schema_disambiguation_ = true;
+    }
+
+    template <typename T>
+    bool provider<T>::trace_logging_schema_disambiguation_enabled() const
+    {
+        return trace_logging_schema_disambiguation_;
+    }
+
+    template <typename T>
     provider<T>::operator provider<>() const
     {
         provider<> tmp(guid_);
@@ -569,6 +622,7 @@ namespace krabs {
         tmp.level_          = static_cast<UCHAR>(level_);
         tmp.trace_flags_    = static_cast<ULONG>(trace_flags_);
         tmp.callbacks_      = this->callbacks_;
+        tmp.trace_logging_schema_disambiguation_ = trace_logging_schema_disambiguation_;
 
         return tmp;
     }

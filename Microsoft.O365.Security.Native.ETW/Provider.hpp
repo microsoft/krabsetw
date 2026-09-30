@@ -160,6 +160,32 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 
         /// <summary>
+        /// Opts this provider into TraceLogging schema disambiguation.
+        /// </summary>
+        /// <remarks>
+        /// TraceLogging events carry no meaningful event id, so schemas are cached
+        /// by event name. A provider is free to log the same event name from several
+        /// call sites with different fields; without this, those variants collide in
+        /// the cache and the first schema seen is used to decode all of them, which
+        /// silently shifts every field.
+        ///
+        /// Enabling this hashes the event's TraceLogging metadata into the cache key
+        /// so that the variants are told apart. The hash walks the whole metadata
+        /// blob, so it costs time proportional to the size of every event from this
+        /// provider - only enable it for providers known to reuse an event name.
+        ///
+        /// Must be called before the provider is passed to UserTrace.Enable.
+        /// </remarks>
+        /// <example>
+        /// var provider = new Provider("Microsoft.Windows.AppLifeCycle.UI");
+        /// provider.EnableTraceLoggingSchemaDisambiguation();
+        /// trace.Enable(provider);
+        /// </example>
+        void EnableTraceLoggingSchemaDisambiguation() {
+            provider_->enable_trace_logging_schema_disambiguation();
+        }
+
+        /// <summary>
         /// Adds a new EventFilter to the provider.
         /// </summary>
         /// <param name="filter">the <see cref="O365::Security::ETW::EventFilter"/> to add</param>

@@ -17,6 +17,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <variant>
+#include <vector>
 #include <cassert>
 #include <cstring>
 
@@ -55,9 +56,9 @@ namespace krabs {
         uint64_t  keyword;
 
         /**
-         * Hash of the TraceLogging event metadata, or 0 for events that don't
-         * carry any (i.e. manifest-based events, which the fields above already
-         * identify uniquely).
+         * Hash of the TraceLogging event metadata, or 0 when it wasn't hashed
+         * (manifest-based events, which the fields above already identify
+         * uniquely, and providers that haven't opted in).
          *
          * A provider may emit the same TraceLogging event name from several call
          * sites with different fields. Those variants share the provider, name,
@@ -65,6 +66,10 @@ namespace krabs {
          * the cache and the first schema seen is used to decode all of them -
          * silently shifting every field. The metadata *is* the schema, so hashing
          * it tells the variants apart without an extra TDH call.
+         *
+         * Hashing walks the whole metadata blob, so its cost grows with the size
+         * of the event. It is therefore opt-in per provider - see
+         * krabs::provider::enable_trace_logging_schema_disambiguation.
          */
         uint64_t  schema_hash;
 
@@ -289,8 +294,33 @@ namespace krabs {
          */
         bool has_event_schema(const EVENT_RECORD& record) const;
 
+        /**
+         * <summary>
+         * Opts a provider into TraceLogging schema disambiguation, so that the
+         * event's TraceLogging metadata is hashed into its schema cache key.
+         * See krabs::provider::enable_trace_logging_schema_disambiguation for
+         * why this is opt-in.
+         * </summary>
+         */
+        void enable_trace_logging_schema_disambiguation(const krabs::guid& provider_id);
+
+        /**
+         * <summary>
+         * Returns true if the given provider was opted into TraceLogging schema
+         * disambiguation.
+         * </summary>
+         */
+        bool trace_logging_schema_disambiguation_enabled(const GUID& provider_id) const;
+
     private:
         mutable std::unordered_map<schema_key, std::variant<std::unique_ptr<char[]>, TDHSTATUS>> cache_;
+
+        /**
+         * Providers opted into TraceLogging schema disambiguation. A trace has a
+         * handful of providers at most and this is empty unless someone opted in,
+         * so a flat scan is cheaper than hashing the GUID on every event.
+         */
+        std::vector<krabs::guid> disambiguated_providers_;
     };
 
     // Implementation
@@ -395,10 +425,16 @@ namespace krabs {
         status = ERROR_SUCCESS;
 
         auto metadata = get_trace_logger_event_metadata(record);
-        auto key = schema_key(
-            record,
-            metadata.name,
-            hash_trace_logging_metadata(metadata.data, metadata.size));
+
+        // Hashing walks the whole metadata blob, so the cost grows with the size
+        // of the event. Only do it for providers that asked for it.
+        uint64_t schema_hash = 0;
+        if (metadata.data != nullptr &&
+            trace_logging_schema_disambiguation_enabled(record.EventHeader.ProviderId)) {
+            schema_hash = hash_trace_logging_metadata(metadata.data, metadata.size);
+        }
+
+        auto key = schema_key(record, metadata.name, schema_hash);
 
         // Check the cache...
         auto it = cache_.find(key);
@@ -430,6 +466,24 @@ namespace krabs {
         TDHSTATUS status = ERROR_SUCCESS;
         get_event_schema_no_throw(record, status);
         return status == ERROR_SUCCESS;
+    }
+
+    inline void schema_locator::enable_trace_logging_schema_disambiguation(const krabs::guid& provider_id)
+    {
+        if (!trace_logging_schema_disambiguation_enabled(provider_id)) {
+            disambiguated_providers_.push_back(provider_id);
+        }
+    }
+
+    inline bool schema_locator::trace_logging_schema_disambiguation_enabled(const GUID& provider_id) const
+    {
+        for (size_t i = 0; i < disambiguated_providers_.size(); ++i) {
+            if (disambiguated_providers_[i] == provider_id) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     inline std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD &record)
