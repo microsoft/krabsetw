@@ -184,5 +184,34 @@ namespace krabstests
 
             Assert::IsTrue(hash(key1) == hash(key2));
         }
+        TEST_METHOD(should_own_name_after_assignment)
+        {
+            const EVENT_RECORD eventRecord = {};
+            const std::string expected(256, 'X');
+
+            krabs::schema_key key{ eventRecord, {} };
+            {
+                const std::string source(expected);
+                key = krabs::schema_key{ eventRecord, source };
+            }
+
+            Assert::IsTrue(key.name == expected);
+        }
+        TEST_METHOD(should_keep_name_when_assigned_from_a_key_that_borrows_it)
+        {
+            // The key being assigned from can borrow its name from the key being
+            // assigned to. The name has to be copied before the old storage is
+            // released, or the copy reads freed memory. The debug heap fills
+            // freed memory, so Debug builds catch this deterministically.
+            const EVENT_RECORD eventRecord = {};
+            const std::string expected(256, 'X');
+
+            krabs::schema_key key{ eventRecord, expected };
+            key.internalize_name();
+
+            key = krabs::schema_key{ eventRecord, key.name };
+
+            Assert::IsTrue(key.name == expected);
+        }
     };
 }

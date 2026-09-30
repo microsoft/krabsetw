@@ -107,8 +107,15 @@ namespace krabs {
         schema_key& operator=(const schema_key &rhs)
         {
             if (this != &rhs) {
+                // NB: rhs may be borrowing its name from our own backing_name -
+                // for example, a key built from this key's name. Copy the name
+                // before the old storage is released, or we'd copy freed memory.
+                std::unique_ptr<std::string> incoming_name;
+                if (!rhs.name.empty()) {
+                    incoming_name = std::make_unique<std::string>(rhs.name);
+                }
+
                 provider = rhs.provider;
-                name = rhs.name;
                 id = rhs.id;
                 version = rhs.version;
                 opcode = rhs.opcode;
@@ -116,10 +123,9 @@ namespace krabs {
                 keyword = rhs.keyword;
                 schema_hash = rhs.schema_hash;
 
-                // NB: 'name' currently points at memory owned by rhs, so take
-                // ownership of a copy to match the copy constructor's behaviour.
-                backing_name.reset();
-                internalize_name();
+                // Take ownership of the copy, matching the copy constructor.
+                backing_name = std::move(incoming_name);
+                name = backing_name ? std::string_view(*backing_name) : std::string_view();
             }
 
             return *this;
