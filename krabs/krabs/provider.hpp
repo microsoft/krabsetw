@@ -332,7 +332,7 @@ namespace krabs {
         T level_;
         T trace_flags_;
         bool rundown_enabled_;
-        bool trace_logging_full_schema_hashing_;
+        bool trace_logging_full_schema_hashing_enabled_;
 
         GUID provider_name_to_guid(const std::wstring& name);
 
@@ -557,7 +557,7 @@ namespace krabs {
     , level_(5)
     , trace_flags_(0)
     , rundown_enabled_(false)
-    , trace_logging_full_schema_hashing_(false)
+    , trace_logging_full_schema_hashing_enabled_(false)
     {}
 
     template <typename T>
@@ -604,13 +604,13 @@ namespace krabs {
     template <typename T>
     void provider<T>::enable_trace_logging_full_schema_hashing()
     {
-        trace_logging_full_schema_hashing_ = true;
+        trace_logging_full_schema_hashing_enabled_ = true;
     }
 
     template <typename T>
     bool provider<T>::trace_logging_full_schema_hashing_enabled() const
     {
-        return trace_logging_full_schema_hashing_;
+        return trace_logging_full_schema_hashing_enabled_;
     }
 
     template <typename T>
@@ -622,7 +622,7 @@ namespace krabs {
         tmp.level_          = static_cast<UCHAR>(level_);
         tmp.trace_flags_    = static_cast<ULONG>(trace_flags_);
         tmp.callbacks_      = this->callbacks_;
-        tmp.trace_logging_full_schema_hashing_ = trace_logging_full_schema_hashing_;
+        tmp.trace_logging_full_schema_hashing_enabled_ = trace_logging_full_schema_hashing_enabled_;
 
         return tmp;
     }
