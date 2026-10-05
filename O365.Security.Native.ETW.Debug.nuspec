@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Native.ETW.Debug</id>
-        <version>4.4.9</version>
+        <version>4.5.0</version>
         <title>Microsoft.O365.Security.Native.ETW Debug - managed wrappers for krabsetw</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -12,9 +12,10 @@
         <description>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</description>
         <summary>Microsoft.O365.Security.Native.ETW Debug is a managed wrapper around the krabsetw ETW library. This is the Debug build.</summary>
         <releaseNotes>
-            Version 4.4.9:
-              - Optimize parser property lookup with last property hinted linear scan
-              - Add hinted parse/try_parse/view_of overloads accepting a ULONG property index hint
+            Version 4.5.0:
+              - Add Provider.EnableTraceLoggingFullSchemaHashing() to distinguish TraceLogging events that reuse a name with different fields. Call it before enabling the provider; hashing is disabled by default.
+              - Bound underlying TraceLogging event-name reads and validate metadata lengths, including metadata within larger extended-data buffers.
+              - Fix underlying schema-key copy assignment recursion and preserve owned event names, including assignments from borrowed names.
         </releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
