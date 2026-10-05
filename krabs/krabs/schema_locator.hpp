@@ -17,7 +17,9 @@
 #include <string_view>
 #include <unordered_map>
 #include <variant>
+#include <vector>
 #include <cassert>
+#include <cstring>
 
 #include "compiler_check.hpp"
 #include "errors.hpp"
@@ -53,6 +55,24 @@ namespace krabs {
         uint8_t   level;
         uint64_t  keyword;
 
+        /**
+         * Hash of the TraceLogging event metadata, or 0 when it wasn't hashed
+         * (manifest-based events, which the fields above already identify
+         * uniquely, and providers that haven't opted in).
+         *
+         * A provider may emit the same TraceLogging event name from several call
+         * sites with different fields. Those variants share the provider, name,
+         * id, version, opcode, level and keyword, so without this they collide in
+         * the cache and the first schema seen is used to decode all of them -
+         * silently shifting every field. The metadata *is* the schema, so hashing
+         * it tells the variants apart without an extra TDH call.
+         *
+         * Hashing walks the whole metadata blob, so its cost grows with the size
+         * of the event. It is therefore opt-in per provider - see
+         * krabs::provider::enable_trace_logging_full_schema_hashing.
+         */
+        uint64_t  schema_hash;
+
     private:
         /**
          * See note on 'name', this is only set when internalized and
@@ -61,14 +81,15 @@ namespace krabs {
         std::unique_ptr<std::string> backing_name;
 
     public:
-        schema_key(const EVENT_RECORD &record, std::string_view name)
+        schema_key(const EVENT_RECORD &record, std::string_view name, uint64_t schema_hash = 0)
             : provider(record.EventHeader.ProviderId)
             , name(name)
             , id(record.EventHeader.EventDescriptor.Id)
             , version(record.EventHeader.EventDescriptor.Version)
             , opcode(record.EventHeader.EventDescriptor.Opcode)
             , level(record.EventHeader.EventDescriptor.Level)
-            , keyword(record.EventHeader.EventDescriptor.Keyword) { }
+            , keyword(record.EventHeader.EventDescriptor.Keyword)
+            , schema_hash(schema_hash) { }
 
         schema_key(const schema_key &rhs)
             : provider(rhs.provider)
@@ -78,21 +99,45 @@ namespace krabs {
             , opcode(rhs.opcode)
             , level(rhs.level)
             , keyword(rhs.keyword)
+            , schema_hash(rhs.schema_hash)
         {
             internalize_name();
         }
 
         schema_key& operator=(const schema_key &rhs)
         {
-            schema_key temp(rhs);
-            std::swap(*this, temp);
+            if (this != &rhs) {
+                // NB: rhs may be borrowing its name from our own backing_name -
+                // for example, a key built from this key's name. Copy the name
+                // before the old storage is released, or we'd copy freed memory.
+                std::unique_ptr<std::string> incoming_name;
+                if (!rhs.name.empty()) {
+                    incoming_name = std::make_unique<std::string>(rhs.name);
+                }
+
+                provider = rhs.provider;
+                id = rhs.id;
+                version = rhs.version;
+                opcode = rhs.opcode;
+                level = rhs.level;
+                keyword = rhs.keyword;
+                schema_hash = rhs.schema_hash;
+
+                // Take ownership of the copy, matching the copy constructor.
+                backing_name = std::move(incoming_name);
+                name = backing_name ? std::string_view(*backing_name) : std::string_view();
+            }
+
             return *this;
         }
 
         bool operator==(const schema_key &rhs) const
         {
             // NB: Compare 'name' last for perf. Do not compare 'backing_name'.
-            return provider == rhs.provider &&
+            // 'schema_hash' goes first: it is a cheap integer compare and is the
+            // most discriminating field when a provider reuses an event name.
+            return schema_hash == rhs.schema_hash &&
+                   provider == rhs.provider &&
                    id == rhs.id &&
                    version == rhs.version &&
                    opcode == rhs.opcode &&
@@ -142,6 +187,7 @@ namespace std {
             h ^= (h << 5) + (h >> 2) + key.opcode;
             h ^= (h << 5) + (h >> 2) + key.level;
             h ^= (h << 5) + (h >> 2) + key.keyword;
+            h ^= (h << 5) + (h >> 2) + static_cast<size_t>(key.schema_hash);
 
             return h;
         }
@@ -164,6 +210,53 @@ namespace krabs {
      * </summary>
      */
     std::unique_ptr<char[]> get_event_schema_from_tdh_no_throw(const EVENT_RECORD&, TDHSTATUS&);
+
+    /**
+     * <summary>
+     * The TraceLogging metadata carried by an event: its name, and the raw
+     * metadata bytes that describe its fields.
+     * </summary>
+     */
+    struct trace_logging_metadata
+    {
+        std::string_view name;
+        const char*      data = nullptr;
+        uint16_t         size = 0;
+    };
+
+    /**
+     * <summary>
+     * Returns the TraceLogging metadata for an event, or an empty result if the
+     * event was not logged with the TraceLogger API.
+     * </summary>
+     */
+    trace_logging_metadata get_trace_logger_event_metadata(const EVENT_RECORD &);
+
+    /**
+     * <summary>
+     * Computes a hash of TraceLogging metadata, used to tell apart events that
+     * share a name but declare different fields. Returns 0 when there is no
+     * metadata.
+     * </summary>
+     */
+    inline uint64_t hash_trace_logging_metadata(const char* data, uint16_t size)
+    {
+        if (data == nullptr || size == 0) {
+            return 0;
+        }
+
+        // FNV-1a (64-bit). The metadata blob is small, so this is cheap, and a
+        // 64-bit digest makes a collision between two variants of one event name
+        // negligible. TdhGetEventInformation still validates the result.
+        uint64_t h = 14695981039346656037ULL;
+        for (uint16_t i = 0; i < size; ++i) {
+            h ^= static_cast<unsigned char>(data[i]);
+            h *= 1099511628211ULL;
+        }
+
+        // Never return 0 for real metadata; 0 means "no metadata".
+        return h == 0 ? 1 : h;
+    }
 
     /**
      * <summary>
@@ -207,14 +300,39 @@ namespace krabs {
          */
         bool has_event_schema(const EVENT_RECORD& record) const;
 
+        /**
+         * <summary>
+         * Opts a provider into full TraceLogging schema hashing, so that the
+         * event's TraceLogging metadata is hashed into its schema cache key.
+         * See krabs::provider::enable_trace_logging_full_schema_hashing for
+         * why this is opt-in.
+         * </summary>
+         */
+        void enable_trace_logging_full_schema_hashing(const krabs::guid& provider_id);
+
+        /**
+         * <summary>
+         * Returns true if the given provider was opted into full TraceLogging
+         * schema hashing.
+         * </summary>
+         */
+        bool trace_logging_full_schema_hashing_enabled(const GUID& provider_id) const;
+
     private:
         mutable std::unordered_map<schema_key, std::variant<std::unique_ptr<char[]>, TDHSTATUS>> cache_;
+
+        /**
+         * Providers opted into full TraceLogging schema hashing. A trace has a
+         * handful of providers at most and this is empty unless someone opted in,
+         * so a flat scan is cheaper than hashing the GUID on every event.
+         */
+        std::vector<krabs::guid> full_schema_hashing_providers_;
     };
 
     // Implementation
     // ------------------------------------------------------------------------
 
-    inline std::string_view get_trace_logger_event_name(const EVENT_RECORD & record)
+    inline trace_logging_metadata get_trace_logger_event_metadata(const EVENT_RECORD & record)
     {
         /**
          * This implements part of the parsing that TDH would normally do so that
@@ -247,36 +365,57 @@ namespace krabs {
             }
         }
 
-        // Didn't find one or it was too small.
+        // Didn't find one or it was too small to hold the 'Size' field.
         if (metadataPtr == nullptr || metadataSize < sizeof(USHORT)) {
             return {};
         }
 
-        // Ensure that the sizes match to prevent reading off the buffer.
+        // 'Size' describes the extent of the metadata pseudo-structure. The
+        // extended data item is allowed to be larger than that (e.g. trailing
+        // padding), but a 'Size' that runs past the end of the item means the
+        // record is malformed and can't be read safely.
         USHORT structSize = *(USHORT*)metadataPtr;
-        if (structSize != metadataSize) {
+        if (structSize < sizeof(USHORT) || structSize > metadataSize) {
             return {};
         }
 
         // Skipping over the 'Extension' field of the block to find the name offset.
-        // Per code comment: Read until you hit a byte with high bit unset.
+        // Per code comment: Read until you hit a byte with the high bit unset.
         USHORT nameOffset = sizeof(USHORT);
+        bool extensionTerminated = false;
         while (nameOffset < structSize) {
             char c = *(metadataPtr + nameOffset);
             nameOffset++; // NB: always consume the character.
 
             // High-bit set?
             if ((c & 0x80) != 0x80) {
+                extensionTerminated = true;
                 break;
             }
         }
 
-        // Ensure the offset found is valid.
-        if (nameOffset >= structSize) {
+        // Ensure the offset found is valid. The extension running to the end of
+        // the metadata means there's no name to read.
+        if (!extensionTerminated || nameOffset >= structSize) {
             return {};
         }
 
-        return {metadataPtr + nameOffset};
+        // The name is nul-terminated, and the terminator must live inside the
+        // metadata. Bound the search so a malformed record can't read past the
+        // end of the buffer.
+        const char* name = metadataPtr + nameOffset;
+        const size_t maxLength = structSize - nameOffset;
+        const size_t length = ::strnlen(name, maxLength);
+        if (length == maxLength) {
+            return {};
+        }
+
+        return {std::string_view{name, length}, metadataPtr, structSize};
+    }
+
+    inline std::string_view get_trace_logger_event_name(const EVENT_RECORD & record)
+    {
+        return get_trace_logger_event_metadata(record).name;
     }
 
     inline const PTRACE_EVENT_INFO schema_locator::get_event_schema(const EVENT_RECORD &record) const
@@ -291,8 +430,17 @@ namespace krabs {
     {
         status = ERROR_SUCCESS;
 
-        auto eventName = get_trace_logger_event_name(record);
-        auto key = schema_key(record, eventName);
+        auto metadata = get_trace_logger_event_metadata(record);
+
+        // Hashing walks the whole metadata blob, so the cost grows with the size
+        // of the event. Only do it for providers that asked for it.
+        uint64_t schema_hash = 0;
+        if (metadata.data != nullptr &&
+            trace_logging_full_schema_hashing_enabled(record.EventHeader.ProviderId)) {
+            schema_hash = hash_trace_logging_metadata(metadata.data, metadata.size);
+        }
+
+        auto key = schema_key(record, metadata.name, schema_hash);
 
         // Check the cache...
         auto it = cache_.find(key);
@@ -324,6 +472,24 @@ namespace krabs {
         TDHSTATUS status = ERROR_SUCCESS;
         get_event_schema_no_throw(record, status);
         return status == ERROR_SUCCESS;
+    }
+
+    inline void schema_locator::enable_trace_logging_full_schema_hashing(const krabs::guid& provider_id)
+    {
+        if (!trace_logging_full_schema_hashing_enabled(provider_id)) {
+            full_schema_hashing_providers_.push_back(provider_id);
+        }
+    }
+
+    inline bool schema_locator::trace_logging_full_schema_hashing_enabled(const GUID& provider_id) const
+    {
+        for (size_t i = 0; i < full_schema_hashing_providers_.size(); ++i) {
+            if (full_schema_hashing_providers_[i] == provider_id) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     inline std::unique_ptr<char[]> get_event_schema_from_tdh(const EVENT_RECORD &record)
