@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>Microsoft.O365.Security.Krabsetw</id>
-        <version>4.4.9</version>
+        <version>4.5.0</version>
         <title>Krabs ETW Wrappers</title>
         <authors>Microsoft</authors>
         <owners>Microsoft</owners>
@@ -12,9 +12,11 @@
         <description>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</description>
         <summary>Krabs ETW provides a modern C++ wrapper around the low-level ETW trace consumption functions</summary>
         <releaseNotes>
-            Version 4.4.9:
-              - Optimize parser property lookup with last property hinted linear scan
-              - Add hinted parse/try_parse/view_of overloads accepting a ULONG property index hint
+            Version 4.5.0:
+              - Add opt-in, per-provider full TraceLogging schema hashing to distinguish events that reuse a name with different fields. Call enable_trace_logging_full_schema_hashing() before enabling the provider; hashing is disabled by default.
+              - Bound TraceLogging event-name reads and validate metadata lengths, including metadata within larger extended-data buffers.
+              - Fix schema-key copy assignment recursion and preserve owned event names, including assignments from borrowed names.
+              - Add user-trace provider-enable error callbacks via set_enable_provider_error_callback(). A handled failure can allow the remaining providers to be enabled.
         </releaseNotes>
         <copyright>© Microsoft Corporation. All rights reserved.</copyright>
         <language />
