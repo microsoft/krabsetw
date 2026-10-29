@@ -10,6 +10,30 @@ using Microsoft.O365.Security.ETW.Schema;
 namespace Microsoft.O365.Security.ETW
 {
     /// <summary>
+    /// The trace a <see cref="TraceContext"/> can bring down from the callback thread.
+    /// </summary>
+    /// <remarks>
+    /// Narrow on purpose. The context needs exactly one thing from its trace -- the ability to
+    /// stop it once a handler has thrown -- and widening this to "the trace" would recreate the
+    /// coupling it exists to express.
+    /// </remarks>
+    internal interface ITraceHost
+    {
+        /// <summary>
+        /// Ends the ETW session. Implementations must not throw, and must not wait for
+        /// processing to finish.
+        /// </summary>
+        /// <remarks>
+        /// Called from a <c>finally</c> on the ETW callback thread, deliberately unguarded: a
+        /// throw would skip the adapter teardown after it and escape into native code, and a
+        /// wait would deadlock against the ProcessTrace it is waiting on. Both implementations
+        /// are native calls under a lock that ignore the status ControlTrace returns. A
+        /// delegate could not carry either requirement, which is why this is an interface.
+        /// </remarks>
+        void Stop();
+    }
+
+    /// <summary>
     /// Per-trace state and the entry point ETW calls for each event.
     /// </summary>
     /// <remarks>
@@ -27,9 +51,21 @@ namespace Microsoft.O365.Security.ETW
     {
         private readonly EventScratch _scratch = new EventScratch();
         private readonly EventRecordAdapter _adapter = new EventRecordAdapter();
+        private readonly ITraceHost _host;
 
         private Routes<Provider> _providers = Routes<Provider>.Empty;
         private Routes<KernelProvider> _kernelProviders = Routes<KernelProvider>.Empty;
+        private Provider? _additionalDispatchProvider;
+
+        /// <summary>
+        /// Creates a context for the given trace.
+        /// </summary>
+        /// <param name="host">The trace to stop when a handler exception brings it down.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="host"/> is null.</exception>
+        public TraceContext(ITraceHost host)
+        {
+            _host = host ?? throw new ArgumentNullException(nameof(host));
+        }
 
         /// <summary>
         /// Every event delivered to the consumer, whether or not a provider claimed it. This
@@ -56,7 +92,13 @@ namespace Microsoft.O365.Security.ETW
         public IEventRecordDelegate DefaultEvent = null!;
         public IEventRecordMetadataDelegate DefaultMetadata = null!;
         public EventRecordErrorDelegate DefaultError = null!;
-        public EventRecordExceptionDelegate DefaultException = null!;
+
+        /// <summary>
+        /// Reporters for handler exceptions. Nullable, unlike the delegates above, because
+        /// <see cref="UserTrace.DefaultUnhandledException"/> exposes it as an event: removing
+        /// the last subscriber assigns the null that <see cref="Delegate.Remove"/> returns.
+        /// </summary>
+        public EventRecordExceptionDelegate? DefaultException;
 
         /// <summary>
         /// How many handler exceptions have been caught. Cumulative for the life of the trace.
@@ -82,12 +124,6 @@ namespace Microsoft.O365.Security.ETW
         /// with the real cause, and the rest are usually the same fault repeating.
         /// </summary>
         public ExceptionDispatchInfo? PendingException;
-
-        /// <summary>
-        /// Stops the owning trace. Set by the trace, because the context has no other way to
-        /// reach it, and called only from the cold path after a handler threw.
-        /// </summary>
-        public Action? RequestStop;
 
         public void SetProviders(List<Provider> providers)
         {
@@ -117,21 +153,31 @@ namespace Microsoft.O365.Security.ETW
 
             public readonly T[] Handlers;
             public readonly Guid[] Ids;
+            public readonly int[] Next;
 
             private Routes()
             {
                 Handlers = Array.Empty<T>();
                 Ids = Array.Empty<Guid>();
+                Next = Array.Empty<int>();
             }
 
             public Routes(List<T> handlers, Func<T, Guid> id)
             {
                 Handlers = handlers.ToArray();
                 Ids = new Guid[Handlers.Length];
+                Next = new int[Handlers.Length];
+                var previous = new Dictionary<Guid, int>();
 
                 for (int i = 0; i < Handlers.Length; i++)
                 {
                     Ids[i] = id(Handlers[i]);
+                    if (previous.TryGetValue(Ids[i], out int preceding))
+                    {
+                        Next[preceding] = i + 1;
+                    }
+
+                    previous[Ids[i]] = i;
                 }
             }
         }
@@ -177,6 +223,7 @@ namespace Microsoft.O365.Security.ETW
         /// </summary>
         public void EndEvent()
         {
+            _additionalDispatchProvider = null;
             _adapter.End();
         }
 
@@ -194,11 +241,13 @@ namespace Microsoft.O365.Security.ETW
         /// </remarks>
         public void HandleDispatchException(EVENT_RECORD* record, Exception ex)
         {
+            bool stopping = false;
+
             try
             {
                 UnhandledExceptions++;
 
-                bool stopping = StopOnHandlerException;
+                stopping = StopOnHandlerException;
 
                 if (stopping)
                 {
@@ -216,16 +265,6 @@ namespace Microsoft.O365.Security.ETW
                 }
 
                 Report(record, ex, stopping);
-
-                if (stopping)
-                {
-                    // Safe from this thread: Stop takes the trace's gate and returns without
-                    // waiting, and the one call that does wait -- Dispose -- waits outside
-                    // that gate. CloseTrace from inside the callback is how ETW is told to
-                    // end processing, and ProcessTrace returns ERROR_CANCELLED, which Start
-                    // already treats as a clean stop.
-                    RequestStop?.Invoke();
-                }
             }
             catch
             {
@@ -233,6 +272,15 @@ namespace Microsoft.O365.Security.ETW
             }
             finally
             {
+                if (stopping)
+                {
+                    // In the finally so nothing failing inside Report can deny the stop:
+                    // Stopping is already set, so the trace would drop every event yet never
+                    // close, and Start would never return. Safe unguarded, and safe from this
+                    // thread; see ITraceHost.Stop.
+                    _host.Stop();
+                }
+
                 EndEvent();
             }
         }
@@ -248,18 +296,50 @@ namespace Microsoft.O365.Security.ETW
             // trace-level surface below.
             object? provider = MatchProvider(view, record);
 
-            try
+            // Both surfaces contain each subscriber individually, so neither can deny the
+            // other its report and no reporter can silence the ones registered after it.
+            (provider as Provider)?.RaiseUnhandledException(reported);
+            (provider as KernelProvider)?.RaiseUnhandledException(reported);
+
+            RaiseEachContained(DefaultException, reported);
+        }
+
+        /// <summary>
+        /// Invokes each subscriber separately, recording any that throws rather than letting
+        /// it escape.
+        /// </summary>
+        /// <remarks>
+        /// A multicast delegate raised as one call abandons the rest of its invocation list
+        /// at the first subscriber to throw. Here that would be silent, because the throw is
+        /// caught and only recorded, so a failing health reporter would take the log
+        /// registered after it down with it -- and which of the two a consumer registered
+        /// first is not something they should have to think about.
+        ///
+        /// The <see cref="Delegate.GetInvocationList"/> allocation is confined to the
+        /// exception path, where the report being handed out has already been built.
+        /// </remarks>
+        internal static void RaiseEachContained(
+            EventRecordExceptionDelegate? reporters,
+            IEventRecordException reported)
+        {
+            if (reporters == null)
             {
-                (provider as Provider)?.RaiseUnhandledException(reported);
-                (provider as KernelProvider)?.RaiseUnhandledException(reported);
-            }
-            catch (Exception nested)
-            {
-                // The provider-level surface must not deny the trace-level one its report.
-                LastReportingException = nested;
+                return;
             }
 
-            DefaultException?.Invoke(reported);
+            Delegate[] subscribers = reporters.GetInvocationList();
+
+            for (int i = 0; i < subscribers.Length; i++)
+            {
+                try
+                {
+                    ((EventRecordExceptionDelegate)subscribers[i])(reported);
+                }
+                catch (Exception nested)
+                {
+                    LastReportingException = nested;
+                }
+            }
         }
 
         /// <summary>
@@ -268,8 +348,8 @@ namespace Microsoft.O365.Security.ETW
         internal static Exception? LastReportingException;
 
         /// <summary>
-        /// Delivers the event to the first provider that claims it, mirroring
-        /// krabs::details::ut::forward_events.
+        /// Delivers a user event to every registration for its provider GUID. Native enablement
+        /// already merges those registrations; routing must not discard the later filters.
         /// </summary>
         /// <remarks>
         /// For manifest and TraceLogging events the header carries the provider GUID. For MOF
@@ -315,6 +395,13 @@ namespace Microsoft.O365.Security.ETW
             }
 
             providers.Handlers[i].Dispatch(view, _adapter);
+            for (int next = providers.Next[i]; next != 0; next = providers.Next[next - 1])
+            {
+                _additionalDispatchProvider = providers.Handlers[next - 1];
+                _additionalDispatchProvider.Dispatch(view, _adapter);
+                _additionalDispatchProvider = null;
+            }
+
             return true;
         }
 
@@ -371,8 +458,8 @@ namespace Microsoft.O365.Security.ETW
         /// </summary>
         /// <remarks>
         /// Cold path only: it exists to attribute a handler exception to a provider, and
-        /// runs once per exception rather than once per event. Recording the provider during
-        /// dispatch instead would put a store on the hot path for a value almost never read.
+        /// runs once per exception rather than once per event. The first registration is
+        /// re-derived; additional registrations are recorded because their GUID is identical.
         ///
         /// Reached only from the catch in <see cref="TraceCallbacks.Dispatch"/>, on the same
         /// thread and the same record, so it re-derives the same answer the routing loop
@@ -381,6 +468,11 @@ namespace Microsoft.O365.Security.ETW
         /// </remarks>
         private object? MatchProvider(in EventRecordRef view, EVENT_RECORD* record)
         {
+            if (_additionalDispatchProvider != null)
+            {
+                return _additionalDispatchProvider;
+            }
+
             Routes<KernelProvider> kernel = Volatile.Read(ref _kernelProviders);
 
             if (kernel.Ids.Length != 0)

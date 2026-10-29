@@ -23,7 +23,7 @@ namespace Microsoft.O365.Security.ETW
     /// the name "NT Kernel Logger", keyed on SystemTraceControlGuid) are not reproduced,
     /// because no framework this library targets runs there.
     /// </remarks>
-    public sealed unsafe class KernelTrace : IKernelTrace, IDisposable
+    public sealed unsafe class KernelTrace : IKernelTrace, ITraceHost, IDisposable
     {
         private readonly object _gate = new object();
         private readonly List<KernelProvider> _providers = new List<KernelProvider>();
@@ -69,8 +69,10 @@ namespace Microsoft.O365.Security.ETW
         public KernelTrace(string name)
         {
             _name = name ?? throw new ArgumentNullException(nameof(name));
-            _context = new TraceContext();
-            _context.RequestStop = Stop;
+
+            // Safe to hand out this instance here: the class is sealed, so no derived
+            // constructor can observe it half-built, and the context only stores it.
+            _context = new TraceContext(this);
         }
 
         public string Name
@@ -127,10 +129,10 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <inheritdoc cref="UserTrace.DefaultUnhandledException"/>
-        public EventRecordExceptionDelegate DefaultUnhandledException
+        public event EventRecordExceptionDelegate DefaultUnhandledException
         {
-            get { return _context.DefaultException; }
-            set { _context.DefaultException = value; }
+            add { _context.DefaultException += value; }
+            remove { _context.DefaultException -= value; }
         }
 
         [Obsolete("This method is deprecated. Use the DefaultMetadata/DefaultEvent/DefaultError event instead.")]
@@ -299,6 +301,12 @@ namespace Microsoft.O365.Security.ETW
         /// release anything the callback thread can still reach; see
         /// <see cref="UserTrace.Stop"/> for why.
         /// </summary>
+        /// <remarks>
+        /// Implements <see cref="ITraceHost.Stop"/>, which requires this not to throw: it is
+        /// called from a <c>finally</c> on the callback thread. That holds because everything
+        /// below is native calls under a lock, and the stop path ignores the status
+        /// ControlTrace returns rather than raising on it.
+        /// </remarks>
         public void Stop()
         {
             lock (_gate)
@@ -421,9 +429,16 @@ namespace Microsoft.O365.Security.ETW
             properties->Wnode.Flags = NativeConstants.WNODE_FLAG_TRACED_GUID;
             properties->Wnode.ClientContext = 1;
             properties->Wnode.Guid = Guid.NewGuid();
-            properties->LogFileMode = NativeConstants.EVENT_TRACE_REAL_TIME_MODE
-                | NativeConstants.EVENT_TRACE_SYSTEM_LOGGER_MODE
-                | _properties.LogFileMode;
+
+            // Mirrors UserTrace.InitialiseProperties: a caller that has not requested a
+            // specific mode gets real-time plus one buffer pool for the whole session, not
+            // one per processor. SYSTEM_LOGGER_MODE is required for a non-NT-Kernel-Logger
+            // kernel session regardless of what the caller asked for, so it is always added
+            // on top rather than being part of the default/override choice.
+            properties->LogFileMode = (_properties.LogFileMode != 0
+                ? _properties.LogFileMode
+                : NativeConstants.EVENT_TRACE_REAL_TIME_MODE | NativeConstants.EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING)
+                | NativeConstants.EVENT_TRACE_SYSTEM_LOGGER_MODE;
             properties->EnableFlags = EnableFlags;
             properties->BufferSize = _properties.BufferSize;
             properties->MinimumBuffers = _properties.MinimumBuffers;

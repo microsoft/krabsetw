@@ -2,7 +2,8 @@
 
 `Microsoft.O365.Security.ETW` is a pure .NET reimplementation of the C++/CLI wrapper in
 `Microsoft.O365.Security.Native.ETW`, which is itself a thin layer over the native
-`krabs` headers. The two are meant to be drop-in interchangeable for consumers.
+`krabs` headers. The familiar API is retained where possible, but source and binary
+compatibility are not complete; the migration guide lists the exceptions.
 
 **Consumers should read `MIGRATION.md` instead.** It lists every public-surface difference
 and what to do about it. This file is the engineering record behind those decisions: where
@@ -11,6 +12,36 @@ wrong, and defects still open on one side or both.
 
 The parity suite (`tests/ManagedETWTests`, compiled twice — once against each
 implementation) is the mechanical check for everything else.
+
+## Comparison baseline and pending native backport
+
+Unless stated otherwise, **C++/CLI** and **krabs** below mean the upstream **4.5.0**
+baseline at `d626e49`, not the pending native correctness backport. The older 4.4.x
+comparison missed two upstream additions: provider-enable error callbacks in native krabs
+(#281), and opt-in TraceLogging full-schema hashing plus metadata bounds/padding fixes
+(#282). Both are retained by the backport.
+
+The following fixes are implemented in a separate **pending native backport**. They are
+not part of that baseline and must not be assumed present in existing 4.x packages.
+Historical defect descriptions below explain why the port differs from the baseline;
+they are not claims that these defects remain unfixed in the pending backport.
+
+| Area | Pending native/C++/CLI behaviour |
+| --- | --- |
+| Property sizing | Fixed Unicode lengths count WCHARs; structs are rejected before reading the union |
+| Filter and provider lifetime | Each filter gates its own event IDs before its predicate; traces retain providers and providers retain filters |
+| Value conversion | FILETIME range checks, exact IP widths, actual socket lengths, empty binary arrays |
+| String conversion | UTF8/JSON out-types select UTF-8 in readers, predicates and builders; sized Unicode/ANSI strings preserve embedded NULs |
+| Callback lifetime | Borrowed wrappers are invalidated in `finally`; property enumerators cannot rebind to later callbacks |
+| Kernel routing | C++/CLI `SystemCallProvider` uses PerfInfo, matching native krabs and the port |
+| Synthetic records | Correct SID/pointer padding, declared-length validation, sized-string layout, zero lengths, payloads capped at 65535 bytes, GC keep-alives |
+| TraceLogging cache | Exact metadata equality supplements the existing opt-in hash; opt-out behaviour is unchanged |
+| Handler exceptions | Fail-stop containment inside native callbacks; cleanup and original-exception rethrow after `ProcessTrace` |
+
+Important differences remain after that backport: same-GUID user-provider fanout, predicate
+ordering, case folding, failed `TryGet*` out parameters, boxed `DateTime^` signatures, schema
+error placement, and the managed-only ref/testing/reporting surfaces. Full-schema identity
+is unconditional in the port but still opt-in per provider in native krabs/C++/CLI.
 
 ## Why the parity suite is not sufficient on its own
 
@@ -54,6 +85,22 @@ system-wide activity — `RundownTests`, `KernelGroupMaskTests` — are the exce
 
 ## Deliberate divergences
 
+### Every user-provider registration for a GUID receives its events
+
+Native `krabs::details::ut::forward_events` (`krabs/krabs/ut.hpp`) returns after the first
+matching registration, for both header-GUID and schema-GUID routing. The port now invokes
+every user-provider registration for that GUID in registration order. ETW enablement
+already merges the registrations; keeping first-match dispatch would silently discard
+independently registered handlers and filters. Kernel-provider routing remains first-match.
+
+The routing snapshot contains a precomputed next-registration chain, so dispatch allocates
+nothing and does not rescan unrelated GUIDs for each additional registration. If a later
+registration throws, that registration receives the exception report and dispatch stops for
+that event. The additional attribution state is cleared on exception teardown.
+
+`TraceContextRoutingCoverageTests` covers nonadjacent registrations, independent filters,
+later-registration failures, and attribution reset before the next event.
+
 ### Records are invalidated when the callback returns
 
 C++/CLI hands the callback an `EventRecordMetadata` (or a subclass) that wraps a raw
@@ -66,7 +113,10 @@ silently, with no diagnostic. Native krabs has the same lifetime and relies on c
 
 The port keeps the same reuse — one adapter per trace, rebound per event, so the hot path
 still allocates nothing — but clears the pointer when the callback returns. A stashed record
-throws `ObjectDisposedException` on its next use instead of returning another event's data.
+throws `InvalidOperationException` if read between callbacks. This is not a snapshot:
+the same adapter is rebound during a later callback, so retaining an alias is still unsafe.
+The pending C++/CLI backport also invalidates its wrappers, using
+`ObjectDisposedException`, and guards property enumerators against later generations.
 
 Callers that never stashed a record see no behavioural change. Callers that did were already
 broken; they now find out. The invalidation is a single field store on the normal path:
@@ -84,7 +134,9 @@ laid out sequentially, so an unsupported type part-way through a schema prevents
 after it from being addressed. The port adds an adder for every in-type
 `how_many_bytes_to_fill` already knew how to pad. It also drops the terminator on a string
 the schema sizes, which krabs emits unconditionally; TDH consumes exactly the declared
-number of characters, so the extra terminator displaced every later property.
+number of characters, so the extra terminator displaced every later property. The pending
+native backport fixes that sized-string layout too; the port's additional adders and
+`EventSchema` remain managed-only.
 
 `EventSchema` is new. It lets a test declare an event's layout rather than read it from the
 machine's registered providers, which removes the requirement that a fixture's provider be
@@ -136,8 +188,8 @@ always been in — `0` was never distinguishable either — so this makes `DateT
 consistent with the rest of the API rather than an outlier.
 
 `SYSTEMTIME`-shaped payloads are decoded with `DateTimeKind.Utc` assumed rather than read
-from the out-type. That assumption is port-only new behaviour — krabs' `GetValue<FILETIME>`
-rejects a 16-byte property outright — and is folded into the ANSI out-type defect below.
+from the out-type. This remains a port-only capability: the native backport preserves the
+C++/CLI getter's `GetValue<FILETIME>` shape, which rejects a 16-byte property.
 
 ### `TryGet*` leaves nothing behind on failure
 
@@ -162,9 +214,9 @@ is deterministic and is kept.
 
 ### Value conversions that differ at the edges
 
-Three conversions on the compat surface behave differently from C++/CLI at inputs that are
-degenerate or out of range. All three are cases where C++/CLI's behaviour is hard to defend
-on its own terms, so the port did not reproduce it.
+The following conversions on the compat surface differ from the 4.5.0 baseline at inputs
+that are degenerate or out of range. The pending native backport fixes these cases too;
+the boxed `DateTime^` public signatures are deliberately preserved there.
 
 **A FILETIME outside the DateTime range is reported as unreadable rather than throwing.**
 C++/CLI hands the raw value to `DateTime::FromFileTimeUtc` *outside* its try/catch
@@ -185,6 +237,19 @@ had, so a shorter property yields whatever was left in the storage buffer. The p
 the result from the property's own length and copies exactly that. `SocketAddress.Size` and
 the trailing bytes therefore differ for any property whose length is not exactly 16 or 28.
 
+A present, zero-length socket address returns `null` from `GetSocketAddress`, because
+`SocketAddress` cannot represent fewer than two bytes. `TryGetSocketAddress` returns
+`false`; the default-value overload returns its supplied default. A missing, truncated, or
+one-byte value still fails rather than being treated as an empty address. Runtime-length
+zero is covered by `CompatEventRecordAdapterTests`.
+
+**IP addresses require the TDH address out-type and its matching width.** Native krabs
+checks the out-type in `assert_valid_assignment<ip_address>` (`krabs/krabs/tdh_helpers.hpp`).
+The port restores that gate: ordinary four- or sixteen-byte properties are not addresses.
+It additionally rejects an IPv4-marked value whose width is not four bytes or an
+IPv6-marked value whose width is not sixteen, rather than reading a malformed property
+past its end. `EventSchema.IPAddress` supplies those out-types for synthetic tests.
+
 **An empty binary property returns an empty array, not `null`.** C++/CLI's
 `ConvertToByteArray` takes `&data.bytes()[0]` — indexing element zero of a possibly empty
 `std::vector`, which is undefined behaviour — and returns `nullptr` when that address comes
@@ -202,13 +267,12 @@ the invalid value unrepresentable.
 
 ### `TraceStats` is a `readonly struct`
 
-C++/CLI declared `TraceStats` as a mutable value type with public mutable fields. The port
-declares it `readonly struct` with an internal constructor. Reading fields — the only thing
-consumers do with it — is unchanged, as is `new TraceStats()`, so this is source-compatible.
-Assigning a field on a `TraceStats` local no longer compiles, but nothing in the ecosystem
-did that: the type is only ever produced by `UserTrace.QueryStats`/`KernelTrace.QueryStats`.
-It is a binary-breaking change, which costs nothing here because the assembly rename already
-forces every consumer to recompile.
+C++/CLI declared `TraceStats` as a value class whose public fields are already `initonly`
+and whose populated constructor is internal (`TraceStats.hpp`). The port's
+`readonly struct` retains those restrictions. Reading `QueryStats()` results and
+constructing `new TraceStats()` remain source-compatible; field assignment was not
+supported before either. The readonly type declaration is not an additional source break.
+The assembly rename still requires every consumer to recompile.
 
 ### Nullable reference annotations
 
@@ -233,16 +297,16 @@ There are two ways to receive an event, and the split is deliberate.
 
 | | Callback | Record type | Allocates |
 | --- | --- | --- | --- |
-| Compat | `OnEvent` / `DefaultEvent` | `IEventRecord` | yes |
+| Compat | `OnEvent` / `DefaultEvent` | `IEventRecord` | on materialising strings, arrays and address objects |
 | Allocation-free | `OnEventRef` / `DefaultEventRef` | `EventRecordRef` | no |
 
-`IEventRecord` is the compat surface, and every one of its getters allocates: the payload
-lives in the ETW buffer, and returning a `string` or a `byte[]` means copying out of it.
-The adapter itself is reused for the life of the trace, so the allocation is entirely in
-the return types.
+`IEventRecord` is the compat surface. String and binary getters materialise values from
+the ETW buffer; header and scalar reads do not inherently allocate. The adapter itself is
+reused for the life of the trace, so subscribing to `OnEvent` alone does not allocate per
+event. `EventRecordRef` avoids the materialisation cost when a value is only inspected.
 
 `EventRecordRef` has no such problem — it hands back `ReadOnlySpan<T>` views straight into
-the buffer. It is a `ref struct`, so it can never implement an interface; reaching it means
+the buffer. It is a `ref struct` with no record interface; reaching it means
 subscribing `OnEventRef` instead of `OnEvent`. The returned spans are views into the ETW
 buffer and are valid only for the duration of the callback, exactly like the record itself.
 
@@ -276,15 +340,19 @@ because transcoding from the provider's ANSI code page is what forces the alloca
 `AsnDecoder.TryReadPrimitiveCharacterStringBytes`); and no `Properties` enumeration. A
 handler that needs those stays on `IEventRecord`.
 
-**No `EventRecordRef` accessor throws.** C++/CLI exposes three forms per type — `Get(name)`,
-`Get(name, defaultValue)` and `TryGet(name, out value)`. The ref surface exposes the latter
-two, uniformly, for every type it supports. The throwing form is dropped because a missing
-property is an ordinary condition on a per-event path rather than an exceptional one, and
+**Payload accessors omit the throwing `Get(name)` form.** C++/CLI exposes three
+forms per type — `Get(name)`, `Get(name, defaultValue)` and `TryGet(name, out value)`.
+The ref surface exposes the latter two, uniformly, for every type it supports. The throwing
+form is dropped because a missing property is an ordinary condition on a per-event path rather than an exceptional one, and
 because an escaping handler exception now stops the trace, which would make a single mistyped
 property name fatal to the session. The default-value form covers what the throwing form was
 wanted for — `record.GetUnicodeString(name, default).SequenceEqual(other)` is a single
 expression — while `TryGet*` remains the only form that separates absent from empty, since a
 returned `ReadOnlySpan<char>` cannot express absence. `IEventRecord` keeps all three forms.
+
+Debug builds still enforce numeric TDH in-types and throw `TypeMismatchAssert` on a
+mismatch, matching native krabs. That assertion is separate from ordinary lookup failure;
+`TryGet*` is not a promise to suppress debug type assertions.
 
 ### Schema resolution failures are reported once, on the provider
 
@@ -338,24 +406,27 @@ be chosen.
 C++/CLI has no such catch. `base_provider::on_event` catches only `could_not_find_schema`
 (`krabs/provider.hpp:485-505`) and `ExecuteAndConvertExceptions` catches only the eight krabs
 C++ exception types (`Errors.hpp:69-101`), so a managed handler exception matches neither: it
-unwinds the native `ProcessTrace` frames and leaves `UserTrace::Start()`. The session is gone
-and the caller is told, loudly.
+unwinds the native `ProcessTrace` frames and leaves `UserTrace::Start()`. That does **not**
+guarantee teardown: a live regression left the session enabled after `Start()` threw.
+The pending native backport contains the exception inside the callback, suppresses further
+dispatch, closes the consumer without waiting there, then stops the session and rethrows
+the original exception after `ProcessTrace` returns.
 
 An intermediate revision of the port caught the exception, stored it in a `LastException`
 field nobody read, and carried on. That is not availability — `EventsHandled` is incremented
 before routing, so every counter a consumer polls keeps climbing while the module delivers
 nothing, indefinitely and across restarts. Silence was the defect, not the catch.
 
-The port now reproduces the C++/CLI outcome without the undefined behaviour:
+The port reports the failure and guarantees session shutdown without unwinding native frames:
 
-| | C++/CLI | Port |
-| --- | --- | --- |
-| Exception leaves `Start()` | yes, by unwinding native frames | yes, rethrown after `ProcessTrace` returns |
-| Original stack preserved | yes | yes, via `ExceptionDispatchInfo` |
-| Session torn down | yes | yes, `CloseTrace` from the callback thread |
-| Reported before the throw | no | `Provider.OnUnhandledException` and `UserTrace.DefaultUnhandledException` |
-| Counted | no | `TraceStats.UnhandledExceptions` |
-| Opt-out | no | `StopOnHandlerException = false` |
+| | C++/CLI 4.5.0 baseline | Pending native backport | Port |
+| --- | --- | --- | --- |
+| Exception leaves `Start()` | by unwinding native frames | after `ProcessTrace` returns | after `ProcessTrace` returns |
+| Original stack preserved | yes | yes, via `ExceptionDispatchInfo` | yes, via `ExceptionDispatchInfo` |
+| Session torn down | not guaranteed | yes | yes |
+| Reported before the throw | no | no | `Provider.OnUnhandledException` and trace `DefaultUnhandledException` |
+| Counted | no | no | `TraceStats.UnhandledExceptions` |
+| Opt-out | no | no | `StopOnHandlerException = false` |
 
 The first exception is captured with `ExceptionDispatchInfo`, further dispatch is
 short-circuited, `Stop()` is called from the callback thread — safe because `Dispose` waits
@@ -368,10 +439,11 @@ Setting `StopOnHandlerException = false` keeps the trace running and still repor
 which is the behaviour a consumer wants when one noisy provider must not take down the others.
 No implementation has ever offered that, so it is additive rather than divergent.
 
-Attribution to a provider runs on the exception path only, by re-deriving the match with the
-same `TryGetRoutingId` helper the hot path uses. Nothing is stored per event to make it
-possible. A provider set mutated concurrently could in principle misattribute a diagnostic,
-which is the whole cost of the choice.
+Attribution normally re-derives the first match on the exception path using
+`TryGetRoutingId`. Dispatch through an additional same-GUID registration records that
+registration temporarily, because the GUID cannot distinguish it from the first. Teardown
+clears this state. A concurrently changed provider snapshot can still misattribute the
+re-derived first match; this affects diagnostics, not routing.
 
 `Testing.Proxy.PushEvent` routes through the same `HandleDispatchException`, so the synthetic
 path and the real callback agree, and then rethrows — which the real callback cannot do. A
@@ -380,7 +452,8 @@ test whose handler throws by accident fails rather than running green.
 ### Public surface that was removed
 
 `MIGRATION.md` lists what was removed and what replaces it. The rationale, in each case,
-is that nothing in the known consumer set used it:
+is that the port uses interfaces or managed values in place of implementation-specific
+types, and omits native ownership where it no longer applies:
 
 | Removed | Reason |
 | --- | --- |
@@ -391,6 +464,7 @@ is that nothing in the known consumer set used it:
 | `Property.Type`, 3-argument `Property` ctor, `OutType` as `int` | The port exposes `InType`/`OutType`/`Length` as `uint`. Unused. |
 | `EventHeaderProperty.LEGACY_EVENTLOG`, `FORWARDED_XML` | Renamed to `LegacyEventLog`, `ForwardedXML`. |
 | `EventTraceProperties` public fields | Now properties. Object-initializer syntax is unaffected; only `ref`/`out` use breaks. |
+| `Provider.EnableTraceLoggingFullSchemaHashing()` | Added upstream in 4.5.0; unnecessary in the port, which always compares full TraceLogging metadata. Remove the opt-in call. |
 | `GetSecurityIdentifier`, `TryGetSecurityIdentifier` | Declared on the concrete C++/CLI `EventRecord` (`EventRecord.hpp:347-382`), not on `IEventRecord`, so only consumers holding the concrete type were affected — and that type is removed anyway. The port has **no** way to read a SID property: `EventRecordRef` has no accessor and neither does the compat adapter. `RecordBuilder` can still *write* one. This is a genuine capability gap, not just a rename. |
 | `GetPointer`, `TryGetPointer` returning `IntPtr^` | Same placement (`EventRecord.hpp:394-423`). The port keeps the capability on the ref surface as `EventRecordRef.TryGetPointer`, returning `ulong` rather than `IntPtr` so it does not box; the compat adapter has no equivalent. |
 
@@ -440,18 +514,20 @@ The port returns -1 from `OffsetResolver.SizeOf` for a property carrying
 everything after it unreadable. This was scoped out of the initial milestone and has not
 been revisited.
 
-krabs does not decode structs either, and fails worse — see below. Nothing that worked
-before stops working, but the failure mode changes from silent corruption to a visible
-failure. Tracked internally.
+The 4.5.0 baseline does not decode structs either and can mis-size their union fields —
+see below. The pending native backport rejects them explicitly instead. Neither
+implementation gains struct decoding from these fixes.
 
 ## Things that look like divergences and are not
 
 ### The schema cache is unbounded in both implementations
 
 Neither cache evicts. `krabs::schema_locator::cache_` and this port's `SchemaCache` are both
-members of the trace, live as long as it does, and grow by one entry per distinct
-`(provider, id, version, opcode, level, keyword, TraceLogging metadata, pointer width)`.
-Failures are cached too, so an event with no schema also takes a slot.
+members of the trace and live as long as it does. Both key on provider and descriptor
+fields. The port additionally uses pointer width and exact full TraceLogging metadata;
+native krabs uses the event name and, when enabled for that provider, a metadata hash.
+The pending native backport adds exact metadata equality under that opt-in. Both
+implementations cache failed resolutions too, so an event with no schema also takes a slot.
 
 Deliberately left that way, on measurement. For a manifest provider the entry count is
 bounded by the manifest: the largest on a reference machine is Microsoft-Windows-Hyper-V-VMMS
@@ -489,7 +565,7 @@ earlier note claiming the port truncated was stale.
 
 ## Known defects
 
-### SystemCallProvider matches no events in C++/CLI (fixed in the port, open in C++/CLI)
+### SystemCallProvider matches no events in baseline C++/CLI (pending native fix)
 
 Tracked internally.
 
@@ -508,14 +584,13 @@ reads "guid for system_call_provider should be PerfInfo not SystemTraceControl".
 C++/CLI wrapper was edited afterwards, in 396d8cc, and took that commit's new FileIo
 providers -- and other `perf_info`-based providers -- but not the one-line fix.
 
-The port uses `PerfInfo`. This is the only place it deliberately declines to reproduce the
-wrapper, because reproducing the wrapper means the provider cannot work at all. A consumer
+The port uses `PerfInfo`, as does the pending C++/CLI backport. A consumer
 migrating off C++/CLI sees SysCall handlers begin to fire where they previously never did;
 nothing that worked before changes. Coverage is
 `KernelProviderTableTests.SystemCallProviderMatchesNativeKrabsRatherThanTheCppCliWrapper`,
 which asserts the correct GUID and, as a regression guard, that it is not the wrapper's.
 
-### krabs halves fixed-length Unicode strings (fixed in the port, open in C++/CLI)
+### Baseline krabs halves fixed-length Unicode strings (pending native fix)
 
 Tracked internally.
 
@@ -533,13 +608,16 @@ The port scales by two for `UnicodeString` and leaves `AnsiString` unscaled
 `PropertySizerTests.FixedLengthUnicodeStringLengthIsACountOfWchars` and its ANSI
 counterpart, which pin the asymmetry rather than the individual sizes.
 
-This is a divergence from C++/CLI until the same fix lands there: a consumer migrating off
-C++/CLI can see a different decoded value for such a property, and for anything after it.
+The pending native backport scales declared Unicode character counts, leaving ANSI lengths
+and byte counts already returned by TDH untouched. Until that fix ships, a consumer
+migrating off C++/CLI can see a different decoded value for such a property, and for
+anything after it.
 Unlike the ANSI out-type defect below, the real-world exposure has not been measured — a
-provider sweep for fixed-length Unicode string properties has not been run. Variable-length
-and NUL-terminated strings are unaffected; both implementations scan the payload identically.
+provider sweep for fixed-length Unicode string properties has not been run. NUL-terminated
+strings without an explicit length are unaffected. Payload-referenced Unicode lengths are
+already returned in bytes by native TDH and must not be scaled again.
 
-### krabs mis-sizes struct properties (open, C++ side, affects shipping code)
+### Baseline krabs mis-sizes struct properties (pending native fix)
 
 Tracked internally.
 
@@ -549,8 +627,9 @@ For a struct property that union member holds a struct-member start index and co
 krabs interprets a member index as a TDH in-type, derives a size from it, and silently
 misaligns every subsequent property in the event.
 
-This is a real bug in the shipping implementation. It is untested on both sides. The
-port avoids it by refusing to size structs at all, which fails visibly instead.
+The port avoids it by refusing to size structs at all, covered by `OffsetResolverTests`.
+The pending native backport adds a `PropertyStruct` rejection before any union read and
+native sizing regressions.
 
 Struct properties are not rare: 1148 events across 88 of the 1503 providers registered on
 a build machine declare one, including three providers in common use (SMBClient,
@@ -558,7 +637,7 @@ BITS-Client, Hyper-V-Compute). That does not by itself establish
 impact — a read only breaks if it targets a property at or after the struct in the same
 event — but it does rule out "no provider does this".
 
-### ANSI decoding ignores the out-type (fixed in the port, open in C++/CLI)
+### Baseline ANSI decoding ignores the out-type (pending native fix)
 
 Tracked internally.
 
@@ -575,14 +654,19 @@ rather than when it is supplied. `TDH_OUTTYPE_XML` is left on the ANSI code page
 honouring the document's declaration means parsing the value, and TDH does not re-encode
 it either.
 
-This is a divergence from C++/CLI until the same fix lands there, and the parity suite
-cannot cover it in the meantime — the coverage is
+The pending native backport applies the same selection in its reader, all eight managed
+ANSI predicate factories, and builder. The port's independent coverage is
 `managed/tests/O365.Security.ETW.Managed.Tests/AnsiOutTypeTests.cs`, which declares an
 `EventSchema` carrying `win:UTF8` and `win:Json` out-types.
 
 A sweep of the 1503 providers registered on a build machine found 4163 ANSI-typed string
-properties: 4162 `TDH_OUTTYPE_STRING`, one `win:Xml`, and zero UTF-8 or JSON. So the
-exposure is currently theoretical.
+properties: 4162 `TDH_OUTTYPE_STRING`, one `win:Xml`, and zero UTF-8 or JSON. That historical
+sample was not exhaustive across machines: a later manifest probe found ANSI/UTF8 property
+`ExceptionWhatString` on Microsoft-Windows-AppXDeployment-Server-UndockedDeh,
+event 10003/version 0. The native backport's `describe_CallbackValues` tests decode literal
+`C3 A9 00` bytes independently of the builder, and verify builder bytes and all eight
+predicates. The defect therefore has a concrete installed-provider fixture, not just a
+synthetic-schema example.
 
 The out-types actually consumed were then checked directly, rather than inferred from that
 sweep, by decoding live events:
@@ -602,16 +686,28 @@ Note that `TdhOutType` in the port had these two values numbered three too high 
 recently; the enum in `tdh.h` is implicitly numbered and the transcription had drifted.
 Values are now spelled out explicitly.
 
-### C++/CLI truncates ANSI strings at an embedded NUL
+### Baseline C++/CLI truncates sized strings at an embedded NUL (pending native fix)
 
 `EventRecord.hpp` decodes via `gcnew String(str.c_str())`, which stops at the first NUL.
 The port decodes the full property length. Only reachable where the length comes from
 somewhere other than the first NUL: the counted and non-NUL-terminated in-types, and a
 `win:AnsiString` whose length is carried by an earlier property. A plain NUL-terminated
 `win:AnsiString` has no length but the position of its first NUL, so there the port
-truncates exactly as C++/CLI does. Covered by `AnsiConsumerShapeTests`.
+truncates exactly as C++/CLI does. Covered by `AnsiConsumerShapeTests`. The baseline
+Unicode conversion also stops at the first NUL. The pending native backport uses explicit
+lengths for both Unicode and ANSI conversion, preserving embedded NULs in sized properties.
 
 ## Resolved
+
+### An unreadable property was always reported as missing
+
+The compat throwing getters now use `EventRecordRef.DescribeUnreadable` to distinguish a
+property absent from the schema from a stalled offset walk, an unresolved length, a payload
+overrun, a present zero-length value, or a value rejected by the requested type. Previously
+all could look like a missing property, hiding the cause of runtime decoding failures.
+The diagnostic is built only on the throwing path; `TryGet*` and default-returning
+accessors keep their existing failure semantics. `UnreadablePropertyDiagnosticsTests`
+covers each cause independently. This diagnostic surface is not part of the native backport.
 
 ### A failed `Open` leaked the ETW session
 
@@ -806,7 +902,10 @@ TraceLogging leaves `EVENT_DESCRIPTOR.Id` at 0 — unlike `EventSource`, which a
 per `Write<T>` call site (measured: 153 and 154 for two shapes). So for a native provider the
 whole descriptor is identical across every event, and the metadata block is the only thing
 separating one event's layout from another's. The cache keyed on the event *name*, which is
-not enough, and krabs keys the same way (`schema_key::name`).
+not enough. Native krabs still uses that policy by default, but upstream #282 added
+`Provider.EnableTraceLoggingFullSchemaHashing()` (native
+`provider::enable_trace_logging_full_schema_hashing()`), called before enabling the
+provider, to include the full-metadata hash.
 
 Measured against a real native provider, two distinct failures:
 
@@ -823,7 +922,18 @@ the insertion point shifts. And which layout wins is a race — whichever the tr
 
 The key is now the hash of the whole metadata block, and collisions are resolved by
 comparing the block rather than the name. Each distinct field layout gets its own entry.
-Covered by `TraceLoggingSchemaKeyTests`; reverting to the name fails two of its three cases.
+Covered by `TraceLoggingSchemaKeyTests`, including same-name/different-layout events.
+
+The pending native backport adds exact metadata equality as well as the existing hash,
+while keeping upstream's per-provider opt-in. Its collision regression injects an equal
+digest at the `schema_key` boundary; unlike the managed regression below, it is not a
+real FNV collision fixture. Native keys do not need pointer width because cached schemas
+do not bake in record-specific property offsets.
+
+Both implementations accept metadata whose declared size is at least two bytes and no
+larger than its extended-data item. Outer padding is excluded from event-name parsing,
+hashing and equality. This preserves the upstream #282 padding fix;
+`TraceSchemaCacheCoverageTests` and `TraceLoggingSchemaKeyTests` cover the managed path.
 
 An entry that loses the comparison used to be *replaced* by the one that won, which was safe
 — nothing can be misdecoded when the whole block is compared before an entry is returned —
@@ -911,7 +1021,8 @@ The port padded the record's pointer width instead — correct on a 64-bit recor
 coincidence, four bytes short on a 32-bit one, where the reader then swallowed the first
 half of the next property. Now always eight. Covered by `UnfilledPropertyTests`.
 
-krabs pads `sizeof(PSID)` and has the same defect, with the same coincidence hiding it.
+Baseline krabs pads `sizeof(PSID)` and has the same defect. The pending native backport
+uses the eight-byte SID header and includes a 32-bit-source regression.
 
 ### A synthetic payload of 64 KiB or more wrapped silently
 
@@ -919,7 +1030,8 @@ krabs pads `sizeof(PSID)` and has the same defect, with the same coincidence hid
 it. A larger payload wrapped, so the record decoded as a much shorter one and every property
 past the wrapped length was reported absent — a fixture failing for a reason nowhere near
 the code under test. `Pack` now refuses to build it. Covered by `OversizedRecordTests`,
-which also pins the largest payload that still fits.
+which also pins the largest payload that still fits: 65535 bytes. The pending native
+backport adds the same check before narrowing the size to `USHORT`.
 
 ### A cached schema baked in the emitting process's pointer width
 
@@ -933,7 +1045,8 @@ set. Everything after the pointer was then read four bytes out. Where the wrong 
 still landed inside `UserDataLength` it produced a wrong value with no error at all.
 
 krabs is immune because it derives the pointer width per event
-(`size_provider::get_property_size`) and caches no offsets. This is port-only, and
+(`size_provider::get_property_size`) and does not bake offsets into cached schemas.
+Its parser's offset memoisation is per record. This is port-only, and
 mixed-bitness providers are ordinary: any manifest provider used from both a 32-bit and a
 64-bit process on the same machine hits it.
 
@@ -961,14 +1074,16 @@ with the old value on a live machine.
 
 krabs issues `EVENT_CONTROL_CODE_CAPTURE_STATE` from `process_trace`, immediately before
 `ProcessTrace`, with a comment recording that the timing was found to matter. The port
-issued it from `EnableMerged`, i.e. during `Open`. Because `Open` and `Start` are separate
-public calls here — they are one call in krabs — the gap in front of `ProcessTrace` was
-unbounded rather than merely early.
+issued it from `EnableMerged`, i.e. during `Open`, so a caller that separated `Open` and
+`Start` could leave an unbounded gap before processing. Native krabs also exposes separate
+public `open` and `process` calls; the important difference is where rundown is requested,
+not whether the lifecycle can be split.
 
 Now issued from `Start`, immediately before `ProcessTrace`, matching krabs. A provider
 enabled *after* `Start` has already passed that point gets its own `CAPTURE_STATE` from
-`Enable`, since there is no later one to wait for; krabs cannot reach that state at all,
-because it has no public `Enable`-while-running.
+`Enable`, since there is no later one to wait for. Native `trace::enable` only appends a
+provider reference; it does not perform the port's live enablement or publish an immutable
+routing snapshot. Its existence is not a guarantee of thread-safe enable-while-running.
 
 An honest note on evidence: this change restores krabs' ordering, but the loss it is meant
 to prevent could not be reproduced on Windows 11 with Kernel-Process. `RundownTests`
@@ -1006,8 +1121,9 @@ record no provider could emit, with every later property shifted. Strings were a
 validated this way (`RequireDeclaredLength`); binaries are now too. Covered by
 `FixedWidthBinaryTests`.
 
-krabs has the same gap in `record_builder.hpp`, and like the pointer padding defect it is
-only reachable through the testing surface.
+Baseline krabs has the same gap in `record_builder.hpp`. The pending native backport
+validates declared and referenced string/binary lengths too. Like the pointer-padding
+defect, this is only reachable through the testing surface.
 
 ### A synthetic record could be finalized while it was being read
 
@@ -1023,7 +1139,9 @@ Both call sites now keep the record alive across dispatch. Covered by
 `SynthRecordLifetimeTests`, which collects from inside the ref handler, the compat handler
 and a predicate; two of the three faulted reliably on net48 before the fix.
 
-This has no analogue in krabs, whose records are not garbage collected.
+Native C++ records are not garbage collected, but the C++/CLI `SynthRecord` owner is.
+The pending C++/CLI backport adds keep-alives around both `Proxy.PushEvent` and
+`Predicate.Test` so temporary records and their owners survive the native dispatch.
 
 ### `RecordBuilder` padded unfilled pointers to the wrong width
 
@@ -1032,7 +1150,8 @@ but an unfilled one padded `IntPtr.Size` bytes — the width of a pointer in the
 running the test. Building a 32-bit-source record with an unfilled pointer therefore
 misplaced every property after it. Both now use the record's own width.
 
-krabs has the same defect (`how_many_bytes_to_fill` pads `sizeof(void*)`), and it is only
+Baseline krabs has the same defect (`how_many_bytes_to_fill` pads `sizeof(void*)`).
+The pending native backport reads the record header's bitness instead. This is only
 reachable through the testing surface.
 
 ### ANSI string decoding used UTF-8

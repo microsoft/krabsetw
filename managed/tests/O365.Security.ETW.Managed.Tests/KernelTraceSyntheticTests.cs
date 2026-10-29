@@ -31,7 +31,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                 trace.DefaultMetadata = defaultMetadata;
                 trace.DefaultEventRef = defaultEventRef;
                 trace.DefaultError = defaultError;
-                trace.DefaultUnhandledException = unhandled;
+                trace.DefaultUnhandledException += unhandled;
                 trace.StopOnHandlerException = false;
 #pragma warning disable CS0618
                 trace.SetDefaultEventCallback(obsoleteDefaultEvent);
@@ -44,8 +44,11 @@ namespace Microsoft.O365.Security.ETW.Tests
                 Assert.Same(defaultMetadata, trace.DefaultMetadata);
                 Assert.Same(defaultEventRef, trace.DefaultEventRef);
                 Assert.Same(defaultError, trace.DefaultError);
-                Assert.Same(unhandled, trace.DefaultUnhandledException);
                 Assert.False(trace.StopOnHandlerException);
+
+                // DefaultUnhandledException is an event, so it cannot be read back. That it
+                // reaches subscribers is covered by HandlerExceptionTests.
+                trace.DefaultUnhandledException -= unhandled;
             }
         }
 
@@ -102,7 +105,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             using (EventSchema.Use(Declaration(FirstProviderId)))
             using (var trace = new KernelTrace())
             {
-                trace.DefaultUnhandledException = e => traceReports.Add(e);
+                trace.DefaultUnhandledException += e => traceReports.Add(e);
                 using var proxy = new Proxy(trace);
                 trace.Enable(provider);
 

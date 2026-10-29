@@ -154,7 +154,7 @@ namespace Microsoft.O365.Security.ETW
 
         internal void RaiseUnhandledException(IEventRecordException exception)
         {
-            OnUnhandledException?.Invoke(exception);
+            TraceContext.RaiseEachContained(OnUnhandledException, exception);
         }
 
         /// <summary>

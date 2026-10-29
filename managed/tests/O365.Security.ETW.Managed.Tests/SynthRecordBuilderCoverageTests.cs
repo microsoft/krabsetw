@@ -19,6 +19,24 @@ namespace Microsoft.O365.Security.ETW.Tests
 
         private delegate void RefAssert(in EventRecordRef record);
 
+        [Theory]
+        [InlineData(0u)]
+        [InlineData(4321u)]
+        [InlineData(uint.MaxValue)]
+        public void HeaderProcessIdReachesBothRecordSurfaces(uint processId)
+        {
+            using (EventSchema.Use(EventSchema.Create("Contoso-Header", ProviderId, id: 21, version: 0)))
+            using (var builder = new RecordBuilder(ProviderId, id: 21, version: 0))
+            {
+                builder.Header.ProcessId = processId;
+
+                Push(
+                    builder.Pack(),
+                    (in EventRecordRef record) => Assert.Equal(processId, record.ProcessId),
+                    record => Assert.Equal(processId, record.ProcessId));
+            }
+        }
+
         [Fact]
         public void SystemTimeIsWrittenAsEightLittleEndianFields()
         {

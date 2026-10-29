@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Microsoft.O365.Security.ETW;
 using Microsoft.O365.Security.ETW.Testing;
@@ -67,7 +68,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             ushort id = 0;
             Guid provider = Guid.Empty;
 
-            Run(throwOn: 1, configure: t => t.DefaultUnhandledException = e =>
+            Run(throwOn: 1, configure: t => t.DefaultUnhandledException += e =>
             {
                 id = e.Record.Id;
                 provider = e.Record.ProviderId;
@@ -151,7 +152,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             var trace = new UserTrace();
             trace.DefaultEventRef = (in EventRecordRef record) =>
                 throw new InvalidOperationException("default handler failed");
-            trace.DefaultUnhandledException = e => reports.Add(e);
+            trace.DefaultUnhandledException += e => reports.Add(e);
 
             // No provider is enabled, so nothing claims the event and it falls to the
             // trace-level default handler above.
@@ -162,6 +163,129 @@ namespace Microsoft.O365.Security.ETW.Tests
 
             Assert.Single(reports);
             Assert.Equal("default handler failed", reports[0].Exception.Message);
+        }
+
+        /// <summary>
+        /// Every subscriber is told, rather than the last registration winning.
+        /// </summary>
+        /// <remarks>
+        /// Locks in the multi-subscriber behaviour the event form is meant to guarantee. It
+        /// does not by itself prove the API shape: <c>+=</c> compiled against the previous
+        /// settable property too, via get/Combine/set. What the event adds is that <c>=</c>
+        /// no longer compiles, so a second reporter can no longer silently replace the first
+        /// -- enforcement the compiler provides and a test cannot.
+        ///
+        /// It also does not prove delivery, since every subscriber here returns normally.
+        /// <see cref="AThrowingReporterDoesNotSilenceTheOnesAfterIt"/> covers the case where
+        /// one throws, which registration alone does not survive.
+        /// </remarks>
+        [Fact]
+        public void EverySubscriberIsToldRatherThanTheLastRegistrationWinning()
+        {
+            var first = new System.Collections.Generic.List<IEventRecordException>();
+            var second = new System.Collections.Generic.List<IEventRecordException>();
+
+            var trace = new UserTrace();
+            trace.DefaultEventRef = (in EventRecordRef record) =>
+                throw new InvalidOperationException("default handler failed");
+
+            trace.DefaultUnhandledException += e => first.Add(e);
+            trace.DefaultUnhandledException += e => second.Add(e);
+
+            using (EventSchema.Use(Declaration(ProviderId)))
+            {
+                PushThrowing(new Proxy(trace), ProviderId);
+            }
+
+            Assert.Single(first);
+            Assert.Single(second);
+            Assert.Equal("default handler failed", first[0].Exception.Message);
+            Assert.Equal("default handler failed", second[0].Exception.Message);
+        }
+
+        /// <summary>
+        /// A subscriber that unsubscribes stops being told, and leaves the others alone.
+        /// </summary>
+        [Fact]
+        public void AnUnsubscribedReporterStopsBeingTold()
+        {
+            var kept = new System.Collections.Generic.List<IEventRecordException>();
+            var removed = new System.Collections.Generic.List<IEventRecordException>();
+
+            var trace = new UserTrace();
+            trace.DefaultEventRef = (in EventRecordRef record) =>
+                throw new InvalidOperationException("default handler failed");
+
+            EventRecordExceptionDelegate goes = e => removed.Add(e);
+            trace.DefaultUnhandledException += e => kept.Add(e);
+            trace.DefaultUnhandledException += goes;
+            trace.DefaultUnhandledException -= goes;
+
+            using (EventSchema.Use(Declaration(ProviderId)))
+            {
+                PushThrowing(new Proxy(trace), ProviderId);
+            }
+
+            Assert.Single(kept);
+            Assert.Empty(removed);
+        }
+
+        /// <summary>
+        /// A reporter that throws does not silence the reporters registered after it.
+        /// </summary>
+        /// <remarks>
+        /// Making this an event stops a subscriber being discarded at registration, but that
+        /// is only half the guarantee: a multicast delegate invoked as one call abandons the
+        /// rest of its invocation list the moment one subscriber throws. A health reporter
+        /// that failed would take the log down with it, silently, since the throw is caught
+        /// and recorded as diagnostics. Each subscriber is therefore invoked separately.
+        /// </remarks>
+        [Fact]
+        public void AThrowingReporterDoesNotSilenceTheOnesAfterIt()
+        {
+            var later = new System.Collections.Generic.List<IEventRecordException>();
+
+            var trace = new UserTrace();
+            trace.DefaultEventRef = (in EventRecordRef record) =>
+                throw new InvalidOperationException("default handler failed");
+
+            trace.DefaultUnhandledException += _ => throw new InvalidOperationException("reporter failed");
+            trace.DefaultUnhandledException += e => later.Add(e);
+
+            using (EventSchema.Use(Declaration(ProviderId)))
+            {
+                PushThrowing(new Proxy(trace), ProviderId);
+            }
+
+            Assert.Single(later);
+            Assert.Equal("default handler failed", later[0].Exception.Message);
+        }
+
+        /// <summary>
+        /// The same containment on the provider-level surface, which is the one most
+        /// consumers actually subscribe.
+        /// </summary>
+        [Fact]
+        public void AThrowingProviderReporterDoesNotSilenceTheOnesAfterIt()
+        {
+            var later = new System.Collections.Generic.List<IEventRecordException>();
+
+            var provider = new Provider(ProviderId);
+            provider.OnEventRef += (in EventRecordRef record) =>
+                throw new InvalidOperationException("handler failed");
+            provider.OnUnhandledException += _ => throw new InvalidOperationException("reporter failed");
+            provider.OnUnhandledException += e => later.Add(e);
+
+            var trace = new UserTrace();
+            trace.Enable(provider);
+
+            using (EventSchema.Use(Declaration(ProviderId)))
+            {
+                PushThrowing(new Proxy(trace), ProviderId);
+            }
+
+            Assert.Single(later);
+            Assert.Equal("handler failed", later[0].Exception.Message);
         }
 
         /// <summary>
@@ -196,7 +320,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             provider.OnEventRef += (in EventRecordRef record) =>
                 throw new InvalidOperationException("handler failed");
             provider.OnUnhandledException += _ => throw new NotSupportedException("reporter failed");
-            trace.DefaultUnhandledException = _ => traceReports++;
+            trace.DefaultUnhandledException += _ => traceReports++;
 
             using (EventSchema.Use(Declaration(ProviderId)))
             {
@@ -229,6 +353,103 @@ namespace Microsoft.O365.Security.ETW.Tests
                 new System.Collections.Generic.List<IEventRecordException>();
         }
 
+        /// <summary>
+        /// A reporting surface that throws must not be able to deny the stop.
+        /// </summary>
+        /// <remarks>
+        /// By the time the reports go out <c>Stopping</c> is set, so every event ETW is still
+        /// draining is dropped. If the stop request were skipped as well, CloseTrace would
+        /// never be called, ProcessTrace would never return and Start would never rethrow --
+        /// a session that consumes and delivers nothing, which is the failure the whole path
+        /// exists to avoid. Which surface a consumer happens to subscribe is not something
+        /// they should have to weigh against that.
+        /// </remarks>
+        [Theory]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public void AThrowingReporterCannotDenyTheStop(bool providerThrows, bool traceThrows)
+        {
+            var host = new StubTraceHost();
+
+            Reporting(providerThrows, traceThrows, host);
+
+            Assert.Equal(1, host.Stops);
+        }
+
+        /// <summary>
+        /// Both reporting surfaces are contained the same way, so a throw on either stays
+        /// recoverable as a diagnostic rather than vanishing.
+        /// </summary>
+        [Fact]
+        public void AThrowingTraceLevelReporterIsRecordedRatherThanLost()
+        {
+            TraceContext.LastReportingException = null;
+
+            Reporting(providerThrows: false, traceThrows: true);
+
+            Assert.IsType<InvalidOperationException>(TraceContext.LastReportingException);
+            Assert.Equal("trace reporter failed", TraceContext.LastReportingException.Message);
+        }
+
+        /// <summary>
+        /// The provider-level surface throwing must not stop the trace-level one being told.
+        /// </summary>
+        [Fact]
+        public void AThrowingProviderReporterDoesNotDenyTheTraceLevelReport()
+        {
+            var reports = new List<IEventRecordException>();
+
+            Reporting(
+                providerThrows: true,
+                traceThrows: false,
+                configure: context => context.DefaultException = e => reports.Add(e));
+
+            Assert.Single(reports);
+            Assert.Equal("handler failed", reports[0].Exception.Message);
+        }
+
+        /// <summary>
+        /// Drives the exception path directly, which is where the ordering guarantee lives.
+        /// A trace would only add its own stop on top of the request being asserted, and the
+        /// context already exposes everything needed to stand in for one.
+        /// </summary>
+        private static unsafe void Reporting(
+            bool providerThrows,
+            bool traceThrows,
+            StubTraceHost host = null,
+            Action<TraceContext> configure = null)
+        {
+            var context = new TraceContext(host ?? new StubTraceHost());
+            var provider = new Provider(ProviderId);
+
+            if (providerThrows)
+            {
+                provider.OnUnhandledException += _ => throw new InvalidOperationException("provider reporter failed");
+            }
+
+            if (traceThrows)
+            {
+                context.DefaultException = _ => throw new InvalidOperationException("trace reporter failed");
+            }
+
+            context.SetProviders(new List<Provider> { provider });
+            configure?.Invoke(context);
+
+            using (EventSchema.Use(Declaration(ProviderId)))
+            using (var builder = new RecordBuilder(ProviderId, id: 7, version: 0))
+            {
+                builder.AddValue("ProcessId", 4321u);
+
+                using (SynthRecord record = builder.Pack())
+                {
+                    context.HandleDispatchException(
+                        record.Record,
+                        new InvalidOperationException("handler failed"));
+                }
+            }
+        }
+
         private static RunResult Run(int throwOn, Action<UserTrace> configure = null, int events = 1)
         {
             var result = new RunResult();
@@ -247,7 +468,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             provider.OnUnhandledException += e => result.ProviderReports.Add(e);
 
             var trace = new UserTrace();
-            trace.DefaultUnhandledException = e => result.TraceReports.Add(e);
+            trace.DefaultUnhandledException += e => result.TraceReports.Add(e);
             configure?.Invoke(trace);
 
             using (EventSchema.Use(Declaration(ProviderId)))

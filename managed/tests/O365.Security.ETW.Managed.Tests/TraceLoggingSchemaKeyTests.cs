@@ -78,18 +78,45 @@ namespace Microsoft.O365.Security.ETW.Tests
             }
         }
 
-        [Fact]
-        public void TwoShapesSharingANameGetSeparateEntries()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void TwoShapesSharingANameGetSeparateEntries(bool padded)
         {
             using (var cache = new SchemaCache())
             {
                 byte[] shapeA = MetadataBlock("Ambiguous", 0x01, 0x04);
                 byte[] shapeB = MetadataBlock("Ambiguous", 0x01, 0x04, 0x02, 0x08);
 
+                if (padded)
+                {
+                    Array.Resize(ref shapeA, shapeA.Length + 2);
+                    Array.Resize(ref shapeB, shapeB.Length + 2);
+                }
+
                 Push(cache, shapeA);
                 Push(cache, shapeB);
 
                 Assert.Equal(2, cache.Misses);
+            }
+        }
+
+        [Fact]
+        public void PaddingDoesNotChangeSchemaIdentity()
+        {
+            using (var cache = new SchemaCache())
+            {
+                byte[] shape = MetadataBlock("Padded", 0x01, 0x04);
+                byte[] padded = (byte[])shape.Clone();
+                Array.Resize(ref padded, padded.Length + 2);
+                padded[padded.Length - 1] = 0xAA;
+                SchemaEntry entry = Push(cache, shape);
+
+                Assert.Same(entry, Push(cache, padded));
+                padded[padded.Length - 1] = 0xBB;
+                Assert.Same(entry, Push(cache, padded));
+                Assert.Same(entry, Push(cache, shape));
+                Assert.Equal(1, cache.Misses);
             }
         }
 

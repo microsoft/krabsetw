@@ -38,6 +38,12 @@ namespace Microsoft.O365.Security.ETW.Tests
                 Assert.True(ExtendedData.TryGetProcessStartKey(&record, out ulong actualProcessStartKey));
                 Assert.Equal(processStartKey, actualProcessStartKey);
 
+                var view = new EventRecordRef(&record, null);
+                Assert.True(view.TryGetContainerId(out Guid borrowedContainerId));
+                Assert.Equal(containerId, borrowedContainerId);
+                Assert.True(view.TryGetProcessStartKey(out ulong borrowedProcessStartKey));
+                Assert.Equal(processStartKey, borrowedProcessStartKey);
+
                 var items = (EVENT_HEADER_EXTENDED_DATA_ITEM*)packed.Pointer;
                 Assert.Equal(NativeConstants.EVENT_HEADER_EXT_TYPE_CONTAINER_ID, items[0].ExtType);
                 Assert.Equal(36, items[0].DataSize);
@@ -68,6 +74,9 @@ namespace Microsoft.O365.Security.ETW.Tests
                 {
                     Assert.False(ExtendedData.TryGetContainerId(record, out Guid truncated));
                     Assert.Equal(Guid.Empty, truncated);
+                    var view = new EventRecordRef(record, null);
+                    Assert.False(view.TryGetContainerId(out Guid borrowed));
+                    Assert.Equal(Guid.Empty, borrowed);
                 });
 
             WithOneItem(
@@ -99,7 +108,22 @@ namespace Microsoft.O365.Security.ETW.Tests
                 {
                     Assert.False(ExtendedData.TryGetProcessStartKey(record, out ulong truncated));
                     Assert.Equal(0ul, truncated);
+                    var view = new EventRecordRef(record, null);
+                    Assert.False(view.TryGetProcessStartKey(out ulong borrowed));
+                    Assert.Equal(0ul, borrowed);
                 });
+        }
+
+        [Fact]
+        public void BorrowedExtendedDataReadersReturnFalseWhenItemsAreAbsent()
+        {
+            var record = default(EVENT_RECORD);
+            var view = new EventRecordRef(&record, null);
+
+            Assert.False(view.TryGetProcessStartKey(out ulong key));
+            Assert.Equal(0ul, key);
+            Assert.False(view.TryGetContainerId(out Guid container));
+            Assert.Equal(Guid.Empty, container);
         }
 
         [Fact]

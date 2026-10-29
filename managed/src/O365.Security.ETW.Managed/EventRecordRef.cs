@@ -237,6 +237,18 @@ namespace Microsoft.O365.Security.ETW
 
         #endregion
 
+        /// <summary>Reads the raw process start key without resolving the event schema.</summary>
+        public bool TryGetProcessStartKey(out ulong result)
+        {
+            return ExtendedData.TryGetProcessStartKey(_record, out result);
+        }
+
+        /// <summary>Reads the source container identity without resolving the event schema.</summary>
+        public bool TryGetContainerId(out Guid result)
+        {
+            return ExtendedData.TryGetContainerId(_record, out result);
+        }
+
         #region Schema strings
 
         /// <summary>Event name, as a view into the cached schema. Does not allocate.</summary>
@@ -325,6 +337,65 @@ namespace Microsoft.O365.Security.ETW
             }
 
             return schema.Table.IndexOf(name, (byte*)schema.Blob);
+        }
+
+        /// <summary>Builds a diagnostic message explaining why a property could not be read.</summary>
+        /// <param name="name">The name of the property that could not be read.</param>
+        /// <returns>
+        /// A message naming the cause: the property is absent from the schema, the offset walk
+        /// stalled before reaching it, it is declared past the end of this event's payload, it is
+        /// present but zero-length, or its value was rejected by the requested type.
+        /// </returns>
+        /// <remarks>
+        /// For diagnostics only.
+        /// <see cref="TryGetRaw(ReadOnlySpan{char}, out ReadOnlySpan{byte})"/> reports all of these
+        /// causes as a bare <see langword="false" />.
+        /// </remarks>
+        internal string DescribeUnreadable(ReadOnlySpan<char> name)
+        {
+            var schema = Schema;
+            var table = schema?.Table;
+            if (table == null)
+            {
+                return "no schema could be resolved for this event";
+            }
+
+            int index = table.IndexOf(name, (byte*)schema!.Blob);
+            if (index < 0)
+            {
+                return "not declared in the event schema";
+            }
+
+            int offset = Offsets.GetOffset(index);
+            if (offset < 0)
+            {
+                return FormattableString.Invariant(
+                    $"declared at schema index {index}, but the offset walk stalled before it; the payload is {UserDataLength} bytes and ends inside an earlier property");
+            }
+
+            int size = Offsets.SizeOf(index, offset);
+            if (size < 0)
+            {
+                // A fixed-width property that does not fit arrives here rather than at a
+                // size that overruns the payload: SizeOf refuses such a length outright.
+                int declared = Offsets.FixedSizeOf(index);
+                if (declared > 0 && offset + declared > UserDataLength)
+                {
+                    return FormattableString.Invariant(
+                        $"declared at schema index {index}, offset {offset}, length {declared}, which runs past the {UserDataLength}-byte payload");
+                }
+
+                return FormattableString.Invariant($"declared at schema index {index}, offset {offset}, but its length could not be resolved");
+            }
+
+            if (size == 0)
+            {
+                return FormattableString.Invariant(
+                    $"declared at schema index {index}, offset {offset}, but this event carries a zero-length value for it, so there is nothing to decode");
+            }
+
+            return FormattableString.Invariant(
+                $"present as {size} bytes at offset {offset}, but the requested type rejected the value");
         }
 
         /// <summary>

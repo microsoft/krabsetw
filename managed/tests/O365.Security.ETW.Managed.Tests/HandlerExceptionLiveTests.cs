@@ -32,7 +32,7 @@ namespace Microsoft.O365.Security.ETW.Tests
 
                 provider.AddFilter(filter);
                 provider.OnUnhandledException += e => providerReport = e;
-                trace.DefaultUnhandledException = e => traceReport = e;
+                trace.DefaultUnhandledException += e => traceReport = e;
 
                 trace.Enable(provider);
                 trace.Open();
@@ -114,7 +114,7 @@ namespace Microsoft.O365.Security.ETW.Tests
 
                 provider.AddFilter(filter);
                 trace.StopOnHandlerException = false;
-                trace.DefaultUnhandledException = e =>
+                trace.DefaultUnhandledException += e =>
                 {
                     if (Interlocked.Increment(ref reports) >= 3)
                     {

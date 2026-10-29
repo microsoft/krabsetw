@@ -51,6 +51,58 @@ namespace Microsoft.O365.Security.ETW.Tests
         }
 
         [Fact]
+        public void TraceLoggingMetadataIgnoresTrailingItemPadding()
+        {
+            byte[] metadata = { 0x06, 0x00, 0x00, (byte)'O', (byte)'k', 0x00, 0xAA, 0xBB };
+
+            fixed (byte* block = metadata)
+            {
+                var item = stackalloc EVENT_HEADER_EXTENDED_DATA_ITEM[1];
+                var record = RecordWithMetadata(block, metadata.Length, item);
+
+                Assert.Equal(metadata.AsSpan(0, 6).ToArray(), TraceLoggingMetadata.GetMetadata(&record).ToArray());
+                Assert.Equal("Ok", Ascii(TraceLoggingMetadata.GetEventName(&record)));
+            }
+        }
+
+        [Fact]
+        public void TraceLoggingEventNameDoesNotReadIntoItemPadding()
+        {
+            byte[] metadata =
+            {
+                0x07, 0x00, 0x00,
+                (byte)'R', (byte)'e', (byte)'s', (byte)'t',
+                (byte)'X', 0x00
+            };
+
+            fixed (byte* block = metadata)
+            {
+                var item = stackalloc EVENT_HEADER_EXTENDED_DATA_ITEM[1];
+                var record = RecordWithMetadata(block, metadata.Length, item);
+
+                Assert.Equal("Rest", Ascii(TraceLoggingMetadata.GetEventName(&record)));
+            }
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(5)]
+        public void TraceLoggingMetadataRejectsDeclaredSizesOutsideTheItem(int declaredSize)
+        {
+            byte[] metadata = { (byte)declaredSize, 0x00, 0x00, 0x00 };
+
+            fixed (byte* block = metadata)
+            {
+                var item = stackalloc EVENT_HEADER_EXTENDED_DATA_ITEM[1];
+                var record = RecordWithMetadata(block, metadata.Length, item);
+
+                Assert.True(TraceLoggingMetadata.GetMetadata(&record).IsEmpty);
+                Assert.True(TraceLoggingMetadata.GetEventName(&record).IsEmpty);
+            }
+        }
+
+        [Fact]
         public void TraceLoggingMetadataRejectsMalformedBlocks()
         {
             byte[] tooSmall = { 0x01 };

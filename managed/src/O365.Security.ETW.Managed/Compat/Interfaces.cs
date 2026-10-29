@@ -137,10 +137,31 @@ namespace Microsoft.O365.Security.ETW
 
         bool TryGetIPAddress(string name, [MaybeNullWhen(false)] out IPAddress result);
 
-        SocketAddress GetSocketAddress(string name);
+        /// <summary>Gets the value of the named property as a socket address.</summary>
+        /// <param name="name">The name of the property whose value to get.</param>
+        /// <returns>
+        /// The socket address held by the property, or <see langword="null" /> if the property is
+        /// present but carries no address.
+        /// </returns>
+        /// <exception cref="ParserException">
+        /// <paramref name="name" /> is not found, cannot be decoded, or is too short to be a
+        /// socket address.
+        /// </exception>
+        SocketAddress? GetSocketAddress(string name);
 
         SocketAddress GetSocketAddress(string name, SocketAddress defaultValue);
 
+        /// <summary>Gets the value of the named property as a socket address.</summary>
+        /// <param name="name">The name of the property whose value to get.</param>
+        /// <param name="result">
+        /// When this method returns, the socket address held by the property, if it could be read;
+        /// otherwise, <see langword="null" />. This parameter is passed uninitialized.
+        /// </param>
+        /// <returns>
+        /// <see langword="true" /> if the socket address was retrieved; otherwise,
+        /// <see langword="false" />. Returns <see langword="false" /> if <paramref name="name" />
+        /// is not found, is not a socket address, or is of an invalid size.
+        /// </returns>
         bool TryGetSocketAddress(string name, [MaybeNullWhen(false)] out SocketAddress result);
 
         /// <remarks>

@@ -32,6 +32,7 @@ namespace Microsoft.O365.Security.ETW.Tests
 
             using (var inHandler = new ManualResetEventSlim(false))
             using (var releaseHandler = new ManualResetEventSlim(false))
+            using (var handlerResumed = new ManualResetEventSlim(false))
             using (var trace = new UserTrace("Krabs-StopDispose-" + Guid.NewGuid().ToString("N")))
             {
                 var filter = new EventFilter(Filter.EventNameIs("Interesting") && EtwHarness.ThisProcess);
@@ -43,6 +44,10 @@ namespace Microsoft.O365.Security.ETW.Tests
                     // Blocks until the test releases it, then calls back into the trace.
                     // Enable takes the same lock Stop does.
                     releaseHandler.Wait(TimeSpan.FromSeconds(30));
+
+                    // Stop is meant to return while the handler is still parked above, so
+                    // this must still be unset at the moment Stop returns.
+                    handlerResumed.Set();
 
                     try
                     {
@@ -79,12 +84,22 @@ namespace Microsoft.O365.Security.ETW.Tests
                 trace.Stop();
                 elapsed.Stop();
 
+                // Read before the release below: set here means Stop returned only once the
+                // handler had run, which is the wait this test exists to catch.
+                var waitedForTheHandler = handlerResumed.IsSet;
+
                 releaseHandler.Set();
 
+                Assert.False(
+                    waitedForTheHandler,
+                    "Stop returned only after the handler had finished. It is meant to signal " +
+                    "and return, not wait for handlers.");
+
+                // Coarse liveness bound, far above what Stop costs, so the test does not turn
+                // on the timing of an OS call on a loaded build agent.
                 Assert.True(
-                    elapsed.Elapsed < TimeSpan.FromSeconds(2),
-                    "Stop blocked for " + elapsed.Elapsed.TotalSeconds.ToString("F1") +
-                    "s. It is meant to signal and return, not wait for handlers.");
+                    elapsed.Elapsed < TimeSpan.FromSeconds(10),
+                    "Stop blocked for " + elapsed.Elapsed.TotalSeconds.ToString("F1") + "s.");
 
                 emitting.Join(TimeSpan.FromSeconds(10));
                 processing.Join(TimeSpan.FromSeconds(30));

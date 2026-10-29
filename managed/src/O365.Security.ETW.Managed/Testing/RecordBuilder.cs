@@ -40,6 +40,13 @@ namespace Microsoft.O365.Security.ETW.Testing
             get { return _builder.HeaderFlags; }
             set { _builder.HeaderFlags = value; }
         }
+
+        /// <summary>Gets or sets the process id in the synthetic event header.</summary>
+        public uint ProcessId
+        {
+            get { return _builder.HeaderProcessId; }
+            set { _builder.HeaderProcessId = value; }
+        }
     }
 
     /// <summary>
@@ -93,6 +100,12 @@ namespace Microsoft.O365.Security.ETW.Testing
         {
             get { return _header.Flags; }
             set { _header.Flags = value; }
+        }
+
+        internal uint HeaderProcessId
+        {
+            get { return _header.ProcessId; }
+            set { _header.ProcessId = value; }
         }
 
         /// <summary>Adds a property with an ANSI string to the record.</summary>

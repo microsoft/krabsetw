@@ -13,6 +13,110 @@ namespace Microsoft.O365.Security.ETW.Tests
         private static readonly Guid ProviderId = Guid.Parse("d028de6e-0ec2-4d2f-bfe2-24c52ccfbd57");
 
         [Fact]
+        public void NonadjacentRegistrationsWithTheSameGuidDispatchIndependentFilters()
+        {
+            int rejected = 0;
+            int unrelated = 0;
+            int defaults = 0;
+            string order = string.Empty;
+            var firstFilter = new EventFilter(20);
+            firstFilter.OnEventRef += (in EventRecordRef record) => rejected++;
+            var secondFilter = new EventFilter(21);
+            secondFilter.OnEventRef += (in EventRecordRef record) => order += "r";
+            var thirdFilter = new EventFilter(21);
+            thirdFilter.OnEvent += record =>
+            {
+                Assert.Equal(42u, record.GetUInt32("Value"));
+                order += "c";
+            };
+            var first = new Provider(ProviderId);
+            first.AddFilter(firstFilter);
+            var second = new Provider(ProviderId);
+            second.AddFilter(secondFilter);
+            var third = new Provider(ProviderId);
+            third.AddFilter(thirdFilter);
+            var other = new Provider(Guid.NewGuid());
+            other.OnEventRef += (in EventRecordRef record) => unrelated++;
+
+            using (var trace = new UserTrace())
+            using (var proxy = new Proxy(trace))
+            using (EventSchema.Use(Declaration()))
+            using (SynthRecord record = BuildRecord())
+            {
+                trace.DefaultEventRef = (in EventRecordRef evt) => defaults++;
+                trace.Enable(first);
+                trace.Enable(other);
+                trace.Enable(second);
+                trace.Enable(third);
+
+                proxy.PushEvent(record);
+
+                Assert.Equal("rc", order);
+                Assert.Equal(0, rejected);
+                Assert.Equal(0, unrelated);
+                Assert.Equal(0, defaults);
+                Assert.Equal(1UL, trace.EventsHandledCount);
+            }
+        }
+
+        [Theory]
+        [InlineData(1)]
+        [InlineData(2)]
+        public void LaterRegistrationExceptionsAreAttributedAndClearedBeforeTheNextEvent(int failingIndex)
+        {
+            var providers = new[] { new Provider(ProviderId), new Provider(ProviderId), new Provider(ProviderId) };
+            var reports = new int[providers.Length];
+            var calls = new int[providers.Length];
+            var firstFailure = new InvalidOperationException("first registration failed");
+            var laterFailure = new InvalidOperationException("later registration failed");
+            bool failLater = true;
+            IEventRecord borrowed = null;
+            IEventRecordException traceReport = null;
+
+            for (int i = 0; i < providers.Length; i++)
+            {
+                int index = i;
+                providers[i].OnEvent += record =>
+                {
+                    calls[index]++;
+                    if ((failLater && index == failingIndex) || (!failLater && index == 0))
+                    {
+                        borrowed = record;
+                        throw failLater ? laterFailure : firstFailure;
+                    }
+                };
+                providers[i].OnUnhandledException += report => reports[index]++;
+            }
+
+            using (var trace = new UserTrace())
+            using (var proxy = new Proxy(trace))
+            using (EventSchema.Use(Declaration()))
+            using (SynthRecord record = BuildRecord())
+            {
+                trace.StopOnHandlerException = false;
+                trace.DefaultUnhandledException += report => traceReport = report;
+                for (int i = 0; i < providers.Length; i++)
+                {
+                    trace.Enable(providers[i]);
+                }
+
+                Assert.Same(laterFailure, Assert.Throws<InvalidOperationException>(() => proxy.PushEvent(record)));
+                Assert.Equal(1, reports[failingIndex]);
+                Assert.Equal(0, reports[0]);
+                Assert.Equal(failingIndex == 2 ? 1 : 0, calls[2]);
+                Assert.Same(laterFailure, traceReport.Exception);
+                Assert.Throws<InvalidOperationException>(() => borrowed.GetUInt32("Value"));
+
+                failLater = false;
+                Assert.Same(firstFailure, Assert.Throws<InvalidOperationException>(() => proxy.PushEvent(record)));
+                Assert.Equal(1, reports[0]);
+                Assert.Equal(1, reports[failingIndex]);
+                Assert.Same(firstFailure, traceReport.Exception);
+                Assert.Equal(2UL, trace.UnhandledExceptions);
+            }
+        }
+
+        [Fact]
         public void UnclaimedEventDispatchesMetadataThenRefThenCompatWhenSchemaResolves()
         {
             string order = string.Empty;
@@ -95,7 +199,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             using (var trace = new UserTrace())
             {
                 trace.StopOnHandlerException = false;
-                trace.DefaultUnhandledException = e =>
+                trace.DefaultUnhandledException += e =>
                 {
                     order += "t";
                     traceReport = e;
@@ -135,7 +239,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                 using (var trace = new UserTrace())
                 {
                     trace.StopOnHandlerException = false;
-                    trace.DefaultUnhandledException = e => traceReport = e;
+                    trace.DefaultUnhandledException += e => traceReport = e;
                     trace.Enable(provider);
 
                     using (EventSchema.Use(Declaration()))
@@ -192,7 +296,7 @@ namespace Microsoft.O365.Security.ETW.Tests
             {
                 for (int i = 0; i < contexts.Length; i++)
                 {
-                    contexts[i] = new TraceContext();
+                    contexts[i] = new TraceContext(new StubTraceHost());
                     indexes[i] = TraceRegistry.Register(contexts[i]);
                     registered = i + 1;
                     Assert.Same(contexts[i], TraceRegistry.Get(indexes[i]));

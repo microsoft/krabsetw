@@ -193,6 +193,30 @@ namespace Microsoft.O365.Security.ETW.Testing
             return Add(name, TdhInType.Binary, (ushort)length, 0);
         }
 
+        /// <summary>
+        /// Declares an IPv4 or IPv6 address: binary of the matching width, carrying the out-type
+        /// that marks it as an address.
+        /// </summary>
+        /// <param name="name">The name of the property to declare.</param>
+        /// <param name="v6">
+        /// <see langword="true" /> to declare an IPv6 address; <see langword="false" /> to declare
+        /// an IPv4 address.
+        /// </param>
+        /// <param name="length">
+        /// The width to declare in place of the one implied by <paramref name="v6" />, to create an
+        /// invalid record; or <see langword="null" /> to use the implied width.
+        /// </param>
+        /// <returns>The same <see cref="EventSchema" />, so that calls can be chained.</returns>
+        public EventSchema IPAddress(string name, bool v6 = false, int? length = null)
+        {
+            return Add(
+                name,
+                TdhInType.Binary,
+                (ushort)(length ?? (v6 ? 16 : 4)),
+                0,
+                v6 ? TdhOutType.Ipv6 : TdhOutType.Ipv4);
+        }
+
         internal bool Describes(Guid providerId, ushort id, byte version)
         {
             return _id == id && _version == version && _providerId == providerId;

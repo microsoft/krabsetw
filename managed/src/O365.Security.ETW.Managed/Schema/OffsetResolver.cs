@@ -128,6 +128,52 @@ namespace Microsoft.O365.Security.ETW.Schema
         }
 
         /// <summary>
+        /// Returns the width a property occupies from its schema alone, ignoring the payload.
+        /// </summary>
+        /// <param name="index">Index of the property in the schema.</param>
+        /// <returns>
+        /// The width in bytes, or -1 when the property has no width the schema fixes, such as a
+        /// string, a struct, or a payload-derived length or count.
+        /// </returns>
+        /// <remarks>
+        /// <see cref="SizeOf"/> refuses a length that would overrun the payload, so it cannot
+        /// report how wide a truncated property was meant to be. Diagnostics use this to tell a
+        /// property that does not fit from one whose length could not be worked out at all.
+        /// </remarks>
+        public int FixedSizeOf(int index)
+        {
+            if (_table == null || index < 0 || index >= _table.Count)
+            {
+                return -1;
+            }
+
+            uint flags = _table.Properties[index].Flags;
+            const uint NotFixed = NativeConstants.PropertyStruct
+                | NativeConstants.PropertyParamLength
+                | NativeConstants.PropertyParamCount;
+
+            if ((flags & NotFixed) != 0)
+            {
+                return -1;
+            }
+
+            ushort schemaLength = _table.Properties[index].Length;
+            int size = PropertySizer.TryGetFixedElementSize(
+                _table.Properties[index].InType,
+                _table.Properties[index].OutType,
+                schemaLength == 0 ? PropertySizer.LengthUnspecified : schemaLength,
+                _pointerSize);
+
+            if (size < 0)
+            {
+                return -1;
+            }
+
+            int count = _table.Properties[index].Count;
+            return size * (count == 0 ? 1 : count);
+        }
+
+        /// <summary>
         /// Returns the size in bytes of a property, resolving payload-derived lengths and counts.
         /// </summary>
         public int SizeOf(int index, int offset)

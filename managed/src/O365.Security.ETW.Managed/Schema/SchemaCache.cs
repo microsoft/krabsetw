@@ -463,9 +463,9 @@ namespace Microsoft.O365.Security.ETW.Schema
                 return default;
             }
 
-            // Guard against reading past the block.
+            // Size covers the metadata, not any trailing extended-data padding.
             ushort structSize = (ushort)(metadata[0] | (metadata[1] << 8));
-            if (structSize != metadataSize)
+            if (structSize < sizeof(ushort) || structSize > metadataSize)
             {
                 return default;
             }

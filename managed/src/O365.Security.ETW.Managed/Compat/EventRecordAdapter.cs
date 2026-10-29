@@ -227,7 +227,7 @@ namespace Microsoft.O365.Security.ETW
 
         public string GetUnicodeString(string name)
         {
-            return TryGetUnicodeString(name, out string? result) ? result : throw Missing(name);
+            return TryGetUnicodeString(name, out string? result) ? result : throw Unreadable(name);
         }
 
         public string GetUnicodeString(string name, string defaultValue)
@@ -249,7 +249,7 @@ namespace Microsoft.O365.Security.ETW
 
         public string GetCountedString(string name)
         {
-            return TryGetCountedString(name, out string? result) ? result : throw Missing(name);
+            return TryGetCountedString(name, out string? result) ? result : throw Unreadable(name);
         }
 
         public string GetCountedString(string name, string defaultValue)
@@ -271,7 +271,7 @@ namespace Microsoft.O365.Security.ETW
 
         public string GetAnsiString(string name)
         {
-            return TryGetAnsiString(name, out string? result) ? result : throw Missing(name);
+            return TryGetAnsiString(name, out string? result) ? result : throw Unreadable(name);
         }
 
         public string GetAnsiString(string name, string defaultValue)
@@ -308,49 +308,49 @@ namespace Microsoft.O365.Security.ETW
 
         #region Numbers
 
-        public sbyte GetInt8(string name) => TryGetInt8(name, out sbyte v) ? v : throw Missing(name);
+        public sbyte GetInt8(string name) => TryGetInt8(name, out sbyte v) ? v : throw Unreadable(name);
 
         public sbyte GetInt8(string name, sbyte defaultValue) => TryGetInt8(name, out sbyte v) ? v : defaultValue;
 
         public bool TryGetInt8(string name, out sbyte result) => Ref.TryGetInt8(name.AsSpan(), out result);
 
-        public byte GetUInt8(string name) => TryGetUInt8(name, out byte v) ? v : throw Missing(name);
+        public byte GetUInt8(string name) => TryGetUInt8(name, out byte v) ? v : throw Unreadable(name);
 
         public byte GetUInt8(string name, byte defaultValue) => TryGetUInt8(name, out byte v) ? v : defaultValue;
 
         public bool TryGetUInt8(string name, out byte result) => Ref.TryGetUInt8(name.AsSpan(), out result);
 
-        public short GetInt16(string name) => TryGetInt16(name, out short v) ? v : throw Missing(name);
+        public short GetInt16(string name) => TryGetInt16(name, out short v) ? v : throw Unreadable(name);
 
         public short GetInt16(string name, short defaultValue) => TryGetInt16(name, out short v) ? v : defaultValue;
 
         public bool TryGetInt16(string name, out short result) => Ref.TryGetInt16(name.AsSpan(), out result);
 
-        public ushort GetUInt16(string name) => TryGetUInt16(name, out ushort v) ? v : throw Missing(name);
+        public ushort GetUInt16(string name) => TryGetUInt16(name, out ushort v) ? v : throw Unreadable(name);
 
         public ushort GetUInt16(string name, ushort defaultValue) => TryGetUInt16(name, out ushort v) ? v : defaultValue;
 
         public bool TryGetUInt16(string name, out ushort result) => Ref.TryGetUInt16(name.AsSpan(), out result);
 
-        public int GetInt32(string name) => TryGetInt32(name, out int v) ? v : throw Missing(name);
+        public int GetInt32(string name) => TryGetInt32(name, out int v) ? v : throw Unreadable(name);
 
         public int GetInt32(string name, int defaultValue) => TryGetInt32(name, out int v) ? v : defaultValue;
 
         public bool TryGetInt32(string name, out int result) => Ref.TryGetInt32(name.AsSpan(), out result);
 
-        public uint GetUInt32(string name) => TryGetUInt32(name, out uint v) ? v : throw Missing(name);
+        public uint GetUInt32(string name) => TryGetUInt32(name, out uint v) ? v : throw Unreadable(name);
 
         public uint GetUInt32(string name, uint defaultValue) => TryGetUInt32(name, out uint v) ? v : defaultValue;
 
         public bool TryGetUInt32(string name, out uint result) => Ref.TryGetUInt32(name.AsSpan(), out result);
 
-        public long GetInt64(string name) => TryGetInt64(name, out long v) ? v : throw Missing(name);
+        public long GetInt64(string name) => TryGetInt64(name, out long v) ? v : throw Unreadable(name);
 
         public long GetInt64(string name, long defaultValue) => TryGetInt64(name, out long v) ? v : defaultValue;
 
         public bool TryGetInt64(string name, out long result) => Ref.TryGetInt64(name.AsSpan(), out result);
 
-        public ulong GetUInt64(string name) => TryGetUInt64(name, out ulong v) ? v : throw Missing(name);
+        public ulong GetUInt64(string name) => TryGetUInt64(name, out ulong v) ? v : throw Unreadable(name);
 
         public ulong GetUInt64(string name, ulong defaultValue) => TryGetUInt64(name, out ulong v) ? v : defaultValue;
 
@@ -362,7 +362,7 @@ namespace Microsoft.O365.Security.ETW
 
         public byte[] GetBinary(string name)
         {
-            return TryGetBinary(name, out byte[]? result) ? result : throw Missing(name);
+            return TryGetBinary(name, out byte[]? result) ? result : throw Unreadable(name);
         }
 
         public bool TryGetBinary(string name, [MaybeNullWhen(false)] out byte[] result)
@@ -377,16 +377,37 @@ namespace Microsoft.O365.Security.ETW
             return false;
         }
 
+        /// <summary>Gets the value of the named property as an IP address.</summary>
+        /// <param name="name">The name of the property whose value to get.</param>
+        /// <param name="result">
+        /// When this method returns, the IP address held by the property, if it could be read;
+        /// otherwise, <see langword="null" />. This parameter is passed uninitialized.
+        /// </param>
+        /// <returns>
+        /// <see langword="true" /> if the IP address was retrieved; otherwise,
+        /// <see langword="false" />. Returns <see langword="false" /> if <paramref name="name" />
+        /// is not found, is not marked as an address by its out-type, or has a width that does not
+        /// match that out-type.
+        /// </returns>
         public bool TryGetIPAddress(string name, [MaybeNullWhen(false)] out IPAddress result)
         {
             result = null;
 
-            if (!Ref.TryGetBinary(name.AsSpan(), out ReadOnlySpan<byte> raw))
+            if (!Ref.TryGetRaw(name.AsSpan(), out ReadOnlySpan<byte> raw, out _, out ushort outType))
             {
                 return false;
             }
 
-            if (raw.Length != 4 && raw.Length != 16)
+            // Matched together, not separately: IPAddress picks its family from the byte count, so
+            // an IPV4 property carrying sixteen bytes would otherwise read back as an IPv6 address.
+            int required = (TdhOutType)outType switch
+            {
+                TdhOutType.Ipv4 => 4,
+                TdhOutType.Ipv6 => 16,
+                _ => -1,
+            };
+
+            if (raw.Length != required)
             {
                 return false;
             }
@@ -397,11 +418,91 @@ namespace Microsoft.O365.Security.ETW
 
         public bool TryGetSocketAddress(string name, [MaybeNullWhen(false)] out SocketAddress result)
         {
-            result = null;
+            result = ReadSocketAddress(name, throwIfUnreadable: false);
+            return result != null;
+        }
 
-            if (!Ref.TryGetBinary(name.AsSpan(), out ReadOnlySpan<byte> raw) || raw.Length < 2)
+        public IPAddress GetIPAddress(string name)
+        {
+            return TryGetIPAddress(name, out IPAddress? v) ? v : throw Unreadable(name);
+        }
+
+        public IPAddress GetIPAddress(string name, IPAddress defaultValue)
+        {
+            return TryGetIPAddress(name, out IPAddress? v) ? v : defaultValue;
+        }
+
+        /// <summary>
+        /// Returns the property as a socket address.
+        /// </summary>
+        /// <param name="name">Name of the property to read.</param>
+        /// <returns>
+        /// The socket address, or <see langword="null"/> when the event carries the property as a
+        /// zero-length value. Null rather than an empty <see cref="SocketAddress"/> because the
+        /// type cannot represent one: its minimum size is two bytes, so there is no value to hand
+        /// back.
+        /// </returns>
+        /// <exception cref="ParserException">
+        /// The property is not declared in the event schema, or its value could not be decoded.
+        /// </exception>
+        /// <remarks>
+        /// A provider may declare a runtime-length socket address and then emit it empty on
+        /// events that have no address to report; Microsoft-Windows-TCPIP event 1422 does
+        /// exactly this. That is ordinary data rather than a fault, which is why it is a null
+        /// return and not an exception.
+        /// </remarks>
+        public SocketAddress? GetSocketAddress(string name)
+        {
+            return ReadSocketAddress(name, throwIfUnreadable: true);
+        }
+
+        public SocketAddress GetSocketAddress(string name, SocketAddress defaultValue)
+        {
+            return TryGetSocketAddress(name, out SocketAddress? v) ? v : defaultValue;
+        }
+
+        /// <summary>
+        /// Gets the value of the named property as a socket address, shared by the Try and throwing
+        /// forms so that both make a single schema lookup.
+        /// </summary>
+        /// <param name="name">The name of the property whose value to get.</param>
+        /// <param name="throwIfUnreadable">
+        /// <see langword="true" /> to throw when the property cannot be read;
+        /// <see langword="false" /> to return <see langword="null" />. A zero-length value returns
+        /// <see langword="null" /> either way.
+        /// </param>
+        /// <returns>
+        /// The socket address; or <see langword="null" /> if the property carries no address, or if
+        /// it could not be read and <paramref name="throwIfUnreadable" /> is
+        /// <see langword="false" />.
+        /// </returns>
+        /// <exception cref="ParserException">
+        /// <paramref name="throwIfUnreadable" /> is <see langword="true" /> and
+        /// <paramref name="name" /> is not found, cannot be decoded, or is too short to be a socket
+        /// address.
+        /// </exception>
+        private SocketAddress? ReadSocketAddress(string name, bool throwIfUnreadable)
+        {
+            if (!Ref.TryGetBinary(name.AsSpan(), out ReadOnlySpan<byte> raw))
             {
-                return false;
+                // Not resolvable: absent from the schema, behind a stalled offset walk, or
+                // declared past the end of this event's payload.
+                return throwIfUnreadable ? throw Unreadable(name) : null;
+            }
+
+            // Resolved, so the property is present. An empty value means the provider had no
+            // address to report, which is data rather than a fault. A resolvable value carries
+            // its own length, so there is no need to ask the schema a second time.
+            if (raw.Length == 0)
+            {
+                return null;
+            }
+
+            if (raw.Length < 2)
+            {
+                // Present, but too short to hold even the address family. Malformed rather than
+                // empty, so it stays loud.
+                return throwIfUnreadable ? throw Unreadable(name) : null;
             }
 
             var family = (AddressFamily)(raw[0] | (raw[1] << 8));
@@ -412,28 +513,7 @@ namespace Microsoft.O365.Security.ETW
                 address[i] = raw[i];
             }
 
-            result = address;
-            return true;
-        }
-
-        public IPAddress GetIPAddress(string name)
-        {
-            return TryGetIPAddress(name, out IPAddress? v) ? v : throw Missing(name);
-        }
-
-        public IPAddress GetIPAddress(string name, IPAddress defaultValue)
-        {
-            return TryGetIPAddress(name, out IPAddress? v) ? v : defaultValue;
-        }
-
-        public SocketAddress GetSocketAddress(string name)
-        {
-            return TryGetSocketAddress(name, out SocketAddress? v) ? v : throw Missing(name);
-        }
-
-        public SocketAddress GetSocketAddress(string name, SocketAddress defaultValue)
-        {
-            return TryGetSocketAddress(name, out SocketAddress? v) ? v : defaultValue;
+            return address;
         }
 
         /// <remarks>
@@ -444,7 +524,7 @@ namespace Microsoft.O365.Security.ETW
         /// </remarks>
         public DateTime GetDateTime(string name)
         {
-            return TryGetDateTime(name, out DateTime v) ? v : throw Missing(name);
+            return TryGetDateTime(name, out DateTime v) ? v : throw Unreadable(name);
         }
 
         /// <inheritdoc cref="GetDateTime(string)"/>
@@ -512,9 +592,18 @@ namespace Microsoft.O365.Security.ETW
 
         #endregion
 
-        private static ParserException Missing(string name)
+        /// <summary>
+        /// Builds the exception thrown when a Get accessor cannot produce a value.
+        /// </summary>
+        /// <param name="name">The name of the property that could not be read.</param>
+        /// <returns>
+        /// A <see cref="ParserException"/> whose message names the cause, resolved at throw time by
+        /// <see cref="EventRecordRef.DescribeUnreadable"/>.
+        /// </returns>
+        private ParserException Unreadable(string name)
         {
-            return new ParserException("Could not find property in event schema: " + name);
+            return new ParserException(
+                "Could not read property '" + name + "': " + Ref.DescribeUnreadable(name.AsSpan()));
         }
     }
 }

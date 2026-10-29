@@ -129,7 +129,7 @@ namespace Microsoft.O365.Security.ETW
     /// <summary>
     /// A real-time ETW session.
     /// </summary>
-    public sealed unsafe class UserTrace : IUserTrace, IDisposable
+    public sealed unsafe class UserTrace : IUserTrace, ITraceHost, IDisposable
     {
         private readonly object _gate = new object();
         private readonly List<Provider> _providers = new List<Provider>();
@@ -191,8 +191,10 @@ namespace Microsoft.O365.Security.ETW
         public UserTrace(string name)
         {
             _name = name ?? throw new ArgumentNullException(nameof(name));
-            _context = new TraceContext();
-            _context.RequestStop = Stop;
+
+            // Safe to hand out this instance here: the class is sealed, so no derived
+            // constructor can observe it half-built, and the context only stores it.
+            _context = new TraceContext(this);
             _processTraceMode = NativeConstants.PROCESS_TRACE_MODE_REAL_TIME
                 | NativeConstants.PROCESS_TRACE_MODE_EVENT_RECORD;
         }
@@ -258,14 +260,20 @@ namespace Microsoft.O365.Security.ETW
         }
 
         /// <summary>
-        /// Invoked for every exception thrown by a handler, including those raised outside
-        /// any provider's dispatch. <see cref="Provider.OnUnhandledException"/> fires first
+        /// Occurs when a handler throws, including where the exception was raised outside any
+        /// provider's dispatch. <see cref="Provider.OnUnhandledException"/> is raised first
         /// where the event was routed to a provider.
         /// </summary>
-        public EventRecordExceptionDelegate DefaultUnhandledException
+        /// <remarks>
+        /// An event rather than a settable delegate so that adding a subscriber cannot discard
+        /// one already registered. Reporting is often wired in more than one place -- a health
+        /// reporter and a log, say -- and losing one silently would hide exactly the failures
+        /// this exists to surface.
+        /// </remarks>
+        public event EventRecordExceptionDelegate DefaultUnhandledException
         {
-            get { return _context.DefaultException; }
-            set { _context.DefaultException = value; }
+            add { _context.DefaultException += value; }
+            remove { _context.DefaultException -= value; }
         }
 
         /// <summary>
@@ -540,6 +548,11 @@ namespace Microsoft.O365.Security.ETW
         /// Nothing is released here either. The registration and the logger name live until
         /// <see cref="Dispose"/>, which is what makes it safe for this call not to wait: a
         /// still-draining ProcessTrace can keep reading through both.
+        ///
+        /// Implements <see cref="ITraceHost.Stop"/>, which requires this not to throw: it is
+        /// called from a <c>finally</c> on the callback thread. That holds because everything
+        /// below is native calls under a lock, and the stop path ignores the status
+        /// ControlTrace returns rather than raising on it.
         /// </remarks>
         public void Stop()
         {
@@ -624,7 +637,16 @@ namespace Microsoft.O365.Security.ETW
             properties->Wnode.BufferSize = (uint)PropertiesBufferSize;
             properties->Wnode.Flags = NativeConstants.WNODE_FLAG_TRACED_GUID;
             properties->Wnode.ClientContext = 1;
-            properties->LogFileMode = NativeConstants.EVENT_TRACE_REAL_TIME_MODE | _properties.LogFileMode;
+
+            // A caller that has not requested a specific mode gets ours: real-time plus one
+            // buffer pool for the whole session rather than one per processor. Omitting
+            // NO_PER_PROCESSOR_BUFFERING here still produces a working trace -- ETW just
+            // multiplies MinimumBuffers/MaximumBuffers/BufferSize by the processor count, so
+            // the loss is silent. A caller that *does* request a mode is trusted to have
+            // picked one deliberately; krabs applies no default in that case either.
+            properties->LogFileMode = _properties.LogFileMode != 0
+                ? _properties.LogFileMode
+                : NativeConstants.EVENT_TRACE_REAL_TIME_MODE | NativeConstants.EVENT_TRACE_NO_PER_PROCESSOR_BUFFERING;
             properties->BufferSize = _properties.BufferSize;
             properties->MinimumBuffers = _properties.MinimumBuffers;
             properties->MaximumBuffers = _properties.MaximumBuffers;

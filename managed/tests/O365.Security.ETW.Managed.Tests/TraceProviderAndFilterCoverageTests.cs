@@ -60,7 +60,7 @@ namespace Microsoft.O365.Security.ETW.Tests
                 IEventRecordMetadataDelegate metadata = record => { };
                 EventRecordErrorDelegate error = e => { };
 
-                trace.DefaultUnhandledException = exception;
+                trace.DefaultUnhandledException += exception;
                 trace.DefaultEventRef = refHandler;
                 trace.DefaultEvent = compat;
                 trace.DefaultMetadata = metadata;
@@ -68,12 +68,15 @@ namespace Microsoft.O365.Security.ETW.Tests
 
                 Assert.Equal(name, trace.Name);
                 Assert.Equal(0UL, trace.BuffersProcessed);
-                Assert.Same(exception, trace.DefaultUnhandledException);
                 Assert.Same(refHandler, trace.DefaultEventRef);
                 Assert.Same(compat, trace.DefaultEvent);
                 Assert.Same(metadata, trace.DefaultMetadata);
                 Assert.Same(error, trace.DefaultError);
                 Assert.Throws<ArgumentNullException>(() => trace.SetTraceProperties(null));
+
+                // DefaultUnhandledException is an event, so it cannot be read back. That it
+                // reaches subscribers is covered by HandlerExceptionTests.
+                trace.DefaultUnhandledException -= exception;
             }
         }
 

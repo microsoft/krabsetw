@@ -4,25 +4,28 @@
 shipped as `Microsoft.O365.Security.Native.ETW`, which was itself a thin layer over the
 native `krabs` headers.
 
-It ships as a **different package** starting at **5.0.0**. The C++/CLI package continues on
-the 4.4.x line, so the two can be installed side by side during migration. The old id retained
-"Native" in the name, which no longer describes anything about this implementation.
+The port uses a **different package**, versioned **5.0.0**. The upstream C++/CLI baseline
+is now **4.5.0**, not 4.4.x. The old id retained "Native" in the name, which no longer
+describes anything about this implementation.
 
 | | `Microsoft.O365.Security.Native.ETW` | `Microsoft.O365.Security.ETW` |
 | --- | --- | --- |
-| Package version | 4.4.x | 5.0.0 |
+| Package version | 4.5.0 baseline | 5.0.0 port |
 | Assembly | `Microsoft.O365.Security.Native.ETW.dll` | `Microsoft.O365.Security.ETW.dll` |
 | Namespace | `Microsoft.O365.Security.ETW` | *unchanged* |
 | Target frameworks | net462, net8.0 | net462, net48, net8.0-windows, net10.0-windows |
 | Architecture | x64 and ARM64 mixed-mode, under `runtimes/` | one AnyCPU assembly under `lib/` |
 
-Because the namespace is unchanged, most source compiles untouched; replacing the
-`PackageReference` is typically the entire migration.
+The namespace is unchanged, but that does **not** make this a source- or binary-compatible
+package swap. Review the breaking-change checklists below and rebuild every consumer.
 
-**Nothing is binary-compatible.** The assembly name changes, so every consumer must be
-recompiled; anything still bound to the old name will throw `MissingMethodException` or fail
-to load. `Assembly.Load` calls and binding redirects naming
-`Microsoft.O365.Security.Native.ETW` need updating.
+**Baseline versus pending fixes:** comparisons below use upstream C++/CLI 4.5.0 at
+`d626e49`. A separate **pending native correctness backport** now fixes callback
+invalidation, handler-exception containment, Unicode/ANSI decoding, FILETIME/IP/socket/binary
+edge cases, SystemCall routing, filter-ID gating, provider/filter lifetime, synthetic-record
+layout and TraceLogging hash-collision handling. These fixes are not assumed shipped in
+existing 4.x packages. [PARITY.md](PARITY.md#comparison-baseline-and-pending-native-backport)
+tracks the details and the differences deliberately retained after that backport.
 
 The rest of this document lists every public-surface difference, followed by the two topics
 most relevant after the swap: converting a hot handler to allocation-free access, and testing
@@ -32,29 +35,77 @@ handlers without a live trace.
 
 ## Breaking changes
 
-**There are nine.**
+The lists below distinguish **package/binary breaks**, **source/API breaks**, and
+**behaviour breaks that still compile** when migrating from C++/CLI 4.5.0. Changes that
+affect only earlier managed previews are listed separately. Pending native fixes do not
+remove the need to review these lists when migrating an existing 4.x consumer.
 
-| # | Breaking change | Affects |
+### Package and binary compatibility
+
+**Every consumer must be rebuilt.** The assembly name changes; an existing binary still
+bound to the old assembly can fail to load or throw `MissingMethodException`.
+
+| Breaking change | Required action |
+| --- | --- |
+| Package id changes from `Microsoft.O365.Security.Native.ETW` to `Microsoft.O365.Security.ETW` | Replace the `PackageReference` and rebuild all dependent assemblies. |
+| Assembly name changes to `Microsoft.O365.Security.ETW.dll` | Update explicit assembly references, `Assembly.Load` calls, binding redirects and deployment rules naming the old DLL. The namespace remains unchanged. |
+
+### Source/API breaking changes
+
+These are **ten groups of source/API breaks**, not just behavioural differences.
+Each row names the affected API and the migration action; details follow below.
+
+| # | Breaking change | Required action |
 | --- | --- | --- |
-| 1 | `GetDateTime` returns `DateTime`, not a boxed one | implementors of `IEventRecord` |
-| 2 | `IDisposable` removed from `Predicate`, `Property`, `KernelProvider`, `RawProvider`, `Provider`, `EventFilter` | anyone `using`/disposing them |
-| 3 | `EventRecord` and `EventRecordMetadata` classes removed | anyone naming the concrete types |
-| 4 | `PropertyEnumerable` and `PropertyEnumerator` removed | anyone naming the iterator types |
-| 5 | `Property.Type` removed; `Property.OutType` is `uint`, not `int` | readers of `Property` |
-| 6 | `EventTraceProperties` fields are now properties | `ref`/`out` use only |
-| 7 | `EventHeaderProperty.LEGACY_EVENTLOG` / `FORWARDED_XML` renamed | users of those two members |
-| 8 | `IUserTrace.Enable(RawProvider)` removed from the interface | callers via the interface |
-| 9 | `Testing.EventHeader` is now `Testing.EventHeaderView` | test code using `RecordBuilder.Header` |
+| 1 | `GetDateTime` returns `DateTime`; its default argument and `TryGetDateTime` out parameter also change from `ValueType` to `DateTime` | Update hand-written implementations, mock setups, default arguments and explicitly typed `out` variables. Use `TryGetDateTime` instead of a boxed-null sentinel. |
+| 2 | `IDisposable` removed from `Predicate`, `Property`, `KernelProvider`, `RawProvider`, `Provider`, `EventFilter` | Remove `using` statements/declarations and `Dispose` calls for these six types. |
+| 3 | `EventRecord` and `EventRecordMetadata` classes removed, including their concrete-only APIs | Use `IEventRecord` / `IEventRecordMetadata`. SID-property readers have **no replacement**; pointer-property reads move to `EventRecordRef.TryGetPointer`, returning `ulong`. See the capability gaps below. |
+| 4 | `PropertyEnumerable` and `PropertyEnumerator` removed | Enumerate `IEventRecord.Properties` without naming the concrete iterator types. |
+| 5 | `Property.Type` and the three-argument constructor removed; `OutType` changes from `int` to `uint` | Use `InType`; construct with `(name, inType, outType, length)`; update explicitly typed `OutType` consumers to `uint` or convert explicitly. |
+| 6 | `EventTraceProperties` public fields become properties | Replace `ref`/`out` access with a local variable and assign the result back. Object initializers still work. |
+| 7 | `EventHeaderProperty.LEGACY_EVENTLOG` / `FORWARDED_XML` renamed | Replace them with `LegacyEventLog` / `ForwardedXML`. |
+| 8 | `IUserTrace.Enable(RawProvider)` removed from the interface | Migrate to `Provider.OnMetadata`; the concrete obsolete overload still exists. |
+| 9 | `Testing.EventHeader` renamed to `Testing.EventHeaderView` | Update explicitly named types used with `RecordBuilder.Header`. |
+| 10 | `Provider.EnableTraceLoggingFullSchemaHashing()` absent | Remove the opt-in call; the port always uses full TraceLogging metadata. |
 
-Most consumers encounter none of them. The most likely to apply is #1, and only to code that
-implements `IEventRecord` directly.
+### Behaviour breaking changes
 
-Separately, seven **behaviour** changes compile silently — record invalidation, `TryGet*` on
-failure, case folding, `KernelProvider.GroupMask`, `TraceStats`, struct-typed properties and
-`Stop` no longer releasing the trace's resources. These warrant the closest reading, and are
-listed after the nine.
+**A successful build does not prove migration is complete.** Review these observable
+changes even if no source/API row applies. Detailed examples and failure semantics are
+in [Behaviour changes that still compile](#behaviour-changes-that-still-compile).
 
-### Compile breaks
+| Breaking change | Required action |
+| --- | --- |
+| Records are invalidated when the callback returns | Copy values inside the callback instead of retaining `IEventRecord` or borrowed data. Reads between callbacks now throw `InvalidOperationException`. |
+| Failed `TryGet*` calls reset the out parameter | Do not rely on the variable retaining its previous value; keep the fallback separately. |
+| Every user-provider registration sharing a GUID receives the event | Check for duplicate processing if registrations previously relied on first-match routing. Kernel routing stays first-match. |
+| Composite predicates run cheaper operands first, not necessarily left to right | Keep predicates side-effect-free; move ordered work into the handler. |
+| Unicode case-insensitive matching folds characters above U+007F | Review non-ASCII allow/deny-list expectations. Byte-oriented ANSI folding remains ASCII-only. |
+| Schema failures move from each filter's `OnError` to the provider's `OnError` | Subscribe on the provider; expect one report per event rather than one per filter. A directly driven `Proxy(EventFilter)` still uses the filter's error event. |
+| Handler exceptions are contained, reported, stop the session by default and are rethrown from `Start()` | Handle failure on the thread calling `Start()` and subscribe to reporting events. Set `StopOnHandlerException = false` only when continued dispatch is intended. |
+| FILETIME, IP, socket and empty-binary edge cases change | Handle empty socket values as `null`, use `TryGet*` for malformed values, and expect a successful empty binary read to return an empty array, not `null`. See the conversion table below. |
+| Fixed Unicode lengths, UTF8/JSON decoding and sized strings with embedded NULs are corrected | Recheck decoded values and remove workarounds for truncation, wrong encoding or displaced properties. |
+| `SystemCallProvider` now routes on PerfInfo and receives events | Expect handlers that were previously silent to run. |
+| Struct properties are rejected instead of being mis-sized | Treat the struct and following properties as unreadable; neither implementation provides struct decoding. |
+| TraceLogging schema identity always uses the complete metadata | Expect same-named events with different layouts to resolve independently; test mixed emitter versions rather than relying on the first cached layout. |
+
+### Additional breaks when updating an earlier managed preview
+
+These are **preview-to-preview changes**, not additional differences from C++/CLI 4.5.0.
+
+| Change | Required action |
+| --- | --- |
+| `UserTrace.DefaultUnhandledException` / `KernelTrace.DefaultUnhandledException` become events instead of settable delegate properties | Replace assignment with `+=` / `-=`; do not read the delegate. Each reporting subscriber is contained independently, so a throwing reporter cannot silence later subscribers or prevent stopping. |
+| `KernelProvider.GroupMask` narrows from `ulong` to `uint` | Update preview-era callers to `uint`; high bits were previously discarded. This restores the C++/CLI signature. |
+| `TraceStats.EventsHandled` / `EventsTotal` regain native counting semantics and event/buffer counts reset on `Open` | Count provider matches in your own handler; do not interpret trace totals as matched-event counts or lifetime totals. |
+| Default buffering becomes `REAL_TIME_MODE | NO_PER_PROCESSOR_BUFFERING` | Set a nonzero `LogFileMode` explicitly if another buffering mode is required. |
+| `Stop` no longer releases callback registrations or logger names; `Dispose` owns teardown | Dispose the trace. If shutdown requires no further handlers, wait for the blocking `Start()` call to return; `Stop()` is a signal, not a join. |
+
+**Not an additional source break:** `TraceStats` is now a `readonly struct`, but the
+C++/CLI fields were already `initonly` and its populated constructor was already internal.
+Reading `QueryStats()` results and constructing `new TraceStats()` remain supported.
+
+### Source/API details
 
 **1. `GetDateTime` returns `DateTime` instead of a boxed one.** C++/CLI declared it `DateTime^`,
 which surfaces to C# as `System.ValueType`. The port returns `DateTime`, dropping the boxing
@@ -120,17 +171,22 @@ concrete `UserTrace.Enable(RawProvider)` is still there, still obsolete.
 **9. `Testing.EventHeader` is now `Testing.EventHeaderView`**, and `RecordBuilder.Header`
 returns the new type.
 
+**10. Remove `Provider.EnableTraceLoggingFullSchemaHashing()` calls.** C++/CLI 4.5.0 makes
+full-schema hashing opt-in per provider. The port always uses and compares the complete
+declared TraceLogging metadata, so it has no opt-in method or opt-out. Extended-data padding
+outside the declared metadata size is ignored by both implementations.
+
 ### Types that no longer exist
 
 Items 3 and 4.
 
 | # | Removed | Why |
 | --- | --- | --- |
-| 3 | `EventRecord`, `EventRecordMetadata` classes | The port's adapter is reused and mutated per event, so naming it publicly makes "hold it past the callback" look supported. C++/CLI also exposed public `_EVENT_HEADER*` / `_EVENT_RECORD*` fields that have no C# equivalent. Keep using `IEventRecord` / `IEventRecordMetadata`, which are unchanged. |
+| 3 | `EventRecord`, `EventRecordMetadata` classes | The port's adapter is reused and mutated per event, so naming it publicly makes "hold it past the callback" look supported. C++/CLI also exposed protected `_EVENT_HEADER*` / `_EVENT_RECORD*` fields that have no C# equivalent. Use `IEventRecord` / `IEventRecordMetadata`; note the `DateTime` signature change above. |
 | 4 | `PropertyEnumerable`, `PropertyEnumerator` | Allocated a `Property` per property. `IEventRecord.Properties` still works; only the concrete iterator types are gone. |
 
 **Reading a SID property has no replacement.** `GetSecurityIdentifier` /
-`TrySecurityIdentifier` were declared on the concrete `EventRecord`, which is gone, and
+`TryGetSecurityIdentifier` were declared on the concrete `EventRecord`, which is gone, and
 nothing in the port replaces them — neither `EventRecordRef` nor the compat adapter can read
 a `Sid`-typed property. If you depend on this, say so; it is a capability gap rather than a
 deliberate removal. `RecordBuilder.Sid` still exists for writing test records.
@@ -143,14 +199,19 @@ deliberate removal. `RecordBuilder.Sid` still exists for writing test records.
 
 ### Behaviour changes that still compile
 
-These are the changes that produce no build-time diagnostic.
+These details cover the behaviour checklist above and the preview-only runtime changes
+identified separately. Unlike the source/API changes, they can affect code that builds
+successfully.
 
 **An `IEventRecord` is invalid once the handler returns.** C++/CLI reuses one record object
 per bridge and only ever reassigns its `EVENT_RECORD*` (`EventRecordMetadata.hpp:26-41`,
 `Callbacks.hpp:75-88`), so a handler that stashed the record kept reading it — first from
 freed memory, then, once the next event arrived, that event's data, with no diagnostic
 either way. The port reuses the object the same way, so nothing is allocated, but clears the
-pointer on return: a stashed record throws `ObjectDisposedException` on its next use.
+pointer on return: a read between callbacks throws `InvalidOperationException`.
+The pending C++/CLI backport adds invalidation too, but throws `ObjectDisposedException`.
+Neither reused wrapper is a snapshot: an alias can see the new event once a later callback
+rebinds the object. Never retain the wrapper.
 
 If you stored records to process later, copy what you need inside the handler instead:
 
@@ -179,17 +240,47 @@ predicates, which are pure. It is only observable if you subclass `Predicate` an
 `Test` a side effect — in which case the side effect may run in a different order, or be
 short-circuited away entirely. Do side-effecting work in the event handler, not a predicate.
 
-**Three value conversions differ at degenerate inputs.** See `PARITY.md` for why each was
-not reproduced.
+**Value conversions differ from the baseline at degenerate inputs.** The pending native
+backport fixes these cases too; see `PARITY.md` for the rationale.
 
 | Input | C++/CLI | Port |
 | --- | --- | --- |
-| Negative FILETIME | `ArgumentOutOfRangeException` out of `GetDateTime` *and* `TryGetDateTime` | `TryGetDateTime` returns `false`; `GetDateTime` throws `ParserException` |
+| FILETIME below zero or beyond year 9999 | `ArgumentOutOfRangeException` out of `GetDateTime` *and* `TryGetDateTime` | `TryGetDateTime` returns `false`; `GetDateTime` throws `ParserException`; default overload returns its default |
 | Socket address whose length is not 16 or 28 | Sized from the address family, fixed 16/28 bytes copied out of a 128-byte buffer | Sized from the property, exactly its bytes copied |
 | Empty binary property | `TryGetBinary` returns `true` with a `null` array | `TryGetBinary` returns `true` with a zero-length array |
+| Present, zero-length socket address | May return uninitialised storage | `GetSocketAddress` returns `null`; `TryGetSocketAddress` returns `false` |
 
 If you wrapped `TryGetDateTime` in a `try`, you no longer need to. If you null-checked the
 array from a successful `TryGetBinary`, that branch is now dead.
+
+`GetSocketAddress(string)` now has a nullable return annotation. Handle `null` when the
+provider emits an empty address; missing, truncated, and one-byte values still throw.
+`TryGetIPAddress` requires an IPv4/IPv6 TDH out-type and the corresponding 4/16-byte width,
+rather than treating any property of either size as an address.
+
+Throwing compat getters now explain whether a property is absent, its offset walk stalled,
+its length could not be resolved, its bytes exceed the payload, it is present but empty,
+or the requested type rejected it. Use `TryGet*` for control flow rather than depending on
+the exact `ParserException` message.
+
+**String and kernel-routing fixes may expose previously wrong values.** Fixed Unicode
+lengths count WCHARs, not bytes; UTF8/JSON ANSI out-types use UTF-8 in getters, predicates
+and builders; explicitly sized strings preserve embedded NULs; and `SystemCallProvider`
+routes on PerfInfo so its handlers actually fire. These also have pending native fixes.
+XML remains on the machine ANSI code page; neither implementation parses its encoding
+declaration.
+
+**User-trace registrations sharing a GUID each receive the event.** Their keyword masks
+were already merged for ETW enablement, but earlier managed previews dispatched only to
+the first registration. Each registration now runs its own handlers and filters in
+registration order. This deliberately differs from native krabs' first-match routing;
+kernel-trace routing is unchanged. An exception aborts the remaining registrations for
+that event and is attributed to the registration that threw.
+
+**Default trace buffering matches native krabs.** With `LogFileMode == 0`, user and kernel
+traces use `REAL_TIME_MODE | NO_PER_PROCESSOR_BUFFERING`, avoiding a separate buffer pool
+per processor. An explicit nonzero mode is used as supplied; kernel traces additionally
+require `SYSTEM_LOGGER_MODE` in either case.
 
 **Schema resolution failures now surface on `Provider.OnError`, not on each filter.** In
 C++/CLI an event whose schema cannot be resolved raises `OnError` on every filter attached to
@@ -239,14 +330,10 @@ C++/CLI mirrored it as `UInt32`. An intermediate revision of the port widened it
 and truncated at the point of use, silently discarding any bit above 32. It is `uint` again,
 which makes the invalid value unrepresentable.
 
-**`TraceStats` is a `readonly struct`.** Reading its fields — the only thing consumers do —
-is unchanged, as is `new TraceStats()`. Assigning a field on a local no longer compiles, but
-the type is only ever produced by `UserTrace.QueryStats` / `KernelTrace.QueryStats`.
-
 **Struct-typed properties are not decoded.** A property carrying `PropertyStruct`, and
 everything after it in the payload, is unreadable. krabs does not decode structs either and
-fails worse, so nothing that worked before stops working — but the failure mode changes from
-silent corruption to a visible failure.
+can mis-size the union fields in the baseline. The pending native backport rejects structs
+explicitly instead. Neither implementation gains struct decoding.
 
 **A handler exception stops the trace and leaves `Start()`.** This restores the C++/CLI
 outcome — there, a managed exception thrown in a handler unwinds the native `ProcessTrace`
@@ -255,6 +342,9 @@ frames and exits `Start()`, because neither `base_provider::on_event` nor
 the port caught it and continued silently, which left a consumer polling healthy-looking
 counters on a trace that was delivering nothing. The port now captures the first exception,
 reports it, stops the session, and rethrows it — with its original stack — out of `Start()`.
+The old native unwind did not guarantee session teardown. The pending native backport
+also contains exceptions and stops safely before rethrowing, but does not add the reporting
+events, counter or opt-out shown below.
 
 ```csharp
 provider.OnUnhandledException += e => Log(e.Exception, e.Record.ProviderId, e.Stopping);
@@ -319,7 +409,7 @@ filter.OnError += e => Log(e.Message);
 provider.AddFilter(filter);
 
 // Handler failures: nothing to subscribe. The only signal was Start() throwing,
-// from a background thread, with the session already gone.
+// on the thread calling Start(). The old unwind did not guarantee session teardown.
 try
 {
     trace.Start();
@@ -359,10 +449,10 @@ The ordering guarantees, for the handler-exception path:
 1. The exception is counted — `QueryStats().UnhandledExceptions`.
 2. `Stopping` is set, so no further event is dispatched.
 3. `Provider.OnUnhandledException` fires for the provider whose dispatch threw. If **that**
-   handler throws too, it is swallowed so it cannot deny step 4.
+   reporter throws too, it is recorded without silencing later subscribers or step 4.
 4. `DefaultUnhandledException` fires on the trace, for every exception — including ones with
    no provider to attribute, such as a throw from the trace-level default handler.
-5. The session is stopped.
+5. The session is stopped even if a reporting subscriber threw.
 6. `Start()` rethrows the **first** exception, with its original stack.
 
 Set `trace.StopOnHandlerException = false` to keep steps 1, 3 and 4 and drop 2, 5 and 6: the
@@ -394,23 +484,27 @@ These require no action, but they explain why some call sites can be made faster
   `KernelProvider.OnUnhandledException`, `UserTrace.DefaultUnhandledException` /
   `KernelTrace.DefaultUnhandledException`, the `IEventRecordException` they carry,
   `TraceStats.UnhandledExceptions`, and `StopOnHandlerException`. See above.
+- `EventRecordRef.TryGetProcessStartKey` and `TryGetContainerId` read extended data without
+  resolving a schema or materializing an adapter.
+- Synthetic-record helpers — `RecordBuilder.Header.ProcessId` sets the event header's
+  process identity; `EventSchema.IPAddress` declares IPv4/IPv6 out-types for address tests.
 
 ---
 
 ## Converting a handler to zero-allocation comparison
 
-Every getter on `IEventRecord` allocates. That is not an implementation defect — the payload
-lives in the ETW buffer, and returning a `string` or a `byte[]` means copying out of it. The
-adapter object itself is reused for the life of the trace, so the allocation is entirely in
-the return types.
+String and binary getters on `IEventRecord` materialise values from the ETW buffer;
+header and scalar reads do not inherently allocate. The adapter object itself is reused
+for the life of the trace. Moving string comparisons to spans avoids allocating values
+that a handler only inspects and discards.
 
 `EventRecordRef` hands back `ReadOnlySpan<T>` views straight into the buffer instead. It is a
-`ref struct`, so it can never implement an interface; reaching it means subscribing
+`ref struct` with no record interface; reaching it means subscribing
 `OnEventRef` rather than `OnEvent`.
 
 | | Callback | Record type | Allocates |
 | --- | --- | --- | --- |
-| Compat | `OnEvent` / `DefaultEvent` | `IEventRecord` | yes |
+| Compat | `OnEvent` / `DefaultEvent` | `IEventRecord` | on materialising strings, arrays and address objects |
 | Allocation-free | `OnEventRef` / `DefaultEventRef` | `EventRecordRef` | no |
 
 ### Where the conversions pay off
@@ -443,18 +537,17 @@ never allocate, before reading any string.
 
 ### Property names are passed as spans
 
-Every accessor on `EventRecordRef` takes the property name as a `ReadOnlySpan<char>`. C# 14
-converts a string literal implicitly, so the name can be written bare; **C# 13 and earlier do
-not**, and require an explicit `.AsSpan()`:
+Payload accessors on `EventRecordRef` take the property name as a `ReadOnlySpan<char>`.
+Strings convert implicitly to that type on older compilers too; this does not require
+C# 14. Either spelling works:
 
 ```csharp
-record.TryGetUnicodeString("ImageName".AsSpan(), out var image);  // every language version
-record.TryGetUnicodeString("ImageName", out var image);           // C# 14 and later only
+record.TryGetUnicodeString("ImageName".AsSpan(), out var image);  // explicit span
+record.TryGetUnicodeString("ImageName", out var image);           // implicit string-to-span conversion
 ```
 
-Omitting `.AsSpan()` on an older compiler produces CS1503 (`cannot convert from 'string' to
-'System.ReadOnlySpan<char>'`). The `.AsSpan()` form costs nothing at run time and compiles
-everywhere, so it is the form used throughout this document.
+The explicit `.AsSpan()` form costs nothing at run time and makes span comparisons
+unambiguous; most examples below use it for clarity.
 
 ### Handlers must declare their parameter explicitly
 
@@ -547,14 +640,16 @@ A handler that needs any of these stays on `IEventRecord`:
 - **IP-address and socket-address accessors**, because `IPAddress` and `SocketAddress` are
   classes.
 - **`Properties` enumeration.**
-- **Throwing `Get*` accessors.** Nothing on `EventRecordRef` throws for a missing or
-  wrongly typed property. Where C++/CLI offers three forms per type, the ref surface offers
-  the two that cannot throw, uniformly, for every type it supports:
+- **Throwing `Get(name)` payload accessors.** Where C++/CLI offers three forms per type,
+  the ref surface offers `TryGet*` and default-returning forms for ordinary lookup failures:
 
   ```csharp
   bool TryGetUInt32(ReadOnlySpan<char> name, out uint value);        // distinguishes absent
   uint GetUInt32(ReadOnlySpan<char> name, uint defaultValue);        // substitutes instead
   ```
+
+  Debug builds still throw `TypeMismatchAssert` for a numeric TDH in-type mismatch,
+  matching native krabs; the `TryGet*` form does not suppress that assertion.
 
   A missing property is an ordinary condition on a hot path, not an exceptional one, and the
   ref surface exists to avoid per-event costs; a throwing accessor invites exceptions as
@@ -578,18 +673,19 @@ A handler that needs any of these stays on `IEventRecord`:
 
 ## Testing handlers
 
-Tests that mock `IEventRecord` keep working. The interface is unchanged in shape, so an
-existing `Mock<IEventRecord>` and every `It.IsAny<IEventRecord>()` compile and run against the
-port as they did against the C++/CLI assembly.
+Tests may keep mocking `IEventRecord`. Ordinary `Mock<IEventRecord>` and
+`It.IsAny<IEventRecord>()` usages are unchanged, but `DateTime` setups and hand-written
+implementations must adopt the new signatures described above.
 
 Tests covering a handler moved to `OnEventRef` do not. `EventRecordRef` is a `ref struct`, and
 a mocking framework cannot represent one:
 
-- it cannot be a generic type argument, so `Mock<EventRecordRef>` and
-  `It.IsAny<EventRecordRef>()` do not compile;
+- ordinary mocking APIs do not accept ref-struct type arguments, so `Mock<EventRecordRef>`
+  and `It.IsAny<EventRecordRef>()` do not compile. C# 13's `allows ref struct` support on
+  compatible runtimes does not remove a mocking API's class constraints or boxing needs;
 - it cannot appear in an expression tree, so `Setup` on a member that takes or returns one
   fails (CS8640, CS9244);
-- it cannot be boxed, stored in a field, captured in a lambda, or returned from an `async`
+- it cannot be boxed, stored in a class field, captured in a lambda, or returned from an `async`
   method or iterator.
 
 Construct a real record instead. `Testing.RecordBuilder` lays out a payload and `Testing.Proxy`
@@ -621,7 +717,7 @@ using (var builder = new RecordBuilder(providerId, id: 7937, version: 1))
 `Proxy` also takes a `UserTrace` or a `KernelTrace` if the code under test wires providers
 onto a trace rather than a bare filter.
 
-Four constraints on `RecordBuilder` are easily overlooked:
+Five constraints on `RecordBuilder` are easily overlooked:
 
 - **It resolves the layout from a schema, which by default must be registered on the machine.**
   `Pack()` asks TDH for the provider's manifest, so an invented provider GUID fails with
@@ -648,15 +744,15 @@ Four constraints on `RecordBuilder` are easily overlooked:
   The same applies to `AddBinary` where the template fixes the width: a `win:Binary` value
   carries no length of its own, so the reader takes the width from the schema and ignores
   the bytes, and supplying a different number of them would shift every later property.
-- **A record's payload has to fit in 64 KiB.** `EVENT_RECORD.UserDataLength` is a `USHORT`,
+- **A record's payload must not exceed 65535 bytes.** `EVENT_RECORD.UserDataLength` is a `USHORT`,
   so `Pack()` rejects anything larger rather than letting the length wrap. Real events are
   bounded the same way; a fixture that hits this is usually padding a string far past what
   the provider would emit.
 
 Assertions inside a ref handler carry one further constraint: the record cannot be captured,
 so nothing about it can be asserted through a lambda-taking overload such as `Assert.Throws`.
-Assert inline instead. No ref accessor throws, so the case that most often wants that shape —
-a missing property — is asserted on the returned default rather than on an exception:
+Assert inline instead. Assert a missing property on the `TryGet*` result or returned
+default rather than on an exception:
 
 ```csharp
 Assert.False(record.TryGetUnicodeString("Missing", out var value));
@@ -728,10 +824,12 @@ Two points are worth keeping in mind:
   the event looks like, so a declaration that has drifted from the real manifest yields a
   passing test against an event shape that is never emitted. Prefer a real in-box provider
   where one exists, and keep the declaration next to the template it mirrors.
-- **The scope is the execution context, not the process.** Tests running in parallel do not
-  see one another's declarations, and disposing the value returned by `Use` restores whatever
-  was in scope before. Declarations do not reach a live trace's processing thread, which needs
-  none: events delivered by ETW come from providers that are registered by definition.
+- **The scope is the execution context, not the process.** `AsyncLocal` declarations flow
+  with that context, including into `Task.Run`; unrelated test contexts do not see them.
+  Disposing the value returned by `Use` restores the previous scope. Declarations are a test
+  override, not a way to register a production provider. The cache consults them only on a
+  miss: existing entries are not overridden, and a resolved entry survives scope disposal.
+  Use a fresh trace/proxy when changing declarations for the same event.
 
 ### Converting a producer test
 

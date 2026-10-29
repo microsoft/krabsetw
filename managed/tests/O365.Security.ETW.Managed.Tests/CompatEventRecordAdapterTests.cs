@@ -146,6 +146,25 @@ namespace Microsoft.O365.Security.ETW.Tests
                 Assert.False(record.TryGetIPAddress("Unicode", out IPAddress wrongTypeIp));
                 Assert.Null(wrongTypeIp);
 
+                // Four bytes of the right width, but declared without an IP out-type. The C++/CLI
+                // package refuses this, and returning a plausible-looking address here would be
+                // silent wrong data rather than a refusal.
+                Assert.False(record.TryGetIPAddress("NotAnAddress", out IPAddress unmarkedIp));
+                Assert.Null(unmarkedIp);
+                Assert.Throws<ParserException>(() => record.GetIPAddress("NotAnAddress"));
+
+                // The out-type names the family and the family fixes the width, so the two are
+                // checked together. Apart, an IPV4-marked sixteen-byte value would read back as
+                // an IPv6 address and an IPV6-marked four-byte one as IPv4, because IPAddress
+                // picks its family from the byte count -- the same silent wrong data the
+                // out-type gate exists to refuse, one step further in.
+                Assert.False(record.TryGetIPAddress("V4Marked16", out IPAddress wideV4));
+                Assert.Null(wideV4);
+                Assert.Throws<ParserException>(() => record.GetIPAddress("V4Marked16"));
+                Assert.False(record.TryGetIPAddress("V6Marked4", out IPAddress narrowV6));
+                Assert.Null(narrowV6);
+                Assert.Throws<ParserException>(() => record.GetIPAddress("V6Marked4"));
+
                 SocketAddress socket = record.GetSocketAddress("Socket");
                 Assert.Equal(AddressFamily.InterNetwork, socket.Family);
                 Assert.Equal(16, socket.Size);
@@ -199,6 +218,30 @@ namespace Microsoft.O365.Security.ETW.Tests
         }
 
         [Fact]
+        public void ZeroLengthPropertyIsReportedAsPresentButEmptyRatherThanAsMissing()
+        {
+            // Microsoft-Windows-TCPIP event 1422 declares SourceAddress and DestAddress with a
+            // runtime length and emits them as zero-length on events that have no address to
+            // report. The property is in the schema and in the payload; only the value is empty.
+            // SocketAddress cannot represent fewer than two bytes, so the Try form is obliged to
+            // return false, which makes the exception message the only thing distinguishing this
+            // from a schema mismatch. It has to say so, or the reader goes looking for a manifest
+            // version problem that does not exist.
+            WithRecord(record =>
+            {
+                Assert.False(record.TryGetSocketAddress("EmptySocket", out SocketAddress empty));
+                Assert.Null(empty);
+
+                // Present but empty is data, not a fault, so it is a null return rather than a throw.
+                Assert.Null(record.GetSocketAddress("EmptySocket"));
+
+                // Genuinely absent still throws, and must not read like the case above.
+                ParserException absent = Assert.Throws<ParserException>(() => record.GetSocketAddress("Missing"));
+                Assert.Contains("not declared in the event schema", absent.Message, StringComparison.Ordinal);
+            });
+        }
+
+        [Fact]
         public void ExtendedDataAccessorsSurfaceBuilderItemsThroughTheAdapter()
         {
             var containerId = Guid.Parse("267bc684-2b8a-4e25-9643-5a6f4acbea0b");
@@ -237,11 +280,16 @@ namespace Microsoft.O365.Security.ETW.Tests
                 .AnsiString("Ansi")
                 .UnicodeString("Counted")
                 .Binary("Payload", length: 4)
-                .Binary("IPv4", length: 4)
-                .Binary("IPv6", length: 16)
+                .IPAddress("IPv4")
+                .IPAddress("IPv6", v6: true)
+                .IPAddress("V4Marked16", length: 16)
+                .IPAddress("V6Marked4", v6: true, length: 4)
+                .Binary("NotAnAddress", length: 4)
                 .Binary("Socket", length: 16)
                 .Binary("ShortBinary", length: 3)
                 .Binary("OneByte", length: 1)
+                .UInt16("EmptySocketLength")
+                .Binary("EmptySocket", lengthFrom: "EmptySocketLength")
                 .Binary("FileTimeRaw", length: 8)
                 .Binary("ZeroFileTime", length: 8)
                 .Binary("NegativeFileTime", length: 8)
@@ -291,9 +339,19 @@ namespace Microsoft.O365.Security.ETW.Tests
             builder.AddBinary("Payload", new byte[] { 1, 2, 3, 4 });
             builder.AddBinary("IPv4", IPAddress.Parse("192.0.2.7").GetAddressBytes());
             builder.AddBinary("IPv6", IPAddress.Parse("2001:db8::1").GetAddressBytes());
+            builder.AddBinary("V4Marked16", IPAddress.Parse("2001:db8::2").GetAddressBytes());
+            builder.AddBinary("V6Marked4", IPAddress.Parse("192.0.2.8").GetAddressBytes());
+            builder.AddBinary("NotAnAddress", new byte[] { 10, 0, 0, 1 });
             builder.AddBinary("Socket", socket);
             builder.AddBinary("ShortBinary", new byte[] { 1, 2, 3 });
             builder.AddBinary("OneByte", new byte[] { 1 });
+
+            // A runtime length that resolves to zero, as Microsoft-Windows-TCPIP emits for the
+            // address fields of ICMP event 1422. A fixed length of zero would not model it: on
+            // the schema-length path zero means "unspecified", which sends the reader scanning
+            // to the end of the payload and misaligns every property after it.
+            builder.AddValue("EmptySocketLength", (ushort)0);
+            builder.AddBinary("EmptySocket", Array.Empty<byte>());
             builder.AddBinary("FileTimeRaw", BitConverter.GetBytes(fileTime.ToFileTimeUtc()));
             builder.AddBinary("ZeroFileTime", BitConverter.GetBytes(0L));
             builder.AddBinary("NegativeFileTime", BitConverter.GetBytes(-1L));
