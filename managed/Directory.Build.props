@@ -1,0 +1,27 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <!--
+      Keep output at bin\$(Configuration)\ instead of bin\x64\$(Configuration)\. The solution
+      builds these projects with Platform=x64, but CI packs the library csproj directly without
+      rebuilding, where Platform is not set; without this the two disagree and pack fails NU5026.
+    -->
+    <AppendPlatformToOutputPath>false</AppendPlatformToOutputPath>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- Lets the .NET Framework TFMs build on a machine without VS targeting packs. -->
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="System.Memory" Version="4.6.0" />
+  </ItemGroup>
+
+</Project>
