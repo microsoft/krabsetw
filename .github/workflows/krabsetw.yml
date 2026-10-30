@@ -44,10 +44,10 @@ jobs:
     # applies -- the repository root pins an SDK that cannot parse .slnx.
     - name: build managed release
       working-directory: managed
-      run: dotnet build Krabs.Managed.slnx -c Release
+      run: dotnet build Krabs.Managed.slnx -c Release -p:ContinuousIntegrationBuild=true
     - name: build managed debug
       working-directory: managed
-      run: dotnet build Krabs.Managed.slnx -c Debug
+      run: dotnet build Krabs.Managed.slnx -c Debug -p:ContinuousIntegrationBuild=true
     - name: test managed release
       working-directory: managed
       run: dotnet test Krabs.Managed.slnx -c Release --no-build
@@ -56,7 +56,7 @@ jobs:
       run: dotnet test Krabs.Managed.slnx -c Debug --no-build
     - name: pack managed
       working-directory: managed
-      run: dotnet pack src\O365.Security.ETW.Managed\O365.Security.ETW.Managed.csproj -c Release --no-build -o artifacts
+      run: dotnet pack src\O365.Security.ETW.Managed\O365.Security.ETW.Managed.csproj -c Release --no-build -p:ContinuousIntegrationBuild=true -o artifacts
     - uses: actions/upload-artifact@v4
       with:
         name: Microsoft.O365.Security.ETW

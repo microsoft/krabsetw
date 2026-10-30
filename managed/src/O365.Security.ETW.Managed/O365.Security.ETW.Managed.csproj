@@ -25,8 +25,9 @@
     <Title>Microsoft.O365.Security.ETW - a pure .NET ETW consumer</Title>
     <Authors>Microsoft</Authors>
     <Company>Microsoft</Company>
-    <Description>Microsoft.O365.Security.ETW is a pure .NET implementation of the krabsetw ETW consumer API. It replaces the C++/CLI wrapper shipped as Microsoft.O365.Security.Native.ETW with managed code that allocates nothing on the event callback path.</Description>
+    <Description>Microsoft.O365.Security.ETW is a pure .NET ETW consumer for Windows, with compatibility-oriented APIs and an allocation-free EventRecordRef reading surface. It calls ETW and TDH directly without a C++/CLI or mixed-mode assembly dependency.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/Microsoft/krabsetw</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Microsoft/krabsetw</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -35,14 +36,15 @@
     <PackageReleaseNotes>
       Version 5.0.0:
         - Replaces the C++/CLI wrapper with a pure .NET implementation. The C++/CLI package
-          Microsoft.O365.Security.Native.ETW continues to ship on the 4.4.x line.
-        - No allocation on the event callback path, and no native binary, so a single AnyCPU
-          assembly serves x64 and ARM64.
+          Microsoft.O365.Security.Native.ETW remains a separate 4.x package.
+        - Adds an allocation-free EventRecordRef reading surface. Materializing strings,
+          arrays and other objects may allocate.
+        - No C++/CLI or mixed-mode assembly dependency; one AnyCPU assembly serves x64 and ARM64.
         - Targets net462, net48, net8.0-windows and net10.0-windows.
         - The namespace (Microsoft.O365.Security.ETW) is unchanged, but the public surface is
-          not identical. See managed/MIGRATION.md for every difference; the notable
-          source break is IEventRecord.GetDateTime, which now returns DateTime rather than a
-          boxed DateTime.
+          only partially source-compatible, with no binary compatibility. Rebuild all consumers
+          and review the breaking-change checklists:
+          https://github.com/microsoft/krabsetw/blob/master/managed/MIGRATION.md
     </PackageReleaseNotes>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -54,6 +56,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="README.md" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
     <InternalsVisibleTo Include="O365.Security.ETW.Managed.Tests" />
     <InternalsVisibleTo Include="O365.Security.ETW.Managed.Benchmarks" />
   </ItemGroup>
