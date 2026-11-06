@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The parity suite. It compiles the *same* test sources as EtwTestsCS.csproj, which were
+    written against the C++/CLI wrapper, but binds them to the pure .NET implementation.
+
+    An API divergence between the two implementations shows up here as a compile error, and
+    a behavioural divergence shows up as a test failure. Neither can be introduced silently.
+  -->
+
+  <PropertyGroup>
+    <TargetFrameworks>net48;net10.0-windows</TargetFrameworks>
+    <Company>Microsoft Corporation</Company>
+    <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
+    <!-- This project sits outside managed\, so it does not inherit that directory's
+         Directory.Build.props. Krabs.Managed.slnx needs one platform across every project
+         it contains, and the managed ones are x64. -->
+    <Platforms>x64</Platforms>
+    <AssemblyName>EtwTestsCS.PureDotNet</AssemblyName>
+    <RootNamespace>EtwTestsCS</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\ManagedETWTests\**\*.cs" Exclude="..\ManagedETWTests\obj\**\*.cs;..\ManagedETWTests\bin\**\*.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="2.2.10" />
+    <PackageReference Include="MSTest.TestFramework" Version="2.2.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\managed\src\O365.Security.ETW.Managed\O365.Security.ETW.Managed.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>Krabs.Benchmarks.CliCore</AssemblyName>
+    <RootNamespace>Krabs.Benchmarks</RootNamespace>
+    <!--
+      The C++/CLI wrapper is built against net8.0; the C++/CLI toolset does not offer a
+      net10.0 target. Rolling forward runs that same assembly on the .NET 10 runtime, which
+      is exactly what a consumer upgrading their host would get.
+    -->
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Referenced as a built assembly: the C++/CLI vcxproj needs MSBuild.exe from Visual
+      Studio and cannot be imported by the dotnet CLI. Build it first with:
+        msbuild Microsoft.O365.Security.Native.ETW.NetCore\Microsoft.O365.Security.Native.ETW.NetCore.vcxproj
+               /t:Restore;Build /p:Configuration=Release /p:Platform=x64
+    -->
+    <Reference Include="Microsoft.O365.Security.Native.ETW">
+      <HintPath>..\..\Microsoft.O365.Security.Native.ETW.NetCore\x64\Release\net8.0\Microsoft.O365.Security.Native.ETW.dll</HintPath>
+    </Reference>
+
+    <!--
+      A mixed-mode (IJW) assembly cannot be loaded on .NET Core without its shim. It is not
+      pulled in by the assembly reference, so copy it explicitly.
+    -->
+    <None Include="..\..\Microsoft.O365.Security.Native.ETW.NetCore\x64\Release\net8.0\Ijwhost.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Ijwhost.dll</Link>
+    </None>
+  </ItemGroup>
+
+</Project>
