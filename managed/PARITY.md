@@ -24,7 +24,7 @@ comparison missed two upstream additions: provider-enable error callbacks in nat
 The following fixes are implemented in a separate **pending native backport**. They are
 not part of that baseline and must not be assumed present in existing 4.x packages.
 Historical defect descriptions below explain why the port differs from the baseline;
-they are not claims that these defects remain unfixed in the pending backport.
+the table identifies which fixes the pending backport includes.
 
 | Area | Pending native/C++/CLI behaviour |
 | --- | --- |
@@ -32,16 +32,15 @@ they are not claims that these defects remain unfixed in the pending backport.
 | Filter and provider lifetime | Each filter gates its own event IDs before its predicate; traces retain providers and providers retain filters |
 | Value conversion | FILETIME range checks, exact IP widths, actual socket lengths, empty binary arrays |
 | String conversion | UTF8/JSON out-types select UTF-8 in readers, predicates and builders; sized Unicode/ANSI strings preserve embedded NULs |
-| Callback lifetime | Borrowed wrappers are invalidated in `finally`; property enumerators cannot rebind to later callbacks |
 | Kernel routing | C++/CLI `SystemCallProvider` uses PerfInfo, matching native krabs and the port |
 | Synthetic records | Correct SID/pointer padding, declared-length validation, sized-string layout, zero lengths, payloads capped at 65535 bytes, GC keep-alives |
 | TraceLogging cache | Exact metadata equality supplements the existing opt-in hash; opt-out behaviour is unchanged |
-| Handler exceptions | Fail-stop containment inside native callbacks; cleanup and original-exception rethrow after `ProcessTrace` |
 
-Important differences remain after that backport: same-GUID user-provider fanout, predicate
-ordering, case folding, failed `TryGet*` out parameters, boxed `DateTime^` signatures, schema
-error placement, and the managed-only ref/testing/reporting surfaces. Full-schema identity
-is unconditional in the port but still opt-in per provider in native krabs/C++/CLI.
+Important differences remain after that backport: callback lifetime enforcement, handler
+exception containment, same-GUID user-provider fanout, predicate ordering, case folding,
+failed `TryGet*` out parameters, boxed `DateTime^` signatures, schema error placement, and
+the managed-only ref/testing/reporting surfaces. Full-schema identity is unconditional
+in the port but still opt-in per provider in native krabs/C++/CLI.
 
 ## Why the parity suite is not sufficient on its own
 
@@ -115,8 +114,8 @@ The port keeps the same reuse — one adapter per trace, rebound per event, so t
 still allocates nothing — but clears the pointer when the callback returns. A stashed record
 throws `InvalidOperationException` if read between callbacks. This is not a snapshot:
 the same adapter is rebound during a later callback, so retaining an alias is still unsafe.
-The pending C++/CLI backport also invalidates its wrappers, using
-`ObjectDisposedException`, and guards property enumerators against later generations.
+Callback lifetime enforcement is deferred from the pending C++/CLI backport; wrappers
+and property enumerators retain their baseline behaviour.
 
 Callers that never stashed a record see no behavioural change. Callers that did were already
 broken; they now find out. The invalidation is a single field store on the normal path:
@@ -408,9 +407,8 @@ C++/CLI has no such catch. `base_provider::on_event` catches only `could_not_fin
 C++ exception types (`Errors.hpp:69-101`), so a managed handler exception matches neither: it
 unwinds the native `ProcessTrace` frames and leaves `UserTrace::Start()`. That does **not**
 guarantee teardown: a live regression left the session enabled after `Start()` threw.
-The pending native backport contains the exception inside the callback, suppresses further
-dispatch, closes the consumer without waiting there, then stops the session and rethrows
-the original exception after `ProcessTrace` returns.
+Exception containment is deferred from the pending native backport, which retains this
+baseline behaviour.
 
 An intermediate revision of the port caught the exception, stored it in a `LastException`
 field nobody read, and carried on. That is not availability — `EventsHandled` is incremented
@@ -421,9 +419,9 @@ The port reports the failure and guarantees session shutdown without unwinding n
 
 | | C++/CLI 4.5.0 baseline | Pending native backport | Port |
 | --- | --- | --- | --- |
-| Exception leaves `Start()` | by unwinding native frames | after `ProcessTrace` returns | after `ProcessTrace` returns |
-| Original stack preserved | yes | yes, via `ExceptionDispatchInfo` | yes, via `ExceptionDispatchInfo` |
-| Session torn down | not guaranteed | yes | yes |
+| Exception leaves `Start()` | by unwinding native frames | by unwinding native frames | after `ProcessTrace` returns |
+| Original stack preserved | yes | yes | yes, via `ExceptionDispatchInfo` |
+| Session torn down | not guaranteed | not guaranteed | yes |
 | Reported before the throw | no | no | `Provider.OnUnhandledException` and trace `DefaultUnhandledException` |
 | Counted | no | no | `TraceStats.UnhandledExceptions` |
 | Opt-out | no | no | `StopOnHandlerException = false` |

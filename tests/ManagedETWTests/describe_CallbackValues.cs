@@ -2,11 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Diagnostics.Tracing;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.O365.Security.ETW;
 using Microsoft.O365.Security.ETW.Testing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -16,34 +12,6 @@ namespace EtwTestsCS
     [TestClass]
     public class describe_CallbackValues
     {
-        [TestMethod]
-        public void wrappers_are_reused_but_old_enumerables_cannot_bind_to_the_next_event()
-        {
-            var trace = new UserTrace();
-            var provider = new Provider(Events.PowerShellEvent.ProviderId);
-            IEventRecord saved = null;
-            IEnumerable<Property> properties = null;
-            int calls = 0;
-            provider.OnEvent += e =>
-            {
-                ++calls;
-                Assert.AreEqual("value", e.GetUnicodeString(Events.PowerShellEvent.UserData));
-                if (saved != null)
-                {
-                    Assert.AreSame(saved, e);
-                    Assert.ThrowsException<ObjectDisposedException>(() => properties.GetEnumerator());
-                }
-                saved = e;
-                properties = e.Properties;
-            };
-            trace.Enable(provider);
-            var record = Events.PowerShellEvent.CreateRecord("value", "", "");
-            var proxy = new Proxy(trace);
-            proxy.PushEvent(record);
-            proxy.PushEvent(record);
-            Assert.AreEqual(2, calls);
-        }
-
         [TestMethod]
         public void proxy_roots_a_temporary_record_during_gc_in_the_handler()
         {
@@ -71,78 +39,6 @@ namespace EtwTestsCS
             var record = Events.PowerShellEvent.CreateRecord("value", "", "");
             weak = new WeakReference(record);
             return record;
-        }
-
-        [TestMethod]
-        [Timeout(30000)]
-        public void live_handler_failure_preserves_identity_stack_and_allows_restart()
-        {
-            using (var source = new EventSource("krabs-callback-" + Guid.NewGuid(),
-                EventSourceSettings.EtwSelfDescribingEventFormat))
-            using (var trace = new UserTrace("krabs-callback-trace-" + Guid.NewGuid()))
-            {
-                var provider = new Provider(source.Guid);
-                var expected = new InvalidOperationException("live callback");
-                var calls = 0;
-                var fail = true;
-                provider.OnMetadata += e =>
-                {
-                    Interlocked.Increment(ref calls);
-                    if (fail)
-                        ThrowFromHandler(expected);
-                };
-                trace.Enable(provider);
-                for (int run = 0; run < 2; ++run)
-                {
-                    trace.Open();
-                    var processing = Task.Run(() =>
-                    {
-                        try { trace.Start(); return (Exception)null; }
-                        catch (Exception ex) { return ex; }
-                    });
-                    Exception result;
-                    try
-                    {
-                        for (int i = 0; i < 50 && !processing.IsCompleted && Volatile.Read(ref calls) == 0; ++i)
-                        {
-                            source.Write("Trigger", new EventSourceOptions { Level = EventLevel.Informational },
-                                new { Value = 1 });
-                            Thread.Sleep(100);
-                        }
-                        if (!fail)
-                            trace.Stop();
-                        Assert.IsTrue(processing.Wait(TimeSpan.FromSeconds(10)),
-                            "Processing did not stop after the handler failed.");
-                        result = processing.Result;
-                        if (fail)
-                            Assert.IsFalse(source.IsEnabled(), "Failed processing left the ETW session enabled.");
-                    }
-                    finally
-                    {
-                        trace.Stop();
-                        Assert.IsTrue(processing.Wait(TimeSpan.FromSeconds(10)));
-                    }
-                    if (fail)
-                    {
-                        Assert.AreSame(expected, result);
-                        StringAssert.Contains(result.StackTrace, nameof(ThrowFromHandler));
-                        Assert.AreEqual(1, calls, "Dispatch continued after the first handler failure.");
-                    }
-                    else
-                    {
-                        Assert.IsNull(result);
-                        Assert.IsTrue(calls > 0, "Restart did not dispatch any events.");
-                    }
-                    fail = false;
-                    calls = 0;
-                }
-            }
-        }
-
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static void ThrowFromHandler(Exception error)
-        {
-            throw error;
         }
 
         private static readonly Guid Utf8Provider = new Guid("43833E12-078D-4D7D-8AAF-AE8C8520F18C");
@@ -284,76 +180,6 @@ namespace EtwTestsCS
             };
             trace.Enable(provider);
             new Proxy(trace).PushEvent(builder.PackIncomplete());
-        }
-
-        [DataTestMethod]
-        [DataRow(false)]
-        [DataRow(true)]
-        public void wrappers_expire_after_normal_and_exceptional_callbacks(bool throws)
-        {
-            var trace = new UserTrace();
-            var provider = new Provider(Events.PowerShellEvent.ProviderId);
-            IEventRecordMetadata metadata = null;
-            IEventRecord saved = null;
-            IEnumerable<Property> properties = null;
-            IEnumerator<Property> enumerator = null;
-            var expected = new InvalidOperationException("handler");
-            provider.OnMetadata += e => metadata = e;
-            provider.OnEvent += e =>
-            {
-                saved = e;
-                properties = e.Properties;
-                enumerator = properties.GetEnumerator();
-                Assert.IsTrue(enumerator.MoveNext());
-                if (throws)
-                    throw expected;
-            };
-            trace.Enable(provider);
-            var record = Events.PowerShellEvent.CreateRecord("value", "", "");
-            var proxy = new Proxy(trace);
-            if (throws)
-                Assert.AreSame(expected, Assert.ThrowsException<InvalidOperationException>(() => proxy.PushEvent(record)));
-            else
-                proxy.PushEvent(record);
-
-            Assert.ThrowsException<ObjectDisposedException>(() => { var id = metadata.Id; });
-            Assert.ThrowsException<ObjectDisposedException>(() => { var length = saved.UserDataLength; });
-            Assert.ThrowsException<ObjectDisposedException>(() => saved.GetUnicodeString(Events.PowerShellEvent.UserData));
-            Assert.ThrowsException<ObjectDisposedException>(() => saved.GetStackTrace());
-            Assert.ThrowsException<ObjectDisposedException>(() => saved.TryGetContainerId(out _));
-            Assert.ThrowsException<ObjectDisposedException>(() => saved.TryGetProcessStartKey(out _));
-            Assert.ThrowsException<ObjectDisposedException>(() => properties.GetEnumerator());
-            Assert.ThrowsException<ObjectDisposedException>(() => enumerator.MoveNext());
-            GC.KeepAlive(record);
-        }
-
-        [DataTestMethod]
-        [DataRow(false)]
-        [DataRow(true)]
-        public void error_metadata_expires_but_message_is_durable(bool throws)
-        {
-            var trace = new UserTrace();
-            var provider = new Provider(Events.PowerShellEvent.ProviderId);
-            IEventRecordError saved = null;
-            var expected = new InvalidOperationException("error handler");
-            provider.OnEvent += e => Assert.Fail("Unexpected decoded event");
-            provider.OnError += e =>
-            {
-                saved = e;
-                if (throws)
-                    throw expected;
-            };
-            trace.Enable(provider);
-            var record = Events.PowerShellEvent.CreateRecord("", "", "");
-            record.Id = 1234;
-            if (throws)
-                Assert.AreSame(expected, Assert.ThrowsException<InvalidOperationException>(
-                    () => new Proxy(trace).PushEvent(record)));
-            else
-                new Proxy(trace).PushEvent(record);
-            Assert.IsNotNull(saved.Message);
-            Assert.ThrowsException<ObjectDisposedException>(() => { var id = saved.Record.Id; });
-            GC.KeepAlive(record);
         }
 
         [TestMethod]

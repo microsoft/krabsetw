@@ -86,9 +86,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
                 proxy.push_event(*rec);
             }
         }
-        catch (const details::managed_callback_exception& error) {
-            error.rethrow();
-        }
         finally {
             GC::KeepAlive(record);
             GC::KeepAlive(this);

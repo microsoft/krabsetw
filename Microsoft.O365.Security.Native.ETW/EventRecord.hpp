@@ -25,10 +25,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// <summary>
     /// EventRecord represents a managed instance of an event from ETW.
     /// </summary>
-    /// <remarks>
-    /// This is a borrowed callback view, not a snapshot. Access after the callback
-    /// returns throws ObjectDisposedException.
-    /// </remarks>
     public ref class EventRecord : public EventRecordMetadata, public IEventRecord
     {
     private:
@@ -37,14 +33,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         const TRACE_EVENT_INFO* info_;
 
     internal:
-        void InvalidateRecord()
-        {
-            schema_ = nullptr;
-            parser_ = nullptr;
-            info_ = nullptr;
-            EventRecordMetadata::Invalidate();
-        }
-
         EventRecord(
             const EVENT_RECORD& record,
             const krabs::schema& schema,
@@ -75,7 +63,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ Name
         {
-            String^ get() { CheckValid(); return gcnew String(schema_->event_name()); }
+            String^ get() { return gcnew String(schema_->event_name()); }
         }
 
         /// <summary>
@@ -83,7 +71,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ OpcodeName
         {
-            String^ get() { CheckValid(); return gcnew String(schema_->opcode_name()); }
+            String^ get() { return gcnew String(schema_->opcode_name()); }
         }
 
         /// <summary>
@@ -91,7 +79,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ TaskName
         {
-            String^ get() { CheckValid(); return gcnew String(schema_->task_name()); }
+            String^ get() { return gcnew String(schema_->task_name()); }
         }
 
         /// <summary>
@@ -99,7 +87,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ ProviderName
         {
-            String^ get() { CheckValid(); return gcnew String(schema_->provider_name()); }
+            String^ get() { return gcnew String(schema_->provider_name()); }
         }
 
         /// <summary>
@@ -107,7 +95,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property ETW::DecodingSource DecodingSource
         {
-            ETW::DecodingSource get() { CheckValid(); return (ETW::DecodingSource)schema_->decoding_source(); }
+            ETW::DecodingSource get() { return (ETW::DecodingSource)schema_->decoding_source(); }
         }
 
 #pragma endregion
@@ -780,7 +768,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>IEnumerable of Property</returns>
         virtual property IEnumerable<Property^>^ Properties
         {
-            IEnumerable<Property^>^ get() { CheckValid(); return gcnew PropertyEnumerable(*schema_, this); }
+            IEnumerable<Property^>^ get() { return gcnew PropertyEnumerable(*schema_); }
         }
 
         /// <summary>
@@ -818,7 +806,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>a list of return addresses</returns>
         virtual List<UInt64>^ GetStackTrace()
         {
-            CheckValid();
             auto stackTrace = gcnew List<UInt64>();
             for (auto& returnAddress : schema_->stack_trace())
             {
@@ -833,7 +820,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         template <typename T>
         T GetValue(String^ name)
         {
-            CheckValid();
             std::wstring propName = marshal_as<std::wstring>(name);
 
             try
@@ -869,7 +855,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         template <typename T>
         bool TryGetValue(String^ name, T% result)
         {
-            CheckValid();
             try
             {
                 T value;

@@ -48,8 +48,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
         void EventNotification(const EVENT_RECORD& record, const krabs::trace_context& trace_context);
         void ErrorNotification(const EVENT_RECORD& record, const std::string& error_message);
-        void NotifyEvent(const EVENT_RECORD& record, const krabs::trace_context& trace_context);
-        void NotifyError(const EVENT_RECORD& record, const std::string& error_message);
 
     public:
         IEventRecordMetadataDelegate^ OnMetadata;
@@ -105,29 +103,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     void CallbackBridge::EventNotification(const EVENT_RECORD& record, const krabs::trace_context& trace_context)
     {
-        try {
-            NotifyEvent(record, trace_context);
-        }
-        catch (const std::exception&) {
-            throw;
-        }
-        catch (Exception^ error) {
-            throw details::managed_callback_exception(error);
-        }
-    }
-
-    void CallbackBridge::NotifyEvent(const EVENT_RECORD& record, const krabs::trace_context& trace_context)
-    {
         auto onMetadata = OnMetadata;
         if (onMetadata) {
             auto metadata = WrapMetadata(record);
 
-            try {
-                onMetadata(metadata);
-            }
-            finally {
-                metadata->Invalidate();
-            }
+            onMetadata(metadata);
         }
 
         auto onEvent = OnEvent;
@@ -140,12 +120,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
                 krabs::parser parser(schema);
                 auto evt = WrapRecord(record, schema, parser, info);
 
-                try {
-                    onEvent(evt);
-                }
-                finally {
-                    evt->InvalidateRecord();
-                }
+                onEvent(evt);
             }
             else {
                 auto error_message = krabs::get_status_and_record_context(status, record);
@@ -156,29 +131,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     void CallbackBridge::ErrorNotification(const EVENT_RECORD& record, const std::string& error_message)
     {
-        try {
-            NotifyError(record, error_message);
-        }
-        catch (const std::exception&) {
-            throw;
-        }
-        catch (Exception^ error) {
-            throw details::managed_callback_exception(error);
-        }
-    }
-
-    void CallbackBridge::NotifyError(const EVENT_RECORD& record, const std::string& error_message)
-    {
         auto onError = OnError;
         if (onError) {
             auto error = WrapError(error_message, record);
 
-            try {
-                onError(error);
-            }
-            finally {
-                error->Invalidate();
-            }
+            onError(error);
         }
     }
 

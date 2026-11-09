@@ -6,7 +6,6 @@
 #include <krabs.hpp>
 
 #include "NativePtr.hpp"
-#include "EventRecordMetadata.hpp"
 #include <cassert>
 
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
@@ -70,12 +69,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// </summary>
     public ref class PropertyEnumerator : public IEnumerator<Property^> {
     internal:
-        PropertyEnumerator(const krabs::schema& schema, EventRecordMetadata^ owner, uint64_t generation)
+        PropertyEnumerator(const krabs::schema& schema)
         : iterator_(schema)
         , vecIterator_()
         , vecIteratorEnd_()
-        , owner_(owner)
-        , generation_(generation)
         {
             Reset();
         }
@@ -87,7 +84,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         /// <returns>true if more elements to enumerate, false if at the end</returns>
         virtual bool MoveNext() = IEnumerator<Property^>::MoveNext {
-            owner_->CheckValid(generation_);
 
             // C#'s enumerators expect the enumeration to point to a vacuous
             // space *before* the first element when they are Reset. Reset is
@@ -121,7 +117,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the current element in the enumeration as a <see cref="O365::Security::ETW::Property"/></returns>
         property Property^ Current {
             virtual Property ^get() = IEnumerator<Property^>::Current::get {
-                owner_->CheckValid(generation_);
                 return gcnew Property(gcnew String((*vecIterator_.Get())->name().c_str()), (*vecIterator_.Get())->type(), (*vecIterator_.Get())->out_type());
             }
         };
@@ -130,14 +125,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the current element in the enumeration as a <see cref="System::Object"/></returns>
         property Object ^Current2 {
             virtual Object ^get() = System::Collections::IEnumerator::Current::get {
-                owner_->CheckValid(generation_);
                 return gcnew Property(gcnew String((*vecIterator_.Get())->name().c_str()), (*vecIterator_.Get())->type(), (*vecIterator_.Get())->out_type());
             }
         }
 
         /// <summary>Reset the enumeration</summary>
         virtual void Reset() = IEnumerator<Property^>::Reset {
-            owner_->CheckValid(generation_);
             vecIterator_.Reset(nullptr);
             vecIteratorEnd_.Swap(NativePtr<std::vector<krabs::property>::iterator>(iterator_->end()));
         }
@@ -150,8 +143,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         }
 
     internal:
-        EventRecordMetadata^ owner_;
-        uint64_t generation_;
         NativePtr<krabs::property_iterator> iterator_;
         NativePtr<std::vector<krabs::property>::iterator> vecIterator_;
         NativePtr<std::vector<krabs::property>::iterator> vecIteratorEnd_;
@@ -162,10 +153,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// </summary>
     public ref class PropertyEnumerable : public IEnumerable<Property^> {
     internal:
-        PropertyEnumerable(const krabs::schema& schema, EventRecordMetadata^ owner)
+        PropertyEnumerable(const krabs::schema& schema)
         : schema_(&schema)
-        , owner_(owner)
-        , generation_(owner->Generation)
         {}
 
     public:
@@ -174,8 +163,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         /// <returns>an IEnumerator of <see cref="O365::Security::ETW::Property"/></returns>
         virtual IEnumerator<Property^> ^GetEnumerator() {
-            owner_->CheckValid(generation_);
-            return gcnew PropertyEnumerator(*schema_, owner_, generation_);
+            return gcnew PropertyEnumerator(*schema_);
         }
 
         /// <summary>
@@ -185,14 +173,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <see cref="O365::Security::ETW::Property"/>
         /// </returns>
         virtual System::Collections::IEnumerator ^GetEnumerator2() = System::Collections::IEnumerable::GetEnumerator {
-            owner_->CheckValid(generation_);
-            return gcnew PropertyEnumerator(*schema_, owner_, generation_);
+            return gcnew PropertyEnumerator(*schema_);
         }
 
     internal:
         const krabs::schema* schema_;
-        EventRecordMetadata^ owner_;
-        uint64_t generation_;
     };
 
     // Implementation

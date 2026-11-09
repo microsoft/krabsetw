@@ -19,11 +19,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         EventRecordMetadata^ record_;
 
     internal:
-        void Invalidate()
-        {
-            record_->Invalidate();
-        }
-
         EventRecordError(
             System::String^ message,
             EventRecordMetadata^ record)
