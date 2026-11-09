@@ -37,10 +37,11 @@ namespace krabs { namespace testing { namespace details {
     /**
      * <summary>
      *   Defines how much padding to inject into a synth_record when a property
-     *   is not filled by calling code.
+     *   is not filled by calling code. Pointer-sized types use the pointer
+     *   size of the record being built, which may differ from this process's.
      * </summary>
      */
-    inline size_t how_many_bytes_to_fill(_TDH_IN_TYPE type)
+    inline size_t how_many_bytes_to_fill(_TDH_IN_TYPE type, size_t pointerSize)
     {
         static_assert(sizeof(float) == 4, "sizeof(float) must be 4, defined on MSDN");
 
@@ -61,7 +62,8 @@ namespace krabs { namespace testing { namespace details {
         case TDH_INTYPE_BOOLEAN:       return sizeof(uint32_t); // 4-byte bool, defined on MSDN
         case TDH_INTYPE_BINARY:        return sizeof(char);
         case TDH_INTYPE_GUID:          return sizeof(GUID);
-        case TDH_INTYPE_POINTER:       return sizeof(char*);
+        case TDH_INTYPE_POINTER:       return pointerSize;
+        case TDH_INTYPE_SIZET:         return pointerSize;
         case TDH_INTYPE_FILETIME:      return sizeof(FILETIME);
         case TDH_INTYPE_SYSTEMTIME:    return sizeof(SYSTEMTIME);
         case TDH_INTYPE_SID:           return sizeof(PSID);
