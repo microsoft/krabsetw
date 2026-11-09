@@ -4,6 +4,8 @@
 #include "CppUnitTest.h"
 #include <krabs.hpp>
 
+#include <sddl.h>
+
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace krabstests
@@ -161,6 +163,67 @@ namespace krabstests
             auto url = parser.parse<std::wstring>(L"Url");
 
             Assert::AreEqual(expectedUrl, url);
+        }
+
+        TEST_METHOD(parse_sid_should_return_string_form_of_sid_property)
+        {
+            // Microsoft-Windows-Kernel-Process ProcessStart (version 3) carries the
+            // process integrity level as a SID property.
+            krabs::guid kernelProcess(L"{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}");
+            krabs::testing::record_builder builder(kernelProcess, krabs::id(1), krabs::version(3));
+
+            SID highIntegrity = { SID_REVISION, 1, SECURITY_MANDATORY_LABEL_AUTHORITY, SECURITY_MANDATORY_HIGH_RID };
+            builder.add_properties()
+                (L"MandatoryLabel", highIntegrity);
+
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+
+            Assert::AreEqual(std::string("S-1-16-12288"), parser.parse<krabs::sid>(L"MandatoryLabel").sid_string);
+        }
+
+        TEST_METHOD(parse_sid_should_throw_when_sid_property_is_invalid)
+        {
+            krabs::guid kernelProcess(L"{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}");
+            krabs::testing::record_builder builder(kernelProcess, krabs::id(1), krabs::version(3));
+
+            SID badRevision = { SID_REVISION + 1, 1, SECURITY_MANDATORY_LABEL_AUTHORITY, SECURITY_MANDATORY_HIGH_RID };
+            builder.add_properties()
+                (L"MandatoryLabel", badRevision);
+
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+
+            Assert::ExpectException<std::runtime_error>([&]() { parser.parse<krabs::sid>(L"MandatoryLabel"); });
+
+            krabs::sid result;
+            Assert::IsFalse(parser.try_parse(L"MandatoryLabel", result));
+        }
+
+        TEST_METHOD(parse_sid_should_skip_the_token_user_prefix_of_a_wbemsid)
+        {
+            // The kernel logger's classic MOF Process/Start (version 3) carries the
+            // process owner as a WBEMSID: a TOKEN_USER followed by the SID.
+            krabs::guid processClass(L"{3D6FA8D0-FE05-11D0-9DDA-00C04FD7BA7C}");
+            krabs::testing::record_builder builder(processClass, krabs::id(0), krabs::version(3), krabs::opcode(1));
+            builder.header().Flags = EVENT_HEADER_FLAG_CLASSIC_HEADER;
+
+            const std::string expected = "S-1-5-21-3623811015-3361044348-30300820-1013";
+            PSID sid = nullptr;
+            Assert::IsTrue(ConvertStringSidToSidA(expected.c_str(), &sid) != FALSE);
+            builder.add_properties()
+                (L"UserSID", krabs::testing::wbemsid(sid))
+                (L"ImageFileName", std::string("notepad.exe"));
+            LocalFree(sid);
+
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+
+            Assert::AreEqual(expected, parser.parse<krabs::sid>(L"UserSID").sid_string);
+            Assert::AreEqual(std::string("notepad.exe"), parser.parse<std::string>(L"ImageFileName"));
         }
 
         private:

@@ -8,6 +8,30 @@
 #include "../compiler_check.hpp"
 #include "../parse_types.hpp"
 
+namespace krabs { namespace testing {
+
+    /**
+     * <summary>
+     *   A SID to pack as a TDH_INTYPE_WBEMSID property, the form classic MOF
+     *   events such as the kernel's Process/Start use: a TOKEN_USER (two
+     *   pointers wide) followed by the SID.
+     * </summary>
+     * <example>
+     *    PSID sid = ...;
+     *    builder.add_properties()
+     *         (L"UserSID", krabs::testing::wbemsid(sid));
+     * </example>
+     */
+    struct wbemsid {
+        explicit wbemsid(PSID sid)
+        : sid_bytes(static_cast<const BYTE*>(sid), static_cast<const BYTE*>(sid) + GetLengthSid(sid))
+        { }
+
+        std::vector<BYTE> sid_bytes;
+    };
+
+} /* namespace testing */ } /* namespace krabs */
+
 namespace krabs { namespace testing { namespace details {
 
     /**
@@ -41,6 +65,7 @@ namespace krabs { namespace testing { namespace details {
         case TDH_INTYPE_FILETIME:      return sizeof(FILETIME);
         case TDH_INTYPE_SYSTEMTIME:    return sizeof(SYSTEMTIME);
         case TDH_INTYPE_SID:           return sizeof(PSID);
+        case TDH_INTYPE_WBEMSID:       return 4; // TDH reads a NULL TOKEN_USER.Sid as a 4-byte "no SID" value
         case TDH_INTYPE_HEXINT32:      return sizeof(uint32_t);
         case TDH_INTYPE_HEXINT64:      return sizeof(uint64_t);
         default: break;
@@ -170,6 +195,11 @@ namespace krabs { namespace testing { namespace details {
      template <>
      struct tdh_morphism<krabs::binary> {
         static const _TDH_IN_TYPE value = TDH_INTYPE_BINARY;
+     };
+
+     template <>
+     struct tdh_morphism<krabs::testing::wbemsid> {
+        static const _TDH_IN_TYPE value = TDH_INTYPE_WBEMSID;
      };
 
 

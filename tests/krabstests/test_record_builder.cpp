@@ -139,6 +139,22 @@ namespace krabstests
             Assert::AreEqual(parser.parse<uint32_t>(L"LogonType"), (uint32_t)5);
         }
 
+        TEST_METHOD(pack_incomplete_should_correctly_handle_wbemsid_in_event)
+        {
+            // Classic MOF Process/Start (version 3), leaving the WBEMSID UserSID unset.
+            krabs::guid processClass(L"{3D6FA8D0-FE05-11D0-9DDA-00C04FD7BA7C}");
+            krabs::testing::record_builder builder(processClass, krabs::id(0), krabs::version(3), krabs::opcode(1));
+            builder.header().Flags = EVENT_HEADER_FLAG_CLASSIC_HEADER;
+            builder.add_properties()
+                (L"ImageFileName", std::string("notepad.exe"));
+
+            auto record = builder.pack_incomplete();
+
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+            Assert::AreEqual(std::string("notepad.exe"), parser.parse<std::string>(L"ImageFileName"));
+        }
+
         TEST_METHOD(pack_should_include_extended_data)
         {
             krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
