@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <climits>
 
 #include "../compiler_check.hpp"
 #include "../guid.hpp"
@@ -137,6 +138,10 @@ namespace krabs { namespace testing {
     , data_(user_data)
     , extended_data_(extended_data)
     {
+        if (data_.size() > USHRT_MAX) {
+            throw std::invalid_argument("Synthetic event payload exceeds USHRT_MAX");
+        }
+
         if (data_.size() > 0) {
             record_.UserData = &data_[0];
         } else {

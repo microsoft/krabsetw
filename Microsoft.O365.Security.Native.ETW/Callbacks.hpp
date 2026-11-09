@@ -42,11 +42,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         EventRecordError^ error_;
 
         EventRecordMetadata^ WrapMetadata(const EVENT_RECORD& record);
-        EventRecord^ WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser);
+        EventRecord^ WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema,
+            krabs::parser& parser, const TRACE_EVENT_INFO* info);
         EventRecordError^ WrapError(const std::string& error_message, const EVENT_RECORD& record);
 
         void EventNotification(const EVENT_RECORD& record, const krabs::trace_context& trace_context);
         void ErrorNotification(const EVENT_RECORD& record, const std::string& error_message);
+        void NotifyEvent(const EVENT_RECORD& record, const krabs::trace_context& trace_context);
+        void NotifyError(const EVENT_RECORD& record, const std::string& error_message);
 
     public:
         IEventRecordMetadataDelegate^ OnMetadata;
@@ -78,13 +81,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         return value;
     }
 
-    EventRecord^ CallbackBridge::WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser)
+    EventRecord^ CallbackBridge::WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema,
+        krabs::parser& parser, const TRACE_EVENT_INFO* info)
     {
         auto value = record_;
         if (!value) 
-            return record_ = gcnew EventRecord(record, schema, parser);
+            return record_ = gcnew EventRecord(record, schema, parser, info);
 
-        value->Update(record, schema, parser);
+        value->Update(record, schema, parser, info);
         return value;
     }
 
@@ -101,24 +105,47 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     void CallbackBridge::EventNotification(const EVENT_RECORD& record, const krabs::trace_context& trace_context)
     {
+        try {
+            NotifyEvent(record, trace_context);
+        }
+        catch (const std::exception&) {
+            throw;
+        }
+        catch (Exception^ error) {
+            throw details::managed_callback_exception(error);
+        }
+    }
+
+    void CallbackBridge::NotifyEvent(const EVENT_RECORD& record, const krabs::trace_context& trace_context)
+    {
         auto onMetadata = OnMetadata;
         if (onMetadata) {
             auto metadata = WrapMetadata(record);
 
-            onMetadata(metadata);
+            try {
+                onMetadata(metadata);
+            }
+            finally {
+                metadata->Invalidate();
+            }
         }
 
         auto onEvent = OnEvent;
         if (onEvent) {
             TDHSTATUS status = ERROR_SUCCESS;
-            trace_context.schema_locator.get_event_schema_no_throw(record, status);
+            auto info = trace_context.schema_locator.get_event_schema_no_throw(record, status);
 
             if (status == ERROR_SUCCESS) {
-                krabs::schema schema(record, trace_context.schema_locator);
+                krabs::schema schema(record, info);
                 krabs::parser parser(schema);
-                auto evt = WrapRecord(record, schema, parser);
+                auto evt = WrapRecord(record, schema, parser, info);
 
-                onEvent(evt);
+                try {
+                    onEvent(evt);
+                }
+                finally {
+                    evt->InvalidateRecord();
+                }
             }
             else {
                 auto error_message = krabs::get_status_and_record_context(status, record);
@@ -129,11 +156,29 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     void CallbackBridge::ErrorNotification(const EVENT_RECORD& record, const std::string& error_message)
     {
+        try {
+            NotifyError(record, error_message);
+        }
+        catch (const std::exception&) {
+            throw;
+        }
+        catch (Exception^ error) {
+            throw details::managed_callback_exception(error);
+        }
+    }
+
+    void CallbackBridge::NotifyError(const EVENT_RECORD& record, const std::string& error_message)
+    {
         auto onError = OnError;
         if (onError) {
             auto error = WrapError(error_message, record);
 
-            onError(error);
+            try {
+                onError(error);
+            }
+            finally {
+                error->Invalidate();
+            }
         }
     }
 

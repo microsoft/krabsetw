@@ -173,6 +173,7 @@
     <ClInclude Include="Provider.hpp" />
     <ClInclude Include="EventRecord.hpp" />
     <ClInclude Include="RawProvider.hpp" />
+    <ClInclude Include="StringEncoding.hpp" />
     <ClInclude Include="Testing\EventHeader.hpp" />
     <ClInclude Include="Testing\RecordBuilder.hpp" />
     <ClInclude Include="Testing\SynthRecord.hpp" />

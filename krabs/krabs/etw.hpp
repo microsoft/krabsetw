@@ -101,6 +101,7 @@ namespace krabs { namespace details {
          * </summary>
          */
         void on_event(const EVENT_RECORD &record);
+        bool callback_failed() const;
 
     private:
         trace_info fill_trace_info();
@@ -159,7 +160,7 @@ namespace krabs { namespace details {
 
         // NOTE: EventsLost is not set on this type
         trace.set_buffers_processed(pLogFile->BuffersRead);
-        return TRUE;
+        return trace.callback_failed() ? FALSE : TRUE;
     }
 
     template <typename T>
@@ -227,7 +228,27 @@ namespace krabs { namespace details {
     template <typename T>
     void trace_manager<T>::on_event(const EVENT_RECORD &record)
     {
-        trace_.on_event(record);
+        if (callback_failed())
+            return;
+        try {
+            trace_.on_event(record);
+        }
+        catch (...) {
+            trace_.callback_failure_ = std::current_exception();
+            // CloseTrace requests cancellation without waiting on this callback thread.
+            try {
+                close_trace();
+            }
+            catch (...) {
+                // The buffer callback also cancels processing; preserve the first failure.
+            }
+        }
+    }
+
+    template <typename T>
+    bool trace_manager<T>::callback_failed() const
+    {
+        return trace_.callback_failure_ != nullptr;
     }
 
     template <typename T>
@@ -372,6 +393,8 @@ namespace krabs { namespace details {
             throw open_trace_failure();
         }
 
+        trace_.callback_failure_ = nullptr;
+
         // Refactoring warning.
         // During the testing of the (slower) C++/CLI implementation it became evident that
         // EnableTraceEx2(EVENT_CONTROL_CODE_CAPTURE_STATE) must be called very shortly
@@ -379,6 +402,17 @@ namespace krabs { namespace details {
         T::trace_type::enable_rundown(trace_);
 
         ULONG status = ProcessTrace(&trace_.sessionHandle_, 1, NULL, NULL);
+        if (callback_failed()) {
+            auto failure = trace_.callback_failure_;
+            trace_.callback_failure_ = nullptr;
+            try {
+                stop();
+            }
+            catch (...) {
+                // Cleanup must not replace the original handler failure.
+            }
+            std::rethrow_exception(failure);
+        }
         error_check_common_conditions(status);
     }
 

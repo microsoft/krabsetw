@@ -18,6 +18,8 @@
 #include <string>
 #include <vector>
 #include <type_traits>
+#include <cstring>
+#include <stdexcept>
 
 #include "compiler_check.hpp"
 
@@ -190,8 +192,13 @@ namespace krabs {
 
         static socket_address from_bytes(const BYTE* bytes, size_t size_in_bytes)
         {
-            socket_address sa;
-            memcpy_s(&(sa.sa_stor), sizeof sa.sa_stor, bytes, size_in_bytes);
+            if (size_in_bytes == 1 || size_in_bytes > sizeof(sockaddr_storage) ||
+                (bytes == nullptr && size_in_bytes != 0)) {
+                throw std::runtime_error("Invalid socket address property length");
+            }
+            socket_address sa = {};
+            if (size_in_bytes != 0)
+                memcpy_s(&(sa.sa_stor), sizeof sa.sa_stor, bytes, size_in_bytes);
             sa.size = size_in_bytes;
             return sa;
         }
@@ -385,6 +392,20 @@ namespace krabs {
          */
         uint16_t size_;
         wchar_t string_[1];
+
+        static const counted_string* from_bytes(const BYTE* bytes, size_t size_in_bytes)
+        {
+            if (bytes == nullptr || size_in_bytes < sizeof(uint16_t))
+                throw std::runtime_error("Counted string header is incomplete");
+
+            uint16_t count;
+            std::memcpy(&count, bytes, sizeof(count));
+            if (count % sizeof(value_type) != 0 ||
+                count > size_in_bytes - sizeof(count))
+                throw std::runtime_error("Counted string length exceeds property extent or is invalid");
+
+            return reinterpret_cast<const counted_string*>(bytes);
+        }
 
         const_pointer string() const
         {

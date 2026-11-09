@@ -22,7 +22,7 @@ namespace krabs { namespace predicates {
 
             collection_view<const_iterator> operator()(const property_info& propInfo) const
             {
-                auto cs_ptr = reinterpret_cast<const krabs::counted_string*>(propInfo.pPropertyIndex_);
+                auto cs_ptr = krabs::counted_string::from_bytes(propInfo.pPropertyIndex_, propInfo.length_);
                 return krabs::view(cs_ptr->string(), cs_ptr->length());
             }
         };

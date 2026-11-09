@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #pragma once
+#include <algorithm>
 
 #include <evntcons.h>
 #include <functional>
@@ -213,6 +214,13 @@ namespace krabs {
 
         try
         {
+            // ETW push-down merges sibling filters and is unavailable for some providers.
+            if (!provider_filter_event_ids_.empty() &&
+                std::find(provider_filter_event_ids_.begin(), provider_filter_event_ids_.end(),
+                    record.EventHeader.EventDescriptor.Id) == provider_filter_event_ids_.end()) {
+                return;
+            }
+
             if (predicate_ != nullptr && !predicate_(record, trace_context)) {
                 return;
             }

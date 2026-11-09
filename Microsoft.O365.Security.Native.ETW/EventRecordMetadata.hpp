@@ -20,13 +20,53 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// <summary>
     /// Concrete implementation representing the metadata about an ETW event record.
     /// </summary>
+    /// <remarks>
+    /// Instances are reused and valid only during their callback. Copy any values
+    /// that must outlive the callback.
+    /// </remarks>
     public ref class EventRecordMetadata : public IEventRecordMetadata
     {
     protected:
         const EVENT_RECORD* record_;
         const EVENT_HEADER* header_;
+        uint64_t generation_ = 0;
+
+        const EVENT_RECORD* CheckedRecord()
+        {
+            CheckValid();
+            return record_;
+        }
+
+        const EVENT_HEADER* CheckedHeader()
+        {
+            CheckValid();
+            return header_;
+        }
 
     internal:
+        void CheckValid()
+        {
+            if (record_ == nullptr)
+                throw gcnew ObjectDisposedException("EventRecord");
+        }
+
+        void CheckValid(uint64_t generation)
+        {
+            CheckValid();
+            if (generation != generation_)
+                throw gcnew ObjectDisposedException("EventRecord");
+        }
+
+        property uint64_t Generation {
+            uint64_t get() { return generation_; }
+        }
+
+        void Invalidate()
+        {
+            record_ = nullptr;
+            header_ = nullptr;
+        }
+
         EventRecordMetadata(const EVENT_RECORD& record)
             : record_(&record)
             , header_(&record.EventHeader) { }
@@ -36,6 +76,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         void Update(const EVENT_RECORD& record)
         {
+            ++generation_;
             record_ = &record;
             header_ = &record.EventHeader;
         }
@@ -52,7 +93,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property uint16_t Id
         {
-            uint16_t get() { return header_->EventDescriptor.Id; }
+            uint16_t get() { return CheckedHeader()->EventDescriptor.Id; }
         }
 
         /// <summary>
@@ -60,7 +101,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property byte Opcode
         {
-            virtual byte get() { return header_->EventDescriptor.Opcode; }
+            virtual byte get() { return CheckedHeader()->EventDescriptor.Opcode; }
         }
 
         /// <summary>
@@ -68,7 +109,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property byte Version
         {
-            byte get() { return header_->EventDescriptor.Version; }
+            byte get() { return CheckedHeader()->EventDescriptor.Version; }
         }
 
         /// <summary>
@@ -76,7 +117,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property byte Level
         {
-            byte get() { return header_->EventDescriptor.Level; }
+            byte get() { return CheckedHeader()->EventDescriptor.Level; }
         }
 
 #pragma endregion
@@ -88,7 +129,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property uint16_t Flags
         {
-            uint16_t get() { return header_->Flags; }
+            uint16_t get() { return CheckedHeader()->Flags; }
         }
 
         /// <summary>
@@ -98,7 +139,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         {
             EventHeaderProperty get()
             {
-                return (EventHeaderProperty)(header_->EventProperty);
+                return (EventHeaderProperty)(CheckedHeader()->EventProperty);
             }
         }
 
@@ -107,7 +148,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property unsigned int ProcessId
         {
-            unsigned int get() { return header_->ProcessId; }
+            unsigned int get() { return CheckedHeader()->ProcessId; }
         }
 
         /// <summary>
@@ -115,7 +156,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property unsigned int ThreadId
         {
-            unsigned int get() { return header_->ThreadId; }
+            unsigned int get() { return CheckedHeader()->ThreadId; }
         }
 
         /// <summary>
@@ -125,7 +166,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         {
             DateTime get()
             {
-                return DateTime::FromFileTimeUtc(header_->TimeStamp.QuadPart);
+                return DateTime::FromFileTimeUtc(CheckedHeader()->TimeStamp.QuadPart);
             }
         }
 
@@ -134,7 +175,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property Guid ProviderId
         {
-            Guid get() { return ConvertGuid(header_->ProviderId); }
+            Guid get() { return ConvertGuid(CheckedHeader()->ProviderId); }
         }
 
         /// <summary>
@@ -142,7 +183,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property Guid ActivityId
         {
-            Guid get() { return ConvertGuid(header_->ActivityId); }
+            Guid get() { return ConvertGuid(CheckedHeader()->ActivityId); }
         }
 
         /// <summary>
@@ -155,7 +196,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the type of the event record</returns>
         virtual DecodingSource GetEventType()
         {
-            return (DecodingSource)krabs::get_event_type(*record_);
+            return (DecodingSource)krabs::get_event_type(*CheckedRecord());
         }
 
 #pragma endregion
@@ -168,7 +209,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the size of the EVENT_RECORD.UserData buffer</returns>
         virtual property uint16_t UserDataLength
         {
-            uint16_t get() { return record_->UserDataLength; }
+            uint16_t get() { return CheckedRecord()->UserDataLength; }
         }
 
         /// <summary>
@@ -177,7 +218,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>a pointer to the EVENT_RECORD.UserData buffer</returns>
         virtual property IntPtr UserData
         {
-            IntPtr get() { return IntPtr(record_->UserData); }
+            IntPtr get() { return IntPtr(CheckedRecord()->UserData); }
         }
 
         /// <summary>
@@ -207,6 +248,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </returns>
         virtual bool TryGetContainerId([Out] System::Guid% result)
         {
+            CheckValid();
             auto extended_data_count = record_->ExtendedDataCount;
             for (USHORT i = 0; i < extended_data_count; i++)
             {
@@ -243,6 +285,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual bool TryGetProcessStartKey([Out] uint64_t% result)
         {
+            CheckValid();
             auto extended_data_count = record_->ExtendedDataCount;
             for (USHORT i = 0; i < extended_data_count; i++)
             {

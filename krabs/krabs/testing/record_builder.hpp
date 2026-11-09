@@ -325,7 +325,8 @@ namespace krabs { namespace testing {
     {
         std::pair<std::vector<BYTE>, std::vector<std::wstring>> results;
         krabs::schema_locator schema_locator;
-        krabs::schema event_schema(record, schema_locator);
+        auto schema_info = schema_locator.get_event_schema(record);
+        krabs::schema event_schema(record, schema_info);
         krabs::parser event_parser(event_schema);
 
         // Unfilled pointer-sized properties are padded to the record's bitness,
@@ -338,8 +339,59 @@ namespace krabs { namespace testing {
         // set to the number of bytes that can be trimmed from the generated buffer.
 
         auto bytes_to_trim = 0;
+        ULONG property_index = 0;
         for (auto prop : event_parser.properties()) {
             bytes_to_trim = 0;
+            const auto& info = schema_info->EventPropertyInfoArray[property_index++];
+            if ((info.Flags & PropertyStruct) != 0) {
+                throw std::invalid_argument("Struct properties are not supported");
+            }
+
+            const bool sized = (info.Flags & (PropertyParamLength | PropertyParamFixedLength)) != 0 ||
+                info.length != 0;
+            size_t declared_length = info.length;
+            if ((info.Flags & PropertyParamLength) != 0) {
+                if (info.lengthPropertyIndex >= schema_info->PropertyCount) {
+                    throw std::invalid_argument("Invalid length property index");
+                }
+                const auto& length_info = schema_info->EventPropertyInfoArray[info.lengthPropertyIndex];
+                auto length_name = reinterpret_cast<const wchar_t*>(
+                    reinterpret_cast<const BYTE*>(schema_info) + length_info.NameOffset);
+                auto length_value = std::find_if(properties_.begin(), properties_.end(),
+                    [&](const record_property_thunk& value) { return value.name() == length_name; });
+                declared_length = 0;
+                if (length_value != properties_.end()) {
+                    bool signed_length = false;
+                    switch (length_value->type()) {
+                    case TDH_INTYPE_INT8:
+                    case TDH_INTYPE_INT16:
+                    case TDH_INTYPE_INT32:
+                    case TDH_INTYPE_INT64:
+                        signed_length = true;
+                        break;
+                    case TDH_INTYPE_UINT8:
+                    case TDH_INTYPE_UINT16:
+                    case TDH_INTYPE_UINT32:
+                    case TDH_INTYPE_UINT64:
+                        break;
+                    default:
+                        throw std::invalid_argument("Length property must be an integer");
+                    }
+                    const auto& bytes = length_value->bytes();
+                    uint64_t value = 0;
+                    if (bytes.empty() || bytes.size() > sizeof(value) ||
+                        length_value->type() != length_info.nonStructType.InType) {
+                        throw std::invalid_argument("Invalid length property value");
+                    }
+                    memcpy(&value, bytes.data(), bytes.size());
+                    if ((signed_length && (bytes.back() & 0x80) != 0) || value > USHRT_MAX) {
+                        throw std::invalid_argument("Property length is outside the event payload range");
+                    }
+                    declared_length = static_cast<size_t>(value);
+                }
+            }
+            if (prop.type() == TDH_INTYPE_UNICODESTRING)
+                declared_length *= sizeof(wchar_t);
 
             auto found_prop = std::find_if(properties_.begin(),
                                            properties_.end(),
@@ -370,8 +422,16 @@ namespace krabs { namespace testing {
                     bytes_to_trim = sizeof('\0');
                 }
 
+                auto end = found_prop->bytes().end();
+                if (sized && (bytes_to_trim != 0 || prop.type() == TDH_INTYPE_BINARY)) {
+                    if (found_prop->bytes().size() - bytes_to_trim != declared_length) {
+                        throw std::invalid_argument("Property value does not match its declared length");
+                    }
+                    end -= bytes_to_trim;
+                    bytes_to_trim = 0;
+                }
                 std::copy(found_prop->bytes().begin(),
-                          found_prop->bytes().end(),
+                          end,
                           std::back_inserter(results.first));
             } else {
 
@@ -381,9 +441,16 @@ namespace krabs { namespace testing {
                 // because it may be considered an error to not fill all
                 // properties manually.
                 results.second.emplace_back(prop.name());
+                size_t fill = 0;
+                if (sized && (prop.type() == TDH_INTYPE_UNICODESTRING ||
+                    prop.type() == TDH_INTYPE_ANSISTRING || prop.type() == TDH_INTYPE_BINARY)) {
+                    fill = declared_length;
+                }
+                else {
+                    fill = details::how_many_bytes_to_fill(prop.type(), pointer_size);
+                }
                 std::fill_n(std::back_inserter(results.first),
-                            details::how_many_bytes_to_fill(prop.type(), pointer_size),
-                            static_cast<UCHAR>(0));
+                            fill, static_cast<UCHAR>(0));
             }
         }
 

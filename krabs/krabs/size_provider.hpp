@@ -76,6 +76,10 @@ namespace krabs {
         const EVENT_RECORD& record,
         const EVENT_PROPERTY_INFO& propertyInfo)
     {
+        if ((propertyInfo.Flags & PropertyStruct) != 0) {
+            throw std::runtime_error("Struct properties are not supported");
+        }
+
         // The values of the event are essentially stored as an ad-hoc
         // variant. In order to determine how far we need to advance the
         // seeking pointer, we need to know the size of the property that
@@ -112,7 +116,7 @@ namespace krabs {
         const EVENT_PROPERTY_INFO& propertyInfo,
         ULONG pointerSize)
     {
-        if ((propertyInfo.Flags & PropertyParamLength) == 0 &&
+        if ((propertyInfo.Flags & (PropertyParamLength | PropertyStruct)) == 0 &&
             propertyInfo.length > 0)
         {
             // length is a union that may refer to another field for a length
@@ -128,7 +132,9 @@ namespace krabs {
                 return pointerSize;
             }
 
-            return propertyInfo.length;
+            return propertyInfo.nonStructType.InType == TDH_INTYPE_UNICODESTRING
+                ? propertyInfo.length * sizeof(wchar_t)
+                : propertyInfo.length;
         }
 
         return 0;
@@ -199,7 +205,9 @@ namespace krabs {
         desc.PropertyName = (ULONGLONG)propertyName;
         desc.ArrayIndex = ULONG_MAX;
 
-        TdhGetPropertySize((PEVENT_RECORD)&record, 0, NULL, 1, &desc, &propertyLength);
+        auto status = TdhGetPropertySize((PEVENT_RECORD)&record, 0, NULL, 1, &desc, &propertyLength);
+        if (status != ERROR_SUCCESS)
+            throw std::runtime_error("Failed to get property size from TDH");
 
         return propertyLength;
     }

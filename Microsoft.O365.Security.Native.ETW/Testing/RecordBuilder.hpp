@@ -8,6 +8,7 @@
 #include "../Guid.hpp"
 #include "../NativePtr.hpp"
 #include "SynthRecord.hpp"
+#include "../StringEncoding.hpp"
 
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW { namespace Testing {
 
@@ -74,6 +75,27 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
 
     internal:
         NativePtr<krabs::testing::record_builder> builder_;
+        System::Collections::Generic::List<System::Tuple<int, System::String^>^>^ ansiStrings_ =
+            gcnew System::Collections::Generic::List<System::Tuple<int, System::String^>^>();
+
+        void PrepareAnsiStrings()
+        {
+            if (ansiStrings_->Count == 0)
+                return;
+            EVENT_RECORD record = {};
+            record.EventHeader = builder_->header();
+            krabs::schema_locator locator;
+            auto info = locator.get_event_schema(record);
+            // The native API exposes a const view of this wrapper's mutable builder.
+            auto& properties = const_cast<std::vector<krabs::testing::record_property_thunk>&>(
+                builder_->properties());
+            for each (auto item in ansiStrings_) {
+                auto& property = properties[item->Item1];
+                auto text = msclr::interop::marshal_as<std::wstring>(item->Item2);
+                auto bytes = details::encode_string(text, details::string_code_page(info, property.name()));
+                property = krabs::testing::record_property_thunk(property.name(), bytes);
+            }
+        }
 
         template <typename T>
         void AddValueInternal(System::String^ name, T value);
@@ -97,6 +119,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
     {
         try
         {
+            PrepareAnsiStrings();
             // SynthRecord owns the memory management of nativeRecord
             auto nativeRecord  = new krabs::testing::synth_record(builder_->pack());
             SynthRecord^ managed = gcnew SynthRecord(nativeRecord);
@@ -123,6 +146,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
     {
         try
         {
+            PrepareAnsiStrings();
             // SynthRecord owns the memory management of nativeRecord
             auto nativeRecord = new krabs::testing::synth_record(builder_->pack_incomplete());
             SynthRecord^ managed = gcnew SynthRecord(nativeRecord);
@@ -142,7 +166,11 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
 
     inline void RecordBuilder::AddAnsiString(System::String^ name, System::String^ value)
     {
-        AddValueInternal(name, msclr::interop::marshal_as<std::string>(value));
+        if (value == nullptr)
+            throw gcnew ArgumentNullException("value");
+        auto index = static_cast<int>(builder_->properties().size());
+        AddValueInternal(name, std::string());
+        ansiStrings_->Add(System::Tuple::Create(index, value));
     }
 
     inline void RecordBuilder::AddUnicodeString(System::String^ name, System::String^ value)

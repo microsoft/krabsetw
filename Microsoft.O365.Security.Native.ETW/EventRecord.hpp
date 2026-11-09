@@ -8,6 +8,7 @@
 #include "EventRecordMetadata.hpp"
 #include "IEventRecord.hpp"
 #include "Property.hpp"
+#include "StringEncoding.hpp"
 
 #include <msclr\marshal.h>
 #include <msclr\marshal_cppstd.h>
@@ -24,30 +25,46 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     /// <summary>
     /// EventRecord represents a managed instance of an event from ETW.
     /// </summary>
+    /// <remarks>
+    /// This is a borrowed callback view, not a snapshot. Access after the callback
+    /// returns throws ObjectDisposedException.
+    /// </remarks>
     public ref class EventRecord : public EventRecordMetadata, public IEventRecord
     {
     private:
         const krabs::schema* schema_;
         krabs::parser* parser_;
+        const TRACE_EVENT_INFO* info_;
 
     internal:
+        void InvalidateRecord()
+        {
+            schema_ = nullptr;
+            parser_ = nullptr;
+            info_ = nullptr;
+            EventRecordMetadata::Invalidate();
+        }
 
         EventRecord(
             const EVENT_RECORD& record,
             const krabs::schema& schema,
-            krabs::parser& parser)
+            krabs::parser& parser,
+            const TRACE_EVENT_INFO* info)
             : EventRecordMetadata(record)
             , schema_(&schema)
-            , parser_(&parser) { }
+            , parser_(&parser)
+            , info_(info) { }
 
         /// <summary>
         /// Updates this instance to point to the specified event record.
         /// </summary>
-        void Update(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser)
+        void Update(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser,
+            const TRACE_EVENT_INFO* info)
         {
             Update(record);
             schema_ = &schema;
             parser_ = &parser;
+            info_ = info;
         }
 
     public:
@@ -58,7 +75,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ Name
         {
-            String^ get() { return gcnew String(schema_->event_name()); }
+            String^ get() { CheckValid(); return gcnew String(schema_->event_name()); }
         }
 
         /// <summary>
@@ -66,7 +83,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ OpcodeName
         {
-            String^ get() { return gcnew String(schema_->opcode_name()); }
+            String^ get() { CheckValid(); return gcnew String(schema_->opcode_name()); }
         }
 
         /// <summary>
@@ -74,7 +91,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ TaskName
         {
-            String^ get() { return gcnew String(schema_->task_name()); }
+            String^ get() { CheckValid(); return gcnew String(schema_->task_name()); }
         }
 
         /// <summary>
@@ -82,7 +99,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property String^ ProviderName
         {
-            String^ get() { return gcnew String(schema_->provider_name()); }
+            String^ get() { CheckValid(); return gcnew String(schema_->provider_name()); }
         }
 
         /// <summary>
@@ -90,7 +107,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         virtual property ETW::DecodingSource DecodingSource
         {
-            ETW::DecodingSource get() { return (ETW::DecodingSource)schema_->decoding_source(); }
+            ETW::DecodingSource get() { CheckValid(); return (ETW::DecodingSource)schema_->decoding_source(); }
         }
 
 #pragma endregion
@@ -106,7 +123,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         virtual String^ GetUnicodeString(String^ name)
         {
             const auto& str = GetValue<std::wstring>(name);
-            return gcnew String(str.c_str());
+            return gcnew String(str.data(), 0, static_cast<int>(str.size()));
         }
 
         /// <summary>
@@ -138,7 +155,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             bool success = TryGetValue(name, str);
 
             if (success)
-                result = gcnew String(str.c_str());
+                result = gcnew String(str.data(), 0, static_cast<int>(str.size()));
 
             return success;
         }
@@ -155,7 +172,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         virtual String^ GetAnsiString(String^ name)
         {
             const auto& str = GetValue<std::string>(name);
-            return gcnew String(str.c_str());
+            return details::decode_string(str,
+                details::string_code_page(info_, marshal_as<std::wstring>(name)));
         }
 
         /// <summary>
@@ -187,7 +205,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             bool success = TryGetValue(name, str);
 
             if (success)
-                result = gcnew String(str.c_str());
+                result = details::decode_string(str,
+                    details::string_code_page(info_, marshal_as<std::wstring>(name)));
 
             return success;
         }
@@ -331,6 +350,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             krabs::socket_address addr;
             bool success = TryGetValue(name, addr);
 
+            if (success && addr.size == 0)
+                return false;
             if (success)
                 result = ConvertToSocketAddress(addr);
 
@@ -440,9 +461,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the DateTime value associated with the specified property</returns>
         virtual DateTime^ GetDateTime(String^ name)
         {
-            const auto& time = GetValue<::FILETIME>(name);
-            LARGE_INTEGER *largeInt = (LARGE_INTEGER*)&time;
-            return DateTime::FromFileTimeUtc(largeInt->QuadPart);
+            DateTime^ result;
+            if (!TryGetDateTime(name, result))
+                throw gcnew ParserException("Invalid FILETIME property");
+            return result;
         }
 
         /// <summary>
@@ -472,12 +494,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         {
             ::FILETIME time;
             bool success = TryGetValue(name, time);
-            LARGE_INTEGER *largeInt = (LARGE_INTEGER*)&time;
-
-            if (success)
-                result = DateTime::FromFileTimeUtc(largeInt->QuadPart);
-
-            return success;
+            if (!success)
+                return false;
+            const uint64_t ticks = (static_cast<uint64_t>(time.dwHighDateTime) << 32) |
+                time.dwLowDateTime;
+            if (ticks > 2650467743999999999ULL)
+                return false;
+            result = DateTime::FromFileTimeUtc(static_cast<long long>(ticks));
+            return true;
         }
 #pragma endregion
 
@@ -756,7 +780,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>IEnumerable of Property</returns>
         virtual property IEnumerable<Property^>^ Properties
         {
-            IEnumerable<Property^>^ get() { return gcnew PropertyEnumerable(*schema_); }
+            IEnumerable<Property^>^ get() { CheckValid(); return gcnew PropertyEnumerable(*schema_, this); }
         }
 
         /// <summary>
@@ -794,6 +818,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>a list of return addresses</returns>
         virtual List<UInt64>^ GetStackTrace()
         {
+            CheckValid();
             auto stackTrace = gcnew List<UInt64>();
             for (auto& returnAddress : schema_->stack_trace())
             {
@@ -808,6 +833,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         template <typename T>
         T GetValue(String^ name)
         {
+            CheckValid();
             std::wstring propName = marshal_as<std::wstring>(name);
 
             try
@@ -843,6 +869,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         template <typename T>
         bool TryGetValue(String^ name, T% result)
         {
+            CheckValid();
             try
             {
                 T value;
@@ -875,10 +902,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
         SocketAddress^ ConvertToSocketAddress(const krabs::socket_address& addr)
         {
-            auto managed = gcnew SocketAddress((Sockets::AddressFamily)addr.sa_stor.ss_family);
+            if (addr.size == 0)
+                return nullptr;
+            auto managed = gcnew SocketAddress((Sockets::AddressFamily)addr.sa_stor.ss_family,
+                static_cast<int>(addr.size));
             BYTE* ptr = (BYTE*)&(addr.sa_stor);
 
-            int size = addr.sa_stor.ss_family == AF_INET ? sizeof addr.sa_in : sizeof addr.sa_in6;
+            int size = static_cast<int>(addr.size);
 
             for (int ii = 0; ii < size; ii++)
                 managed[ii] = ptr[ii];
@@ -909,11 +939,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         array<Byte>^ ConvertToByteArray(const krabs::binary& data)
         {
             auto managed = gcnew array<Byte>((int)data.bytes().size());
-            IntPtr start((void*)&data.bytes()[0]);
-
-            if (start == IntPtr::Zero) return nullptr;
-
-            Marshal::Copy(start, managed, 0, (int)data.bytes().size());
+            if (managed->Length != 0)
+                Marshal::Copy(IntPtr((void*)data.bytes().data()), managed, 0, managed->Length);
 
             return managed;
         }

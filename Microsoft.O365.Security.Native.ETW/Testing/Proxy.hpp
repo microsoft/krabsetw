@@ -70,19 +70,28 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
     {
         auto rec = record->record_.Get();
 
-        if (userTrace_) {
-            krabs::testing::trace_proxy<krabs::user_trace> proxy(*userTrace_->trace_.Get());
-            proxy.push_event(*rec);
-        }
+        try {
+            if (userTrace_) {
+                krabs::testing::trace_proxy<krabs::user_trace> proxy(*userTrace_->trace_.Get());
+                proxy.push_event(*rec);
+            }
 
-        if (kernelTrace_) {
-            krabs::testing::trace_proxy<krabs::kernel_trace> proxy(*kernelTrace_->trace_.Get());
-            proxy.push_event(*rec);
-        }
+            if (kernelTrace_) {
+                krabs::testing::trace_proxy<krabs::kernel_trace> proxy(*kernelTrace_->trace_.Get());
+                proxy.push_event(*rec);
+            }
 
-        if (filter_) {
-            krabs::testing::event_filter_proxy proxy(*filter_->filter_.Get());
-            proxy.push_event(*rec);
+            if (filter_) {
+                krabs::testing::event_filter_proxy proxy(*filter_->filter_.Get());
+                proxy.push_event(*rec);
+            }
+        }
+        catch (const details::managed_callback_exception& error) {
+            error.rethrow();
+        }
+        finally {
+            GC::KeepAlive(record);
+            GC::KeepAlive(this);
         }
     }
 } /* namespace Testing */ } /* namespace ETW */ } /* namespace Security */ } /* namespace O365 */ } /* namespace Microsoft */

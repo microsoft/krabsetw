@@ -3,6 +3,8 @@
 
 #include "CppUnitTest.h"
 #include <krabs.hpp>
+#include <chrono>
+#include <future>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace std::placeholders;
@@ -78,6 +80,70 @@ namespace krabstests
 
         krabs::provider<> provider = init();
     public:
+        TEST_METHOD(real_native_callback_rethrows_after_stopping_the_session)
+        {
+            const auto id = krabs::guid::random_guid();
+            const GUID native_id = id;
+            struct registration {
+                REGHANDLE handle = 0;
+                ~registration() { if (handle != 0) EventUnregister(handle); }
+            } source;
+            Assert::AreEqual<ULONG>(ERROR_SUCCESS, EventRegister(&native_id, nullptr, nullptr, &source.handle));
+            krabs::user_trace trace;
+            krabs::provider<> live_provider(id);
+            live_provider.add_on_event_callback([](const EVENT_RECORD&, const krabs::trace_context&) {
+                throw std::runtime_error("native callback");
+            });
+            trace.enable(live_provider);
+            trace.open();
+            auto processing = std::async(std::launch::async, [&] {
+                try {
+                    trace.start();
+                    return std::string();
+                }
+                catch (const std::exception& error) {
+                    return std::string(error.what());
+                }
+            });
+            for (int i = 0; i < 50 && processing.wait_for(std::chrono::milliseconds(0)) !=
+                std::future_status::ready; ++i) {
+                EventWriteString(source.handle, 0, 0, L"trigger");
+                Sleep(100);
+            }
+            const bool completed = processing.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+            const bool stopped = trace.query_stats().buffersCount == 0;
+            trace.stop();
+            auto error = processing.get();
+            Assert::IsTrue(completed, L"Callback failure did not stop processing");
+            Assert::AreEqual(std::string("native callback"), error);
+            Assert::IsTrue(stopped, L"Failed processing left the session enabled");
+        }
+
+        TEST_METHOD(etw_callback_boundary_contains_native_failures)
+        {
+            krabs::user_trace trace;
+            size_t calls = 0;
+            provider.add_on_event_callback([&](const EVENT_RECORD&, const krabs::trace_context&) {
+                ++calls;
+                throw std::runtime_error("native callback");
+            });
+            trace.enable(provider);
+            EVENT_RECORD record = {};
+            record.EventHeader.ProviderId = krabs::guid(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
+            record.UserContext = &trace;
+            try {
+                krabs::details::trace_callback_thunk<krabs::user_trace>(&record);
+                krabs::details::trace_callback_thunk<krabs::user_trace>(&record);
+            }
+            catch (...) {
+                Assert::Fail(L"An exception unwound through the ETW callback boundary");
+            }
+            Assert::AreEqual<size_t>(1, calls);
+            EVENT_TRACE_LOGFILE logfile = {};
+            logfile.Context = &trace;
+            Assert::AreEqual<ULONG>(FALSE,
+                krabs::details::trace_buffer_callback<krabs::user_trace>(&logfile));
+        }
 
         TEST_METHOD(add_callback_should_allow_c_style_functors_as_callback)
         {

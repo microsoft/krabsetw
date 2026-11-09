@@ -163,7 +163,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
     CREATE_CONVENIENCE_KERNEL_PROVIDER(
         SystemCallProvider,
         EVENT_TRACE_FLAG_SYSTEMCALL,
-        FromGuid(krabs::guids::system_trace));
+        FromGuid(krabs::guids::perf_info));
 
     /// <summary>A provider that enables thread start and stop events.</summary>
     CREATE_CONVENIENCE_KERNEL_PROVIDER(

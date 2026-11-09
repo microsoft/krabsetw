@@ -4,6 +4,7 @@
 #pragma once
 
 #include <deque>
+#include <exception>
 #include <type_traits>
 
 #include "compiler_check.hpp"
@@ -374,6 +375,7 @@ namespace krabs {
         EVENT_TRACE_PROPERTIES properties_;
 
         trace_context context_;
+        std::exception_ptr callback_failure_;
 
         provider_callback default_callback_ = nullptr;
         enable_provider_error_callback enable_error_callback_ = nullptr;

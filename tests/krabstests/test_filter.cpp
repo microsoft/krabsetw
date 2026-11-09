@@ -25,6 +25,26 @@ namespace krabstests
         krabs::trace_context trace_context;
 
     public:
+        TEST_METHOD(counted_string_filters_reject_counts_beyond_the_property)
+        {
+            krabs::schema schema(record, trace_context.schema_locator);
+            krabs::parser parser(schema);
+            adpt::generic_string<wchar_t> adapter;
+            auto property = parser.view_of(L"UserData", adapter);
+            const uint16_t count = UINT16_MAX - 1;
+            memcpy(const_cast<wchar_t*>(property.begin()), &count, sizeof(count));
+
+            const std::wstring expected;
+            Assert::IsFalse(krabs::predicates::property_equals<adpt::counted_string>(L"UserData", expected)(record, trace_context));
+            Assert::IsFalse(krabs::predicates::property_iequals<adpt::counted_string>(L"UserData", expected)(record, trace_context));
+            Assert::IsFalse(krabs::predicates::property_contains<adpt::counted_string>(L"UserData", expected)(record, trace_context));
+            Assert::IsFalse(krabs::predicates::property_icontains<adpt::counted_string>(L"UserData", expected)(record, trace_context));
+            Assert::IsFalse(krabs::predicates::property_starts_with<adpt::counted_string>(L"UserData", expected)(record, trace_context));
+            Assert::IsFalse(krabs::predicates::property_istarts_with<adpt::counted_string>(L"UserData", expected)(record, trace_context));
+            Assert::IsFalse(krabs::predicates::property_ends_with<adpt::counted_string>(L"UserData", expected)(record, trace_context));
+            Assert::IsFalse(krabs::predicates::property_iends_with<adpt::counted_string>(L"UserData", expected)(record, trace_context));
+        }
+
         TEST_METHOD(should_forward_calls_to_all_its_callbacks_with_an_identity_filter)
         {
             krabs::event_filter filter(krabs::predicates::any_event);
@@ -70,6 +90,36 @@ namespace krabstests
         {
             krabs::predicates::id_is filter(7937);
             Assert::IsTrue(filter(record, trace_context));
+        }
+
+        TEST_METHOD(event_id_list_rejects_an_unrelated_event)
+        {
+            krabs::event_filter filter((unsigned short)1);
+            bool called = false;
+            filter.add_on_event_callback([&](const EVENT_RECORD&, const krabs::trace_context&) { called = true; });
+            krabs::testing::event_filter_proxy proxy(filter);
+            proxy.push_event(record);
+            Assert::IsFalse(called);
+        }
+
+        TEST_METHOD(event_id_list_accepts_any_member)
+        {
+            krabs::event_filter filter(std::vector<unsigned short>{ 1, 7937 });
+            bool called = false;
+            filter.add_on_event_callback([&](const EVENT_RECORD&, const krabs::trace_context&) { called = true; });
+            krabs::testing::event_filter_proxy proxy(filter);
+            proxy.push_event(record);
+            Assert::IsTrue(called);
+        }
+
+        TEST_METHOD(event_id_list_also_requires_the_predicate)
+        {
+            krabs::event_filter filter((unsigned short)7937, krabs::predicates::no_event);
+            bool called = false;
+            filter.add_on_event_callback([&](const EVENT_RECORD&, const krabs::trace_context&) { called = true; });
+            krabs::testing::event_filter_proxy proxy(filter);
+            proxy.push_event(record);
+            Assert::IsFalse(called);
         }
 
         TEST_METHOD(id_is_should_match_events_that_dont_have_matching_ids)

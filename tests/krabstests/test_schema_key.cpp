@@ -31,6 +31,41 @@ namespace krabstests
         }
 
     public:
+        TEST_METHOD(colliding_metadata_keeps_both_success_and_failure_entries)
+        {
+            EVENT_RECORD record = {};
+            std::string first("fields\0a", 8);
+            std::string second("fields\0b", 8);
+            // Inject the same digest at the key boundary; names and descriptors also match.
+            krabs::schema_key a(record, "same", 42, first);
+            krabs::schema_key b(record, "same", 42, second);
+            Assert::IsTrue(hash(a) == hash(b));
+            std::unordered_map<krabs::schema_key, TDHSTATUS> cache;
+            cache.emplace(a, ERROR_SUCCESS);
+            cache.emplace(b, ERROR_NOT_FOUND);
+            Assert::AreEqual<size_t>(2, cache.size());
+            first.back() = 'x';
+            second.back() = 'y';
+            for (int i = 0; i < 8; ++i) {
+                krabs::schema_key lookup_a(record, "same", 42, std::string_view("fields\0a", 8));
+                krabs::schema_key lookup_b(record, "same", 42, std::string_view("fields\0b", 8));
+                Assert::AreEqual<ULONG>(ERROR_SUCCESS, cache.at(lookup_a));
+                Assert::AreEqual<ULONG>(ERROR_NOT_FOUND, cache.at(lookup_b));
+            }
+        }
+
+        TEST_METHOD(metadata_assignment_preserves_borrowed_storage)
+        {
+            EVENT_RECORD record = {};
+            krabs::schema_key owned(record, {});
+            std::string bytes(256, 'y');
+            owned = krabs::schema_key(record, "same", 42, bytes);
+            krabs::schema_key borrowing(record, owned.name, owned.schema_hash, owned.metadata);
+            owned = borrowing;
+            bytes.assign(256, 'z');
+            Assert::IsTrue(owned.metadata == std::string(256, 'y'));
+        }
+
         test_schema_key() :
             provider1(L"{88154140-f63a-4028-8826-b0028614d67b}"),
             provider2(L"{41ee9f36-5a4e-4138-bc0e-2141a84eb089}"),

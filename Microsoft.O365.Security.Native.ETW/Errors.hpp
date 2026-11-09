@@ -3,7 +3,29 @@
 
 #pragma once
 
+#include <exception>
+#include <memory>
+#include <msclr\gcroot.h>
+
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
+
+    namespace details {
+        class managed_callback_exception : public std::exception {
+            using dispatch_info = System::Runtime::ExceptionServices::ExceptionDispatchInfo;
+            using root = msclr::gcroot<dispatch_info^>;
+            std::shared_ptr<root> error_;
+        public:
+            explicit managed_callback_exception(System::Exception^ error)
+                : error_(new root(dispatch_info::Capture(error))) { }
+
+            [[noreturn]] void rethrow() const
+            {
+                dispatch_info^ info = *error_;
+                info->Throw();
+                std::terminate();
+            }
+        };
+    }
 
     /// <summary>
     /// Thrown when the ETW trace object is already registered.
@@ -68,6 +90,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
 #define ExecuteAndConvertExceptions(e) \
         try { e; } \
+        catch (const details::managed_callback_exception& ex) \
+        { \
+            ex.rethrow(); \
+        } \
         catch (const krabs::trace_already_registered &) \
         { \
             throw gcnew TraceAlreadyRegistered; \

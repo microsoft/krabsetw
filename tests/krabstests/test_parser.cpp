@@ -14,6 +14,126 @@ namespace krabstests
     {
     public:
 
+        TEST_METHOD(counted_strings_reject_truncated_headers_and_invalid_counts)
+        {
+            assert_counted_string(1, 0, false);
+            assert_counted_string(2, 2, false);
+            assert_counted_string(4, 4, false);
+            assert_counted_string(8, UINT16_MAX, false);
+            assert_counted_string(8, UINT16_MAX - 1, false);
+            assert_counted_string(8, 3, false);
+        }
+
+        TEST_METHOD(counted_strings_preserve_empty_exact_fit_and_embedded_null_values)
+        {
+            assert_counted_string(2, 0, true);
+            assert_counted_string(8, 6, true);
+            assert_counted_string(10, 6, true);
+        }
+
+        TEST_METHOD(counted_string_views_reject_missing_headers)
+        {
+            EVENT_PROPERTY_INFO metadata = {};
+            BYTE payload[] = { 0 };
+            krabs::predicates::adapters::counted_string adapter;
+            Assert::ExpectException<std::runtime_error>([&] {
+                adapter(krabs::property_info(payload, metadata, 0));
+            });
+            Assert::ExpectException<std::runtime_error>([&] {
+                adapter(krabs::property_info(nullptr, metadata, 2));
+            });
+        }
+
+        TEST_METHOD(ipv4_rejects_a_mismatched_property_width)
+        {
+            assert_invalid_ip_width(TDH_OUTTYPE_IPV4, 3);
+            assert_invalid_ip_width(TDH_OUTTYPE_IPV4, 5);
+        }
+
+        TEST_METHOD(ipv6_rejects_a_mismatched_property_width)
+        {
+            assert_invalid_ip_width(TDH_OUTTYPE_IPV6, 15);
+            assert_invalid_ip_width(TDH_OUTTYPE_IPV6, 17);
+        }
+
+        TEST_METHOD(socket_address_rejects_an_incomplete_family)
+        {
+            BYTE payload[] = { AF_INET };
+            Assert::ExpectException<std::runtime_error>([&] {
+                krabs::socket_address::from_bytes(payload, sizeof(payload));
+            });
+        }
+
+    private:
+        static void assert_counted_string(USHORT extent, USHORT count, bool valid)
+        {
+            struct {
+                TRACE_EVENT_INFO info;
+                wchar_t name[6];
+            } metadata = {};
+            memcpy(metadata.name, L"Value", sizeof(metadata.name));
+            metadata.info.PropertyCount = metadata.info.TopLevelPropertyCount = 1;
+            auto& property = metadata.info.EventPropertyInfoArray[0];
+            property.NameOffset = (ULONG)((BYTE*)metadata.name - (BYTE*)&metadata.info);
+            property.nonStructType.InType = TDH_INTYPE_COUNTEDSTRING;
+            property.nonStructType.OutType = TDH_OUTTYPE_STRING;
+            property.length = extent;
+            property.count = 1;
+            BYTE payload[12] = {};
+            memcpy(payload, &count, sizeof(count));
+            const wchar_t content[] = { L'A', L'\0', L'B', L'X', L'Y' };
+            memcpy(payload + sizeof(count), content, sizeof(content));
+            EVENT_RECORD record = {};
+            record.UserData = payload;
+            record.UserDataLength = sizeof(payload);
+            krabs::schema schema(record, &metadata.info);
+            krabs::parser parser(schema);
+            krabs::predicates::adapters::counted_string adapter;
+            if (!valid) {
+                Assert::ExpectException<std::runtime_error>([&] {
+                    parser.parse<const krabs::counted_string*>(L"Value");
+                });
+                const krabs::counted_string* result = nullptr;
+                Assert::IsFalse(parser.try_parse(L"Value", result));
+                Assert::ExpectException<std::runtime_error>([&] {
+                    parser.view_of(L"Value", adapter);
+                });
+                return;
+            }
+            auto result = parser.parse<const krabs::counted_string*>(L"Value");
+            auto view = parser.view_of(L"Value", adapter);
+            std::wstring expected(content, count / sizeof(wchar_t));
+            Assert::AreEqual(expected, std::wstring(result->string(), result->length()));
+            Assert::AreEqual(expected, std::wstring(view.begin(), view.end()));
+        }
+
+        static void assert_invalid_ip_width(USHORT outType, USHORT length)
+        {
+            struct {
+                TRACE_EVENT_INFO info;
+                wchar_t name[6];
+            } metadata = {};
+            memcpy(metadata.name, L"Value", sizeof(metadata.name));
+            metadata.info.PropertyCount = metadata.info.TopLevelPropertyCount = 1;
+            auto& property = metadata.info.EventPropertyInfoArray[0];
+            property.NameOffset = (ULONG)((BYTE*)metadata.name - (BYTE*)&metadata.info);
+            property.nonStructType.InType = TDH_INTYPE_BINARY;
+            property.nonStructType.OutType = outType;
+            property.length = length;
+            property.count = 1;
+            BYTE payload[32] = {};
+            EVENT_RECORD record = {};
+            record.UserData = payload;
+            record.UserDataLength = length;
+            krabs::schema schema(record, &metadata.info);
+            krabs::parser parser(schema);
+            Assert::ExpectException<std::runtime_error>([&] {
+                parser.parse<krabs::ip_address>(L"Value");
+            });
+        }
+
+    public:
+
         TEST_METHOD(should_return_correct_count_of_props_when_enumerating)
         {
             krabs::guid powershell(L"{A0C1853B-5C40-4B15-8766-3CF1C58F985A}");
