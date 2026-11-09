@@ -36,6 +36,26 @@ namespace krabs {
             const EVENT_RECORD&,
             const EVENT_PROPERTY_INFO&);
 
+        /**
+         * <summary>
+         * Get the size of the specified property if it can be determined from
+         * the schema alone, i.e. without inspecting the event payload.
+         * Returns 0 if the size depends on the payload.
+         * </summary>
+         * EVENT_PROPERTY_INFO& property info for the property to query
+         * ULONG pointer size (4 or 8) of the event
+         */
+        static ULONG get_fixed_property_size(
+            const EVENT_PROPERTY_INFO&,
+            ULONG pointerSize);
+
+        /**
+         * <summary>
+         * Get the pointer size (4 or 8) of the specified record.
+         * </summary>
+         */
+        static ULONG get_pointer_size(const EVENT_RECORD&);
+
     private:
         static ULONG get_heuristic_size(
             const BYTE*,
@@ -64,26 +84,11 @@ namespace krabs {
         // property. For others, the size is immediately accessible in
         // the schema structure.
 
-        if ((propertyInfo.Flags & PropertyParamLength) == 0 &&
-            propertyInfo.length > 0)
+        ULONG propertyLength = get_fixed_property_size(propertyInfo, get_pointer_size(record));
+        if (propertyLength > 0)
         {
-            // length is a union that may refer to another field for a length
-            // value. In that case, defer to TDH for the value otherwise
-            // use the length value directly.
-
-            // For pointer-sized types check header instead of size, see PointerSize at
-            // https://docs.microsoft.com/en-us/windows/win32/api/tdh/nf-tdh-tdhformatproperty
-            // for details
-            if (propertyInfo.nonStructType.InType == TDH_INTYPE_POINTER ||
-                propertyInfo.nonStructType.InType == TDH_INTYPE_SIZET)
-            {
-                return record.EventHeader.Flags & EVENT_HEADER_FLAG_32_BIT_HEADER ? 4 : 8;
-            }
-
-            return propertyInfo.length;
+            return propertyLength;
         }
-
-        ULONG propertyLength = 0;
 
         // If no flags are set on the property, attempt to use the length
         // field. If that field is 0, try using our heuristic.
@@ -101,6 +106,37 @@ namespace krabs {
             propertyLength = get_tdh_size(propertyName, record);
 
         return propertyLength;
+    }
+
+    inline ULONG size_provider::get_fixed_property_size(
+        const EVENT_PROPERTY_INFO& propertyInfo,
+        ULONG pointerSize)
+    {
+        if ((propertyInfo.Flags & PropertyParamLength) == 0 &&
+            propertyInfo.length > 0)
+        {
+            // length is a union that may refer to another field for a length
+            // value. In that case, defer to TDH for the value otherwise
+            // use the length value directly.
+
+            // For pointer-sized types check header instead of size, see PointerSize at
+            // https://docs.microsoft.com/en-us/windows/win32/api/tdh/nf-tdh-tdhformatproperty
+            // for details
+            if (propertyInfo.nonStructType.InType == TDH_INTYPE_POINTER ||
+                propertyInfo.nonStructType.InType == TDH_INTYPE_SIZET)
+            {
+                return pointerSize;
+            }
+
+            return propertyInfo.length;
+        }
+
+        return 0;
+    }
+
+    inline ULONG size_provider::get_pointer_size(const EVENT_RECORD& record)
+    {
+        return record.EventHeader.Flags & EVENT_HEADER_FLAG_32_BIT_HEADER ? 4 : 8;
     }
 
     inline ULONG size_provider::get_heuristic_size(
