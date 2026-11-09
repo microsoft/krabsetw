@@ -24,6 +24,7 @@
 #include "compiler_check.hpp"
 #include "errors.hpp"
 #include "guid.hpp"
+#include "size_provider.hpp"
 
 #pragma comment(lib, "tdh.lib")
 
@@ -268,6 +269,164 @@ namespace krabs {
 
     /**
      * <summary>
+     * Everything the parser needs to know about an event's properties that
+     * can be derived from its schema alone. Built once per cached schema so
+     * that each event pays only for the properties it actually reads.
+     * </summary>
+     * <remarks>
+     * - Property names are stored with their lengths, so a name lookup is a
+     *   length compare followed by a memcmp rather than a wcslen per probe.
+     * - Properties are laid out back to back in the payload. Until the first
+     *   property whose size depends on the payload, every start offset is
+     *   fixed and is precomputed here. Most events put their fixed-width
+     *   properties first, so most reads skip the per-event walk entirely.
+     * - POINTER properties are 4 or 8 bytes depending on the emitting
+     *   process, and the schema cache is not keyed on pointer size, so the
+     *   fixed offsets are precomputed for both widths.
+     * </remarks>
+     */
+    class event_layout {
+    public:
+        event_layout() = default;
+        explicit event_layout(const TRACE_EVENT_INFO* pSchema);
+
+        ULONG property_count() const { return static_cast<ULONG>(names_.size()); }
+
+        /**
+         * <summary>
+         * Returns the index of the named property, or property_count() if it
+         * does not exist. The scan starts at hint and wraps around.
+         * </summary>
+         */
+        ULONG find(std::wstring_view name, ULONG hint) const;
+
+        /**
+         * <summary>
+         * Returns the index most recently read after property previous, or
+         * after the start of the event when previous == property_count().
+         * Initialised to previous + 1, i.e. reading properties in event order.
+         * </summary>
+         */
+        ULONG successor(ULONG previous) const { return successors_[previous]; }
+
+        /**
+         * <summary>
+         * Records that property index was read after property previous, so
+         * that the next event of this type starts its name scan there.
+         * </summary>
+         * <remarks>
+         * Mutable by design: this is per-event-type parser state shared by
+         * every event of the type. It is only ever a hint -- a stale value
+         * costs a longer scan, never a wrong result. Not synchronised: like
+         * the rest of schema_locator it assumes a single consumer thread,
+         * which is how ETW delivers a trace's events.
+         * </remarks>
+         */
+        void learn(ULONG previous, ULONG index) const
+        {
+            if (successors_[previous] != index) successors_[previous] = index;
+        }
+
+        /**
+         * <summary>
+         * Returns the (null-terminated) name of the property at index.
+         * </summary>
+         */
+        const wchar_t* name(ULONG index) const { return names_[index].data(); }
+
+        /**
+         * <summary>
+         * Index of the first property whose start offset is fixed but whose
+         * size depends on the payload. Every property before it has a fixed
+         * start and size, and its own start is fixed too.
+         * </summary>
+         */
+        ULONG first_dynamic(ULONG pointerSize) const { return slot(pointerSize).firstDynamic; }
+
+        /**
+         * <summary>
+         * Returns the start offset of property index, for
+         * index <= first_dynamic(pointerSize).
+         * </summary>
+         */
+        ULONG fixed_offset(ULONG index, ULONG pointerSize) const { return slot(pointerSize).offsets[index]; }
+
+    private:
+        struct fixed_offsets {
+            ULONG firstDynamic = 0;
+            // offsets[i] is the start of property i, for i <= firstDynamic.
+            std::vector<ULONG> offsets;
+        };
+
+        void build_fixed_offsets(const TRACE_EVENT_INFO* pSchema, ULONG pointerSize);
+        const fixed_offsets& slot(ULONG pointerSize) const { return fixed_[pointerSize == 4 ? 1 : 0]; }
+
+        std::vector<std::wstring_view> names_;
+        fixed_offsets fixed_[2]; // [0] = 64-bit events, [1] = 32-bit events
+        // successors_[i] is the index last read after property i;
+        // successors_[count] is the index last read first.
+        mutable std::vector<ULONG> successors_;
+    };
+
+    inline event_layout::event_layout(const TRACE_EVENT_INFO* pSchema)
+    {
+        const ULONG count = pSchema->PropertyCount;
+        names_.reserve(count);
+        for (ULONG i = 0; i < count; ++i) {
+            names_.emplace_back(reinterpret_cast<const wchar_t*>(
+                reinterpret_cast<const BYTE*>(pSchema) +
+                pSchema->EventPropertyInfoArray[i].NameOffset));
+        }
+
+        build_fixed_offsets(pSchema, 8);
+        build_fixed_offsets(pSchema, 4);
+
+        // Until we learn otherwise, assume properties are read in event order.
+        successors_.resize(count + 1);
+        for (ULONG i = 0; i < count; ++i) {
+            successors_[i] = (i + 1) % count;
+        }
+        successors_[count] = 0;
+    }
+
+    inline void event_layout::build_fixed_offsets(const TRACE_EVENT_INFO* pSchema, ULONG pointerSize)
+    {
+        auto& fixed = fixed_[pointerSize == 4 ? 1 : 0];
+        const ULONG count = pSchema->PropertyCount;
+
+        fixed.offsets.reserve(count + 1);
+        fixed.offsets.push_back(0);
+
+        ULONG i = 0;
+        for (; i < count; ++i) {
+            ULONG size = size_provider::get_fixed_property_size(
+                pSchema->EventPropertyInfoArray[i], pointerSize);
+            if (size == 0) {
+                break;
+            }
+            fixed.offsets.push_back(fixed.offsets.back() + size);
+        }
+        fixed.firstDynamic = i;
+    }
+
+    inline ULONG event_layout::find(std::wstring_view name, ULONG hint) const
+    {
+        const ULONG count = property_count();
+        if (hint >= count) hint = 0;
+
+        // Callers usually read properties in event order, so starting at the
+        // hint usually matches on the first probe.
+        for (ULONG i = hint; i < count; ++i) {
+            if (names_[i] == name) return i;
+        }
+        for (ULONG i = 0; i < hint; ++i) {
+            if (names_[i] == name) return i;
+        }
+        return count;
+    }
+
+    /**
+     * <summary>
      * Fetches and caches schemas from TDH.
      * NOTE: this cache also reduces the number of managed to native transitions
      * when krabs is compiled into a managed assembly.
@@ -319,7 +478,23 @@ namespace krabs {
         bool trace_logging_full_schema_hashing_enabled(const GUID& provider_id) const;
 
     private:
-        mutable std::unordered_map<schema_key, std::variant<std::unique_ptr<char[]>, TDHSTATUS>> cache_;
+        /**
+         * A cached schema and the parser layout derived from it, or a cached
+         * failure to obtain one. Entries are never removed, and
+         * unordered_map never moves its values, so pointers into an entry
+         * stay valid for the lifetime of the schema_locator.
+         */
+        struct cache_entry {
+            std::unique_ptr<char[]> buffer; // null on failure
+            TDHSTATUS status = ERROR_SUCCESS;
+            event_layout layout;            // empty on failure
+        };
+
+        const cache_entry& lookup(const EVENT_RECORD& record) const;
+
+        friend class schema;
+
+        mutable std::unordered_map<schema_key, cache_entry> cache_;
 
         /**
          * Providers opted into full TraceLogging schema hashing. A trace has a
@@ -428,8 +603,13 @@ namespace krabs {
 
     inline const PTRACE_EVENT_INFO schema_locator::get_event_schema_no_throw(const EVENT_RECORD& record, TDHSTATUS& status) const
     {
-        status = ERROR_SUCCESS;
+        const auto& entry = lookup(record);
+        status = entry.status;
+        return (PTRACE_EVENT_INFO)entry.buffer.get();
+    }
 
+    inline const schema_locator::cache_entry& schema_locator::lookup(const EVENT_RECORD& record) const
+    {
         auto metadata = get_trace_logger_event_metadata(record);
 
         // Hashing walks the whole metadata blob, so the cost grows with the size
@@ -445,26 +625,21 @@ namespace krabs {
         // Check the cache...
         auto it = cache_.find(key);
         if (it != cache_.end()) {
-            auto& value = it->second;
-            if (std::holds_alternative<TDHSTATUS>(value)) {
-                status = std::get<TDHSTATUS>(value);
-                return nullptr;
-            }
-            return (PTRACE_EVENT_INFO)std::get<std::unique_ptr<char[]>>(value).get();
+            return it->second;
         }
 
         // Cache miss. Fetch the schema...
-        auto buffer = get_event_schema_from_tdh_no_throw(record, status);
-        auto returnVal = (PTRACE_EVENT_INFO)buffer.get();
+        cache_entry entry;
+        entry.buffer = get_event_schema_from_tdh_no_throw(record, entry.status);
+        if (entry.status == ERROR_SUCCESS) {
+            entry.layout = event_layout((PTRACE_EVENT_INFO)entry.buffer.get());
+        } else {
+            entry.buffer.reset();
+        }
 
         // Add the new instance to the cache.
         // NB: key's 'internalize_name' gets called by the cctor here.
-        if (status == ERROR_SUCCESS)
-            cache_.emplace(key, std::move(buffer));
-        else
-            cache_.emplace(key, status);
-
-        return returnVal;
+        return cache_.emplace(key, std::move(entry)).first->second;
     }
 
     inline bool schema_locator::has_event_schema(const EVENT_RECORD& record) const

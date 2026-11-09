@@ -163,7 +163,211 @@ namespace krabstests
             Assert::AreEqual(expectedUrl, url);
         }
 
+        // Microsoft-Windows-Kernel-File Create_V1 (id 12, version 1):
+        //   [0] Pointer Irp, [1] Pointer FileObject, [2] UInt32 IssuingThreadId,
+        //   [3] UInt32 CreateOptions, [4] UInt32 CreateAttributes,
+        //   [5] UInt32 ShareAccess, [6] UnicodeString FileName
+        // Fixed-size properties first, then a payload-dependent one. Pointer
+        // width shifts every fixed offset after the first two properties.
+
+        TEST_METHOD(parse_should_return_same_values_regardless_of_access_order)
+        {
+            auto builder = kernel_file_create_builder();
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record, schema_locator_);
+
+            krabs::parser in_order(schema);
+            Assert::AreEqual(kernel_file_create_thread_id, in_order.parse<uint32_t>(L"IssuingThreadId"));
+            Assert::AreEqual(kernel_file_create_share_access, in_order.parse<uint32_t>(L"ShareAccess"));
+            Assert::AreEqual(kernel_file_create_file_name, in_order.parse<std::wstring>(L"FileName"));
+
+            krabs::parser reversed(schema);
+            Assert::AreEqual(kernel_file_create_file_name, reversed.parse<std::wstring>(L"FileName"));
+            Assert::AreEqual(kernel_file_create_share_access, reversed.parse<uint32_t>(L"ShareAccess"));
+            Assert::AreEqual(kernel_file_create_thread_id, reversed.parse<uint32_t>(L"IssuingThreadId"));
+            Assert::AreEqual(kernel_file_create_file_object, reversed.parse<krabs::pointer>(L"FileObject").address);
+        }
+
+        TEST_METHOD(parse_should_return_correct_values_when_access_order_changes_between_events)
+        {
+            // The parser learns each event type's access order across events.
+            // Readers with different orders sharing an event type must only
+            // ever cost extra scanning, never change a result.
+            auto builder = kernel_file_create_builder();
+            auto record = builder.pack_incomplete();
+
+            for (int i = 0; i < 3; ++i) {
+                krabs::schema schema(record, schema_locator_);
+
+                krabs::parser reversed(schema);
+                Assert::AreEqual(kernel_file_create_file_name, reversed.parse<std::wstring>(L"FileName"));
+                Assert::AreEqual(kernel_file_create_share_access, reversed.parse<uint32_t>(L"ShareAccess"));
+                Assert::AreEqual(kernel_file_create_thread_id, reversed.parse<uint32_t>(L"IssuingThreadId"));
+
+                krabs::parser single(schema);
+                Assert::AreEqual(kernel_file_create_share_access, single.parse<uint32_t>(L"ShareAccess"));
+
+                krabs::parser in_order(schema);
+                Assert::AreEqual(kernel_file_create_file_object, in_order.parse<krabs::pointer>(L"FileObject").address);
+                Assert::AreEqual(kernel_file_create_thread_id, in_order.parse<uint32_t>(L"IssuingThreadId", 0));
+                Assert::AreEqual(kernel_file_create_file_name, in_order.parse<std::wstring>(L"FileName"));
+
+                uint32_t missing = 0;
+                Assert::IsFalse(in_order.try_parse(L"NoSuchProperty", missing));
+                Assert::AreEqual(kernel_file_create_share_access, in_order.parse<uint32_t>(L"ShareAccess"));
+            }
+        }
+
+        TEST_METHOD(parse_with_hint_should_return_correct_value_for_correct_wrong_and_out_of_range_hints)
+        {
+            auto builder = kernel_file_create_builder();
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+
+            Assert::AreEqual(kernel_file_create_thread_id, parser.parse<uint32_t>(L"IssuingThreadId", 2));
+            Assert::AreEqual(kernel_file_create_thread_id, parser.parse<uint32_t>(L"IssuingThreadId", 5));
+            Assert::AreEqual(kernel_file_create_thread_id, parser.parse<uint32_t>(L"IssuingThreadId", 1000));
+            Assert::AreEqual(kernel_file_create_file_name, parser.parse<std::wstring>(L"FileName", 0));
+
+            uint32_t share = 0;
+            Assert::IsTrue(parser.try_parse(L"ShareAccess", share, 6));
+            Assert::AreEqual(kernel_file_create_share_access, share);
+            Assert::IsFalse(parser.try_parse(L"NoSuchProperty", share, 3));
+        }
+
+        TEST_METHOD(parse_should_work_when_schema_is_constructed_without_schema_locator)
+        {
+            auto builder = kernel_file_create_builder();
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record, schema_locator_.get_event_schema(record));
+            krabs::parser parser(schema);
+
+            Assert::AreEqual(kernel_file_create_file_name, parser.parse<std::wstring>(L"FileName"));
+            Assert::AreEqual(kernel_file_create_thread_id, parser.parse<uint32_t>(L"IssuingThreadId"));
+            Assert::AreEqual(kernel_file_create_file_object, parser.parse<krabs::pointer>(L"FileObject").address);
+        }
+
+        TEST_METHOD(parse_should_use_event_pointer_size_when_schema_was_cached_from_other_pointer_size)
+        {
+            // Populate the cache from a 64-bit event...
+            auto builder = kernel_file_create_builder();
+            auto record64 = builder.pack_incomplete();
+            {
+                krabs::schema schema(record64, schema_locator_);
+                krabs::parser parser(schema);
+                Assert::AreEqual(kernel_file_create_thread_id, parser.parse<uint32_t>(L"IssuingThreadId"));
+            }
+
+            // ...then parse a 32-bit event of the same type using the same cache entry.
+            std::vector<BYTE> payload;
+            append(payload, uint32_t(0x11111111));               // Irp
+            append(payload, uint32_t(kernel_file_create_file_object)); // FileObject
+            append(payload, kernel_file_create_thread_id);       // IssuingThreadId
+            append(payload, uint32_t(5));                        // CreateOptions
+            append(payload, uint32_t(6));                        // CreateAttributes
+            append(payload, kernel_file_create_share_access);    // ShareAccess
+            const auto nameBytes = reinterpret_cast<const BYTE*>(kernel_file_create_file_name.c_str());
+            payload.insert(payload.end(), nameBytes, nameBytes + (kernel_file_create_file_name.size() + 1) * sizeof(wchar_t));
+
+            EVENT_RECORD record32 = {};
+            record32.EventHeader = static_cast<const EVENT_RECORD&>(record64).EventHeader;
+            record32.EventHeader.Flags = EVENT_HEADER_FLAG_32_BIT_HEADER;
+            record32.UserData = payload.data();
+            record32.UserDataLength = static_cast<USHORT>(payload.size());
+
+            krabs::schema schema(record32, schema_locator_);
+            krabs::parser parser(schema);
+            Assert::AreEqual(kernel_file_create_share_access, parser.parse<uint32_t>(L"ShareAccess"));
+            Assert::AreEqual(kernel_file_create_thread_id, parser.parse<uint32_t>(L"IssuingThreadId"));
+            Assert::AreEqual(kernel_file_create_file_object, parser.parse<krabs::pointer>(L"FileObject").address);
+            Assert::AreEqual(kernel_file_create_file_name, parser.parse<std::wstring>(L"FileName"));
+        }
+
+        TEST_METHOD(parse_should_throw_out_of_range_when_payload_ends_part_way_through_a_property)
+        {
+            auto builder = kernel_file_create_builder();
+            auto packed = builder.pack_incomplete();
+            EVENT_RECORD record = packed;
+            // Irp, FileObject and IssuingThreadId (8 + 8 + 4 bytes), then half of CreateOptions.
+            record.UserDataLength = 22;
+
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+
+            Assert::ExpectException<std::out_of_range>([&]() { parser.parse<uint32_t>(L"CreateOptions"); });
+            Assert::ExpectException<std::out_of_range>([&]() { parser.parse<std::wstring>(L"FileName"); });
+            Assert::AreEqual(kernel_file_create_thread_id, parser.parse<uint32_t>(L"IssuingThreadId"));
+        }
+
+#if NDEBUG
+        // In debug builds, a payload that ends exactly at a property boundary with
+        // more than one property left trips the parser's exhausted-payload assert.
+        TEST_METHOD(parse_should_throw_out_of_range_for_properties_past_end_of_truncated_payload_in_release)
+        {
+            auto builder = kernel_file_create_builder();
+            auto packed = builder.pack_incomplete();
+            EVENT_RECORD record = packed;
+            // Keep Irp, FileObject and IssuingThreadId (8 + 8 + 4 bytes) only.
+            record.UserDataLength = 20;
+
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+
+            Assert::ExpectException<std::out_of_range>([&]() { parser.parse<std::wstring>(L"FileName"); });
+            Assert::ExpectException<std::out_of_range>([&]() { parser.parse<uint32_t>(L"CreateOptions"); });
+            Assert::AreEqual(kernel_file_create_thread_id, parser.parse<uint32_t>(L"IssuingThreadId"));
+
+            uint32_t share = 0;
+            Assert::IsFalse(parser.try_parse(L"ShareAccess", share));
+        }
+#endif
+
+        TEST_METHOD(parse_should_work_when_many_properties_follow_a_payload_dependent_property)
+        {
+            // Microsoft-Windows-Kernel-Boot event 83 (version 0) has a string at
+            // index 2 followed by ~58 more properties, so reaching the last one
+            // walks more offsets than the parser keeps inline.
+            krabs::guid kernelBoot(L"{15CA44FF-4D7A-4BAA-BBA5-0998955E531E}");
+            krabs::testing::record_builder builder(kernelBoot, krabs::id(83), krabs::version(0));
+            const uint64_t expected = 0x0123456789ABCDEF;
+            builder.add_properties()
+                (L"SystemRoot", std::wstring(L"C:\\Windows"))
+                (L"UnlatchedUnsealPolicy->LKeyPkgId", expected);
+
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+
+            Assert::AreEqual(expected, parser.parse<uint64_t>(L"UnlatchedUnsealPolicy->LKeyPkgId"));
+            Assert::AreEqual(std::wstring(L"C:\\Windows"), parser.parse<std::wstring>(L"SystemRoot"));
+        }
+
         private:
+            static constexpr uint32_t kernel_file_create_thread_id = 1234;
+            static constexpr uint32_t kernel_file_create_share_access = 7;
+            static constexpr uint64_t kernel_file_create_file_object = 0x22222222;
+            const std::wstring kernel_file_create_file_name = L"C:\\krabs\\test.txt";
+
+            krabs::testing::record_builder kernel_file_create_builder()
+            {
+                krabs::guid kernelFile(L"{EDD08927-9CC4-4E65-B970-C2560FB5C289}");
+                krabs::testing::record_builder builder(kernelFile, krabs::id(12), krabs::version(1));
+                builder.add_properties()
+                    (L"FileObject", reinterpret_cast<void*>(kernel_file_create_file_object))
+                    (L"IssuingThreadId", kernel_file_create_thread_id)
+                    (L"ShareAccess", kernel_file_create_share_access)
+                    (L"FileName", kernel_file_create_file_name);
+                return builder;
+            }
+
+            template <typename T>
+            static void append(std::vector<BYTE>& buffer, T value)
+            {
+                const auto bytes = reinterpret_cast<const BYTE*>(&value);
+                buffer.insert(buffer.end(), bytes, bytes + sizeof(T));
+            }
+
             krabs::schema_locator schema_locator_;
     };
 }

@@ -308,6 +308,9 @@ namespace krabs {
     private:
         const EVENT_RECORD &record_;
         const TRACE_EVENT_INFO *pSchema_;
+        // Parser layout cached by the schema_locator alongside pSchema_.
+        // nullptr when constructed from a bare TRACE_EVENT_INFO.
+        const event_layout *pLayout_;
 
     private:
         friend std::wstring event_name(const schema &);
@@ -336,12 +339,17 @@ namespace krabs {
 
     inline schema::schema(const EVENT_RECORD &record, const krabs::schema_locator &schema_locator)
         : record_(record)
-        , pSchema_(schema_locator.get_event_schema(record))
-    { }
+    {
+        const auto& entry = schema_locator.lookup(record);
+        error_check_common_conditions(entry.status, record);
+        pSchema_ = (PTRACE_EVENT_INFO)entry.buffer.get();
+        pLayout_ = &entry.layout;
+    }
 
     inline schema::schema(const EVENT_RECORD &record, const PTRACE_EVENT_INFO pSchema)
         : record_(record)
         , pSchema_(pSchema)
+        , pLayout_(nullptr)
     { }
 
     inline bool schema::operator==(const schema &other) const

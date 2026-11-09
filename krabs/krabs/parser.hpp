@@ -14,6 +14,7 @@
 #include "collection_view.hpp"
 #include "property.hpp"
 #include "parse_types.hpp"
+#include "schema_locator.hpp"
 #include "size_provider.hpp"
 #include "tdh_helpers.hpp"
 
@@ -114,16 +115,45 @@ namespace krabs {
     private:
         property_info find_property(std::wstring_view name);
         property_info find_property(std::wstring_view name, ULONG hint);
-        void cache_property(ULONG index, property_info info);
+        property_info property_at(ULONG index);
+        ULONG &dynamic_start(ULONG slot);
+        ULONG find_index(std::wstring_view name, ULONG hint) const;
+        const wchar_t *property_name(ULONG index) const;
+#ifndef NDEBUG
+        ULONG debug_start_of(ULONG index);
+        ULONG debug_first_overrun(ULONG from) const;
+#endif
 
     private:
         const schema &schema_;
-        const BYTE *pEndBuffer_;
-        BYTE *pBufferIndex_;
-        ULONG lastPropertyIndex_;
+        // Per-schema layout owned by the schema_locator. nullptr when the
+        // schema was constructed from a bare TRACE_EVENT_INFO, in which case
+        // names are scanned from the schema and every offset is walked.
+        const event_layout *pLayout_;
+        const BYTE *pData_;
+        ULONG dataLength_;
+        ULONG pointerSize_;
+        ULONG firstDynamic_;
+        // Where the next name scan starts: the explicit hint if one was given,
+        // otherwise what the layout learned from previous events of this type.
         ULONG nextHint_;
-        // Maintain a mapping from property index to blob data location.
-        std::vector<property_info> propertyCache_;
+        // Index of the previous successful lookup in this event, or
+        // PropertyCount before the first one.
+        ULONG lastIndex_;
+        // Debug builds only: how far upstream's sequential walk would have got
+        // (its lastPropertyIndex_), so its exhausted-payload assert fires on
+        // exactly the same reads. Present in every build to keep the layout
+        // identical; release builds never update it.
+        ULONG debugWalked_;
+
+        // Start offsets of properties firstDynamic_ onwards, discovered by
+        // walking the payload on demand. Slot k holds the start of property
+        // firstDynamic_ + k; resolvedSlots_ of them are known. Held inline
+        // for the common case so constructing a parser does not allocate.
+        static constexpr ULONG inline_slots = 16;
+        ULONG resolvedSlots_;
+        ULONG inlineStarts_[inline_slots];
+        std::vector<ULONG> spillStarts_;
     };
 
     // Implementation
@@ -131,12 +161,49 @@ namespace krabs {
 
     inline parser::parser(const schema &s)
     : schema_(s)
-    , pEndBuffer_((BYTE*)s.record_.UserData + s.record_.UserDataLength)
-    , pBufferIndex_((BYTE*)s.record_.UserData)
-    , lastPropertyIndex_(0)
+    , pLayout_(s.pLayout_)
+    , pData_((const BYTE*)s.record_.UserData)
+    , dataLength_(s.record_.UserDataLength)
+    , pointerSize_(size_provider::get_pointer_size(s.record_))
     , nextHint_(0)
-    , propertyCache_(s.pSchema_->PropertyCount)
-    {}
+    , lastIndex_(s.pSchema_->PropertyCount)
+    , debugWalked_(0)
+    {
+        if (pLayout_ != nullptr) {
+            nextHint_ = pLayout_->successor(lastIndex_);
+            firstDynamic_ = pLayout_->first_dynamic(pointerSize_);
+            // The first payload-dependent property still has a fixed start.
+            inlineStarts_[0] = pLayout_->fixed_offset(firstDynamic_, pointerSize_);
+        } else {
+            firstDynamic_ = 0;
+            inlineStarts_[0] = 0;
+        }
+        resolvedSlots_ = 1;
+    }
+
+    inline ULONG parser::find_index(std::wstring_view name, ULONG hint) const
+    {
+        if (pLayout_ != nullptr) {
+            return pLayout_->find(name, hint);
+        }
+
+        const ULONG count = schema_.pSchema_->PropertyCount;
+        if (hint >= count) hint = 0;
+        for (ULONG n = 0; n < count; ++n) {
+            const ULONG i = (hint + n) % count;
+            if (name == property_name(i)) {
+                return i;
+            }
+        }
+        return count;
+    }
+
+    inline const wchar_t *parser::property_name(ULONG index) const
+    {
+        return reinterpret_cast<const wchar_t*>(
+            reinterpret_cast<const BYTE*>(schema_.pSchema_) +
+            schema_.pSchema_->EventPropertyInfoArray[index].NameOffset);
+    }
 
     inline property_iterator parser::properties() const
     {
@@ -161,86 +228,140 @@ namespace krabs {
         }
 
         // Resolve property name to index via hinted linear scan.
-        // Optimistically start at hint, then wrap around if not found.
         // ** This assumes that callers typically access properties in event order. **
-        // An alternative is to maintain a static name->index map, but this was slower
-        // in practice for events with < ~12 properties.
-
-        if (hint >= totalPropCount) hint = 0;
-
-        ULONG index = totalPropCount; // sentinel = not found
-        for (ULONG n = 0; n < totalPropCount; ++n) {
-            const ULONG i = (hint + n) % totalPropCount;
-            const auto &propInfo = schema_.pSchema_->EventPropertyInfoArray[i];
-            const wchar_t *pName = reinterpret_cast<const wchar_t*>(
-                reinterpret_cast<const BYTE*>(schema_.pSchema_) +
-                propInfo.NameOffset);
-            if (name == pName) {
-                index = i;
-                break;
-            }
-        }
-
+        const ULONG index = find_index(name, hint);
         if (index >= totalPropCount) { // not found
             return property_info();
         }
 
-        nextHint_ = (index + 1) % totalPropCount;
-
-        // The first step is to use our cache for the property to see if we've
-        // discovered it already.
-        if (index < lastPropertyIndex_) {
-            return propertyCache_[index];
+        if (pLayout_ != nullptr) {
+            // Remember this access order for the next event of this type.
+            pLayout_->learn(lastIndex_, index);
+            nextHint_ = pLayout_->successor(index);
+        } else {
+            nextHint_ = (index + 1) % totalPropCount;
         }
+        lastIndex_ = index;
 
-        assert((pBufferIndex_ <= pEndBuffer_ && pBufferIndex_ >= schema_.record_.UserData) &&
-               "invariant: we should've already thrown for falling off the edge");
+#ifdef NDEBUG
+        return property_at(index);
+#else
+        // Upstream checked, before any lookup that had to walk forward, that a
+        // payload which has run out leaves at most one property unread (a
+        // trailing empty string whose null terminator the provider stripped).
+        // Make the same check at the same points, against how far upstream's
+        // walk would have got, so debug builds abort on exactly the same reads.
+        if (index >= debugWalked_) {
+            assert((debug_start_of(debugWalked_) == dataLength_
+                        ? (totalPropCount - debugWalked_) <= 1
+                        : true) &&
+                   "invariant: if we've exhausted our buffer, then we must've"
+                   "exhausted the properties as well");
+        }
+        try {
+            auto info = property_at(index);
+            if (index >= debugWalked_) {
+                debugWalked_ = index + 1;
+            }
+            return info;
+        }
+        catch (const std::out_of_range&) {
+            // Upstream's walk stops at the property that overran.
+            debugWalked_ = debug_first_overrun(debugWalked_);
+            throw;
+        }
+#endif
+    }
 
-        // accept that last property can be omitted from buffer. this happens if last property
-        // is string but empty and the provider strips the null terminator
-        assert((pBufferIndex_ == pEndBuffer_ ? ((totalPropCount - lastPropertyIndex_) <= 1)
-                                             : true)
-               && "invariant: if we've exhausted our buffer, then we must've"
-                  "exhausted the properties as well");
+#ifndef NDEBUG
+    inline ULONG parser::debug_start_of(ULONG index)
+    {
+        // Start offset of a property upstream's walk has reached.
+        if (pLayout_ != nullptr && index <= firstDynamic_) {
+            return pLayout_->fixed_offset(index, pointerSize_);
+        }
+        return dynamic_start(index - firstDynamic_);
+    }
 
-        // We've not looked up this property before, so we have to do the work
-        // to find it. While we're going through the blob to find it, we'll
-        // remember what we've seen to save time later.
-        // The blob walk is lazy per-event -- we only walk forward to the
-        // requested index, avoiding overhead when only a subset of properties
-        // are needed.
-        while (lastPropertyIndex_ <= index) {
+    inline ULONG parser::debug_first_overrun(ULONG from) const
+    {
+        // First property at or after from that doesn't fit in the payload.
+        for (ULONG k = from; k < firstDynamic_; ++k) {
+            if (pLayout_->fixed_offset(k + 1, pointerSize_) > dataLength_) {
+                return k;
+            }
+        }
+        // Otherwise the walk failed on the property it was sizing.
+        return firstDynamic_ + resolvedSlots_ - 1;
+    }
+#endif
 
-            auto &currentPropInfo = schema_.pSchema_->EventPropertyInfoArray[lastPropertyIndex_];
-            const wchar_t *pName = reinterpret_cast<const wchar_t*>(
-                                        reinterpret_cast<const BYTE*>(schema_.pSchema_) +
-                                        currentPropInfo.NameOffset);
+    inline ULONG &parser::dynamic_start(ULONG slot)
+    {
+        if (slot < inline_slots) {
+            return inlineStarts_[slot];
+        }
+        const ULONG spillIndex = slot - inline_slots;
+        if (spillIndex >= spillStarts_.size()) {
+            spillStarts_.resize(spillIndex + 1);
+        }
+        return spillStarts_[spillIndex];
+    }
 
-            ULONG propertyLength = size_provider::get_property_size(
-                                        pBufferIndex_,
-                                        pName,
-                                        schema_.record_,
-                                        currentPropInfo);
+    inline property_info parser::property_at(ULONG index)
+    {
+        const auto &eventPropInfo = schema_.pSchema_->EventPropertyInfoArray[index];
 
-            // verify that the length of the property doesn't exceed the buffer
-            if (pBufferIndex_ + propertyLength > pEndBuffer_) {
+        // Fast path: every property before the first payload-dependent one has
+        // a start and size that are fixed by the schema.
+        if (index < firstDynamic_) {
+            const ULONG start = pLayout_->fixed_offset(index, pointerSize_);
+            const ULONG end = pLayout_->fixed_offset(index + 1, pointerSize_);
+
+            // Offsets are cumulative, so this also covers every property
+            // before this one.
+            if (end > dataLength_) {
                 throw std::out_of_range("Property length past end of property buffer");
             }
 
-            property_info propInfo(pBufferIndex_, currentPropInfo, propertyLength);
-            cache_property(lastPropertyIndex_, propInfo);
-
-            // advance the buffer index since we've already processed this property
-            pBufferIndex_ += propertyLength;
-            lastPropertyIndex_++;
+            return property_info(pData_ + start, eventPropInfo, end - start);
         }
 
-        return propertyCache_[index];
-    }
+        // Slow path: walk the payload forward from the last property whose
+        // start is known, remembering what we've seen to save time later.
+        // The walk is lazy per-event -- we only walk forward to the
+        // requested index, avoiding overhead when only a subset of
+        // properties are needed.
+        const ULONG slot = index - firstDynamic_;
+        while (resolvedSlots_ <= slot + 1) {
+            const ULONG current = firstDynamic_ + resolvedSlots_ - 1;
+            const ULONG start = dynamic_start(resolvedSlots_ - 1);
 
-    inline void parser::cache_property(ULONG index, property_info info)
-    {
-        propertyCache_[index] = info;
+            // A fixed-size prefix that overruns the payload means the
+            // payload-dependent properties can't be located.
+            if (start > dataLength_) {
+                throw std::out_of_range("Property length past end of property buffer");
+            }
+
+            // accept that last property can be omitted from buffer. this happens if last property
+            // is string but empty and the provider strips the null terminator
+            const ULONG propertyLength = size_provider::get_property_size(
+                                        pData_ + start,
+                                        property_name(current),
+                                        schema_.record_,
+                                        schema_.pSchema_->EventPropertyInfoArray[current]);
+
+            // verify that the length of the property doesn't exceed the buffer
+            if (propertyLength > dataLength_ - start) {
+                throw std::out_of_range("Property length past end of property buffer");
+            }
+
+            dynamic_start(resolvedSlots_) = start + propertyLength;
+            resolvedSlots_++;
+        }
+
+        const ULONG start = dynamic_start(slot);
+        return property_info(pData_ + start, eventPropInfo, dynamic_start(slot + 1) - start);
     }
 
     inline void throw_if_property_not_found(const property_info &propInfo)
