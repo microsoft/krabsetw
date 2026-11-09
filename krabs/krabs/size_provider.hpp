@@ -71,10 +71,11 @@ namespace krabs {
             // value. In that case, defer to TDH for the value otherwise
             // use the length value directly.
 
-            // For pointers check header instead of size, see PointerSize at
+            // For pointer-sized types check header instead of size, see PointerSize at
             // https://docs.microsoft.com/en-us/windows/win32/api/tdh/nf-tdh-tdhformatproperty
             // for details
-            if (propertyInfo.nonStructType.InType == TDH_INTYPE_POINTER)
+            if (propertyInfo.nonStructType.InType == TDH_INTYPE_POINTER ||
+                propertyInfo.nonStructType.InType == TDH_INTYPE_SIZET)
             {
                 return record.EventHeader.Flags & EVENT_HEADER_FLAG_32_BIT_HEADER ? 4 : 8;
             }

@@ -201,7 +201,7 @@ namespace krabs {
         {
             auto inType = info.pEventPropertyInfo_->nonStructType.InType;
 
-            if (inType != TDH_INTYPE_POINTER) {
+            if (inType != TDH_INTYPE_POINTER && inType != TDH_INTYPE_SIZET) {
                 throw std::runtime_error(
                     "Requested a POINTER from property that is not one");
             }
