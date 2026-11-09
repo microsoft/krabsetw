@@ -163,6 +163,62 @@ namespace krabstests
             Assert::AreEqual(expectedUrl, url);
         }
 
+        // Heap Trace Provider HeapAlloc (classic MOF, version 2, opcode 33):
+        //   Pointer HeapHandle, SizeT AllocSize, Pointer AllocAddress, UInt32 SourceId
+        // Heap events are emitted in the bitness of the traced process, so a
+        // WoW64 and a native process produce both widths of the same event,
+        // and both share one cached schema.
+
+        TEST_METHOD(parse_should_size_sizet_by_record_bitness_when_64_bit_record_is_cached_first)
+        {
+            krabs::guid heapTrace(L"{222962AB-6180-4B88-A825-346B75F2A24A}");
+
+            krabs::testing::record_builder builder64(heapTrace, krabs::id(0), krabs::version(2), krabs::opcode(33));
+            builder64.header().Flags = EVENT_HEADER_FLAG_CLASSIC_HEADER | EVENT_HEADER_FLAG_64_BIT_HEADER;
+            builder64.add_properties()(L"SourceId", uint32_t(64));
+            auto record64 = builder64.pack_incomplete();
+
+            krabs::testing::record_builder builder32(heapTrace, krabs::id(0), krabs::version(2), krabs::opcode(33));
+            builder32.header().Flags = EVENT_HEADER_FLAG_CLASSIC_HEADER | EVENT_HEADER_FLAG_32_BIT_HEADER;
+            builder32.add_properties()(L"SourceId", uint32_t(32));
+            auto record32 = builder32.pack_incomplete();
+
+            krabs::schema schema64(record64, schema_locator_);
+            krabs::parser parser64(schema64);
+            Assert::AreEqual(size_t(8), parser64.parse<krabs::binary>(L"AllocSize").bytes().size());
+            Assert::AreEqual(uint32_t(64), parser64.parse<uint32_t>(L"SourceId"));
+
+            krabs::schema schema32(record32, schema_locator_);
+            krabs::parser parser32(schema32);
+            Assert::AreEqual(size_t(4), parser32.parse<krabs::binary>(L"AllocSize").bytes().size());
+            Assert::AreEqual(uint32_t(32), parser32.parse<uint32_t>(L"SourceId"));
+        }
+
+        TEST_METHOD(parse_should_size_sizet_by_record_bitness_when_32_bit_record_is_cached_first)
+        {
+            krabs::guid heapTrace(L"{222962AB-6180-4B88-A825-346B75F2A24A}");
+
+            krabs::testing::record_builder builder64(heapTrace, krabs::id(0), krabs::version(2), krabs::opcode(33));
+            builder64.header().Flags = EVENT_HEADER_FLAG_CLASSIC_HEADER | EVENT_HEADER_FLAG_64_BIT_HEADER;
+            builder64.add_properties()(L"SourceId", uint32_t(64));
+            auto record64 = builder64.pack_incomplete();
+
+            krabs::testing::record_builder builder32(heapTrace, krabs::id(0), krabs::version(2), krabs::opcode(33));
+            builder32.header().Flags = EVENT_HEADER_FLAG_CLASSIC_HEADER | EVENT_HEADER_FLAG_32_BIT_HEADER;
+            builder32.add_properties()(L"SourceId", uint32_t(32));
+            auto record32 = builder32.pack_incomplete();
+
+            krabs::schema schema32(record32, schema_locator_);
+            krabs::parser parser32(schema32);
+            Assert::AreEqual(size_t(4), parser32.parse<krabs::binary>(L"AllocSize").bytes().size());
+            Assert::AreEqual(uint32_t(32), parser32.parse<uint32_t>(L"SourceId"));
+
+            krabs::schema schema64(record64, schema_locator_);
+            krabs::parser parser64(schema64);
+            Assert::AreEqual(size_t(8), parser64.parse<krabs::binary>(L"AllocSize").bytes().size());
+            Assert::AreEqual(uint32_t(64), parser64.parse<uint32_t>(L"SourceId"));
+        }
+
         private:
             krabs::schema_locator schema_locator_;
     };

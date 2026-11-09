@@ -328,6 +328,11 @@ namespace krabs { namespace testing {
         krabs::schema event_schema(record, schema_locator);
         krabs::parser event_parser(event_schema);
 
+        // Unfilled pointer-sized properties are padded to the record's bitness,
+        // as when parsing.
+        const size_t pointer_size =
+            (record.EventHeader.Flags & EVENT_HEADER_FLAG_32_BIT_HEADER) ? 4 : 8;
+
         // When the last property in a record is of string type (ansi or unicode), 
         // ETW may omit the string NULL terminator. bytes_to_trim below will eventually be
         // set to the number of bytes that can be trimmed from the generated buffer.
@@ -377,7 +382,8 @@ namespace krabs { namespace testing {
                 // properties manually.
                 results.second.emplace_back(prop.name());
                 std::fill_n(std::back_inserter(results.first),
-                            details::how_many_bytes_to_fill(prop.type()), static_cast<UCHAR>(0));
+                            details::how_many_bytes_to_fill(prop.type(), pointer_size),
+                            static_cast<UCHAR>(0));
             }
         }
 
