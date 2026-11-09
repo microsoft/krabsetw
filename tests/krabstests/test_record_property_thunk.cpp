@@ -196,6 +196,23 @@ namespace krabstests
             Assert::AreEqual(thunk.type(), TDH_INTYPE_SID);
         }
 
+        TEST_METHOD(should_pack_bytes_for_WBEMSID)
+        {
+            SID sid = { 0x01 // revision
+                , 0x01 // sub authority count
+                , 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // identifier authority
+                , 0xAABBCCDD // sub authority
+            };
+
+            krabs::testing::record_property_thunk thunk(L"prop", krabs::testing::wbemsid(&sid));
+
+            // A non-NULL TOKEN_USER (two pointers) followed by the SID.
+            std::vector<BYTE> expected_bytes(2 * sizeof(void*), 0xFF);
+            expected_bytes.insert(expected_bytes.end(), { 0x01, 0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0xDD, 0xCC, 0xBB, 0xAA });
+            Assert::AreEqual(thunk.bytes(), expected_bytes);
+            Assert::AreEqual(thunk.type(), TDH_INTYPE_WBEMSID);
+        }
+
         TEST_METHOD(should_pack_bytes_for_hexint)
         {
             krabs::hexint32 value(0x0102ABCD);

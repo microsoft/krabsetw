@@ -12,6 +12,10 @@
 #include <ws2tcpip.h>
 #include <sddl.h>
 
+#include <cstdint>
+#include <cstring>
+#include <stdexcept>
+#include <string>
 #include <vector>
 #include <type_traits>
 
@@ -239,20 +243,89 @@ namespace krabs {
 
         static sid from_bytes(const BYTE* bytes, size_t size_in_bytes)
         {
-            sid ws;
-            LPSTR temp_sid_string;
-            UNREFERENCED_PARAMETER(size_in_bytes);
-
-            if (!ConvertSidToStringSidA((PSID)bytes, &temp_sid_string)) {
-                throw std::runtime_error(
-                    "Failed to get a SID from a property");
+            // Formats the SID directly rather than via ConvertSidToStringSidA,
+            // which costs a LocalAlloc/LocalFree and a copy per call, and which
+            // trusts the SID's own sub-authority count rather than the size of
+            // the property it was read from.
+            //
+            // Layout: Revision (1 byte), SubAuthorityCount (1 byte),
+            // IdentifierAuthority (6 bytes, big-endian),
+            // SubAuthority[SubAuthorityCount] (4 bytes each, little-endian).
+            constexpr size_t header_size = 8;
+            if (bytes == nullptr || size_in_bytes < header_size) {
+                throw std::runtime_error("Failed to get a SID from a property");
             }
-            ws.sid_string = temp_sid_string;
-            LocalFree(temp_sid_string);
+
+            const BYTE revision = bytes[0];
+            const BYTE count = bytes[1];
+            if (revision != SID_REVISION ||
+                count > SID_MAX_SUB_AUTHORITIES ||
+                size_in_bytes < header_size + count * sizeof(DWORD)) {
+                throw std::runtime_error("Failed to get a SID from a property");
+            }
+
+            uint64_t authority = 0;
+            for (size_t i = 2; i < header_size; ++i) {
+                authority = (authority << 8) | bytes[i];
+            }
+
+            // "S-1-" + "0x" + 12 hex digits + 15 * ("-" + 10 digits) = 183
+            char buffer[192];
+            char* out = buffer;
+            *out++ = 'S';
+            *out++ = '-';
+            *out++ = '1';
+            *out++ = '-';
+            out = append_authority(out, authority);
+            for (BYTE i = 0; i < count; ++i) {
+                DWORD sub_authority;
+                memcpy(&sub_authority, bytes + header_size + i * sizeof(DWORD), sizeof(DWORD));
+                *out++ = '-';
+                out = append_decimal(out, sub_authority);
+            }
+
+            sid ws;
+            ws.sid_string.assign(buffer, out);
             return ws;
         }
 
     private:
+        static char* append_decimal(char* out, uint64_t value)
+        {
+            char digits[20];
+            size_t n = 0;
+            do {
+                digits[n++] = static_cast<char>('0' + value % 10);
+                value /= 10;
+            } while (value != 0);
+            while (n > 0) {
+                *out++ = digits[--n];
+            }
+            return out;
+        }
+
+        static char* append_authority(char* out, uint64_t authority)
+        {
+            // Authorities that fit in 32 bits are written in decimal; larger
+            // ones as 0x followed by uppercase hex without leading zeros.
+            // Verified against ConvertSidToStringSid, which does not zero-pad
+            // to 12 digits despite the 6-byte field.
+            if (authority <= 0xFFFFFFFFull) {
+                return append_decimal(out, authority);
+            }
+
+            static const char hex[] = "0123456789ABCDEF";
+            *out++ = '0';
+            *out++ = 'x';
+            int shift = 44;
+            while (((authority >> shift) & 0xF) == 0) {
+                shift -= 4; // authority > 0xFFFFFFFF, so this stops by shift 32
+            }
+            for (; shift >= 0; shift -= 4) {
+                *out++ = hex[(authority >> shift) & 0xF];
+            }
+            return out;
+        }
     };
 
     /**
