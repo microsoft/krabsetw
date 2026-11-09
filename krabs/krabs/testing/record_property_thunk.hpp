@@ -109,6 +109,20 @@ namespace krabs { namespace testing {
     {
     }
 
+    // Specialization for WBEMSIDs: a TOKEN_USER followed by the SID. Consumers
+    // skip the TOKEN_USER, but TDH reads a NULL TOKEN_USER.Sid as a 4-byte
+    // "no SID" value, so its bytes must not be zero.
+    template <>
+    inline record_property_thunk::record_property_thunk(
+        const std::wstring &property,
+        const krabs::testing::wbemsid &value)
+    : name_(property)
+    , bytes_(2 * sizeof(void*), 0xFF)
+    , type_(krabs::testing::details::tdh_morphism<krabs::testing::wbemsid>::value)
+    {
+        bytes_.insert(bytes_.end(), value.sid_bytes.begin(), value.sid_bytes.end());
+    }
+
     // Overload for booleans
     inline record_property_thunk::record_property_thunk(
         const std::wstring &property,
