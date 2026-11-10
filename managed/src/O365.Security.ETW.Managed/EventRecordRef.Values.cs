@@ -102,20 +102,18 @@ namespace Microsoft.O365.Security.ETW
             int byteCount = raw[0] | (raw[1] << 8);
             ReadOnlySpan<byte> body = raw.Slice(2);
 
-            if (byteCount < body.Length)
+            if ((byteCount & 1) != 0 || byteCount > body.Length)
             {
-                body = body.Slice(0, byteCount);
+                return false;
             }
 
-            // An odd byte count cannot describe whole characters; drop the trailing byte
-            // rather than reading past the field.
-            value = Reinterpret(body.Slice(0, body.Length & ~1));
+            value = Reinterpret(body.Slice(0, byteCount));
             return true;
         }
 
         /// <summary>
         /// As <see cref="TryGetCountedString"/>, substituting <paramref name="defaultValue"/>
-        /// when the property is absent.
+        /// when the property is absent or its byte count is invalid.
         /// </summary>
         public ReadOnlySpan<char> GetCountedString(ReadOnlySpan<char> name, ReadOnlySpan<char> defaultValue)
         {
