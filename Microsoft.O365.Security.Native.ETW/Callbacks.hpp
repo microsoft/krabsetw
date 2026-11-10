@@ -116,7 +116,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             auto info = trace_context.schema_locator.get_event_schema_no_throw(record, status);
 
             if (status == ERROR_SUCCESS) {
-                krabs::schema schema(record, info);
+                krabs::schema schema(record, trace_context.schema_locator);
                 krabs::parser parser(schema);
                 auto evt = WrapRecord(record, schema, parser, info);
 
