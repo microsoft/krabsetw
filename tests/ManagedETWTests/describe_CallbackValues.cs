@@ -65,10 +65,21 @@ namespace EtwTestsCS
           resourceFileName=""unused.dll"" messageFileName=""unused.dll"">
         <events>
           <event value=""10003"" version=""0"" template=""Utf8"" />
+          <event value=""10004"" version=""0"" template=""MixedEncoding"" />
+          <event value=""10005"" version=""0"" template=""SizedUtf8"" />
         </events>
         <templates>
           <template tid=""Utf8"">
             <data name=""ExceptionWhatString"" inType=""win:AnsiString"" outType=""win:Utf8"" />
+          </template>
+          <template tid=""MixedEncoding"">
+            <data name=""AnsiValue"" inType=""win:AnsiString"" />
+            <data name=""Utf8Value"" inType=""win:AnsiString"" outType=""win:Utf8"" />
+            <data name=""JsonValue"" inType=""win:AnsiString"" outType=""win:Json"" />
+          </template>
+          <template tid=""SizedUtf8"">
+            <data name=""Size"" inType=""win:UInt16"" />
+            <data name=""Value"" inType=""win:AnsiString"" outType=""win:Utf8"" length=""Size"" />
           </template>
         </templates>
       </provider>
@@ -143,6 +154,83 @@ namespace EtwTestsCS
             Assert.IsTrue(AnsiString.IContains("ExceptionWhatString", "\u00e9").Test(record));
             Assert.IsTrue(AnsiString.IStartsWith("ExceptionWhatString", "\u00e9").Test(record));
             Assert.IsTrue(AnsiString.IEndsWith("ExceptionWhatString", "\u00e9").Test(record));
+        }
+
+        [DataTestMethod]
+        [DataRow("AnsiValue", false)]
+        [DataRow("Utf8Value", true)]
+        [DataRow("JsonValue", true)]
+        public void ansi_encoding_uses_the_resolved_property(string name, bool utf8)
+        {
+            var builder = new RecordBuilder(Utf8Provider, 10004, 0);
+            builder.AddAnsiString("AnsiValue", "xx");
+            builder.AddAnsiString("Utf8Value", "xx");
+            builder.AddAnsiString("JsonValue", "xx");
+            var record = builder.Pack();
+            var trace = new UserTrace();
+            var provider = new Provider(Utf8Provider);
+            string expectedAnsi = null;
+            bool called = false;
+            provider.OnMetadata += e =>
+            {
+                Marshal.Copy(new byte[] { 0xC3, 0xA9, 0, 0xC3, 0xA9, 0, 0xC3, 0xA9, 0 },
+                    0, e.UserData, 9);
+                expectedAnsi = Marshal.PtrToStringAnsi(e.UserData, 2);
+            };
+            provider.OnEvent += e =>
+            {
+                called = true;
+                Assert.AreEqual("\u00e9", e.GetAnsiString("JsonValue"));
+                Assert.IsTrue(e.TryGetAnsiString("AnsiValue", out var ansi));
+                Assert.AreEqual(expectedAnsi, ansi);
+                Assert.AreEqual("\u00e9", e.GetAnsiString("Utf8Value"));
+                Assert.IsTrue(e.TryGetAnsiString("JsonValue", out var json));
+                Assert.AreEqual("\u00e9", json);
+                Assert.IsFalse(e.TryGetAnsiString("Missing", out _));
+                Assert.AreEqual(expectedAnsi, e.GetAnsiString("AnsiValue"));
+            };
+            trace.Enable(provider);
+            new Proxy(trace).PushEvent(record);
+            Assert.IsTrue(called);
+            string expected = utf8 ? "\u00e9" : expectedAnsi;
+            Assert.IsTrue(AnsiString.Is(name, expected).Test(record));
+            Assert.IsTrue(AnsiString.Contains(name, expected).Test(record));
+            Assert.IsTrue(AnsiString.StartsWith(name, expected).Test(record));
+            Assert.IsTrue(AnsiString.EndsWith(name, expected).Test(record));
+            Assert.IsTrue(AnsiString.IEquals(name, expected).Test(record));
+            Assert.IsTrue(AnsiString.IContains(name, expected).Test(record));
+            Assert.IsTrue(AnsiString.IStartsWith(name, expected).Test(record));
+            Assert.IsTrue(AnsiString.IEndsWith(name, expected).Test(record));
+            Assert.IsFalse(AnsiString.Is(name, "wrong").Test(record));
+            Assert.IsFalse(AnsiString.Is("Missing", expected).Test(record));
+        }
+
+        [DataTestMethod]
+        [DataRow(0)]
+        [DataRow(128)]
+        [DataRow(4096)]
+        public void utf8_decoding_preserves_bounded_output(int prefixLength)
+        {
+            string expected = prefixLength == 0 ? "" :
+                new string('x', prefixLength) + "\u00e9\ud83d\ude80\0tail";
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(expected);
+            var builder = new RecordBuilder(Utf8Provider, 10005, 0);
+            builder.AddValue("Size", (ushort)bytes.Length);
+            builder.AddAnsiString("Value", new string('x', bytes.Length));
+            var trace = new UserTrace();
+            var provider = new Provider(Utf8Provider);
+            bool called = false;
+            provider.OnMetadata += e => Marshal.Copy(bytes, 0, IntPtr.Add(e.UserData, 2), bytes.Length);
+            provider.OnEvent += e =>
+            {
+                called = true;
+                Assert.AreEqual(expected, e.GetAnsiString("Value"));
+                Assert.IsTrue(e.TryGetAnsiString("Value", out var value));
+                Assert.AreEqual(expected, value);
+            };
+            trace.Enable(provider);
+            new Proxy(trace).PushEvent(builder.Pack());
+            Assert.IsTrue(called);
         }
 
         [TestMethod]

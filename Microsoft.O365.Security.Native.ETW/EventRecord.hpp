@@ -30,29 +30,24 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     private:
         const krabs::schema* schema_;
         krabs::parser* parser_;
-        const TRACE_EVENT_INFO* info_;
 
     internal:
         EventRecord(
             const EVENT_RECORD& record,
             const krabs::schema& schema,
-            krabs::parser& parser,
-            const TRACE_EVENT_INFO* info)
+            krabs::parser& parser)
             : EventRecordMetadata(record)
             , schema_(&schema)
-            , parser_(&parser)
-            , info_(info) { }
+            , parser_(&parser) { }
 
         /// <summary>
         /// Updates this instance to point to the specified event record.
         /// </summary>
-        void Update(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser,
-            const TRACE_EVENT_INFO* info)
+        void Update(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser)
         {
             Update(record);
             schema_ = &schema;
             parser_ = &parser;
-            info_ = info;
         }
 
     public:
@@ -161,7 +156,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         {
             const auto& str = GetValue<std::string>(name);
             return details::decode_string(str,
-                details::string_code_page(info_, marshal_as<std::wstring>(name)));
+                details::string_code_page(parser_->last_property_out_type()));
         }
 
         /// <summary>
@@ -194,7 +189,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
             if (success)
                 result = details::decode_string(str,
-                    details::string_code_page(info_, marshal_as<std::wstring>(name)));
+                    details::string_code_page(parser_->last_property_out_type()));
 
             return success;
         }

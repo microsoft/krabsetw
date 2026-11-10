@@ -4,9 +4,17 @@
 #pragma once
 
 #include <krabs.hpp>
+#include <vcclr.h>
 #include "Errors.hpp"
 
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW { namespace details {
+
+#pragma managed(push, off)
+
+    inline UINT string_code_page(USHORT type)
+    {
+        return type == TDH_OUTTYPE_UTF8 || type == TDH_OUTTYPE_JSON ? CP_UTF8 : CP_ACP;
+    }
 
     inline UINT string_code_page(const TRACE_EVENT_INFO* info, std::wstring_view name)
     {
@@ -15,8 +23,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
             const auto property_name = reinterpret_cast<const wchar_t*>(
                 reinterpret_cast<const BYTE*>(info) + property.NameOffset);
             if (name == property_name && (property.Flags & PropertyStruct) == 0) {
-                const auto type = property.nonStructType.OutType;
-                return type == TDH_OUTTYPE_UTF8 || type == TDH_OUTTYPE_JSON ? CP_UTF8 : CP_ACP;
+                return string_code_page(property.nonStructType.OutType);
             }
         }
         return CP_ACP;
@@ -37,6 +44,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
         return result;
     }
 
+#pragma managed(pop)
+
     inline System::String^ decode_string(const std::string& value, UINT code_page)
     {
         if (value.empty())
@@ -45,11 +54,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW { name
             static_cast<int>(value.size()), nullptr, 0);
         if (size == 0)
             throw gcnew ParserException("String decoding failed");
-        std::wstring result(size, L'\0');
+        // Fill only this newly allocated, unpublished string.
+        auto result = gcnew System::String(L'\0', size);
+        pin_ptr<const wchar_t> pinned = PtrToStringChars(result);
+        const wchar_t* buffer = pinned;
         if (MultiByteToWideChar(code_page, 0, value.data(), static_cast<int>(value.size()),
-            result.data(), size) == 0)
+            const_cast<wchar_t*>(buffer), size) == 0)
             throw gcnew ParserException("String decoding failed");
-        return gcnew System::String(result.data(), 0, size);
+        return result;
     }
 
 } } } } }

@@ -43,7 +43,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
         EventRecordMetadata^ WrapMetadata(const EVENT_RECORD& record);
         EventRecord^ WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema,
-            krabs::parser& parser, const TRACE_EVENT_INFO* info);
+            krabs::parser& parser);
         EventRecordError^ WrapError(const std::string& error_message, const EVENT_RECORD& record);
 
         void EventNotification(const EVENT_RECORD& record, const krabs::trace_context& trace_context);
@@ -80,13 +80,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     }
 
     EventRecord^ CallbackBridge::WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema,
-        krabs::parser& parser, const TRACE_EVENT_INFO* info)
+        krabs::parser& parser)
     {
         auto value = record_;
         if (!value) 
-            return record_ = gcnew EventRecord(record, schema, parser, info);
+            return record_ = gcnew EventRecord(record, schema, parser);
 
-        value->Update(record, schema, parser, info);
+        value->Update(record, schema, parser);
         return value;
     }
 
@@ -113,12 +113,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         auto onEvent = OnEvent;
         if (onEvent) {
             TDHSTATUS status = ERROR_SUCCESS;
-            auto info = trace_context.schema_locator.get_event_schema_no_throw(record, status);
+            trace_context.schema_locator.get_event_schema_no_throw(record, status);
 
             if (status == ERROR_SUCCESS) {
                 krabs::schema schema(record, trace_context.schema_locator);
                 krabs::parser parser(schema);
-                auto evt = WrapRecord(record, schema, parser, info);
+                auto evt = WrapRecord(record, schema, parser);
 
                 onEvent(evt);
             }

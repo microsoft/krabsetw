@@ -20,21 +20,32 @@ namespace adapt = krabs::predicates::adapters;
 namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     namespace details {
+#pragma managed(push, off)
+
         template <typename Comparer>
         inline krabs::filter_predicate encoded_string_predicate(
             const std::wstring& name, const std::wstring& value)
         {
             using adapter = adapt::generic_string<char>;
-            using predicate = krabs::predicates::details::property_view_predicate<
-                std::string, adapter, Comparer>;
-            predicate ansi(name, encode_string(value, CP_ACP), adapter(), Comparer());
-            predicate utf8(name, encode_string(value, CP_UTF8), adapter(), Comparer());
+            auto ansi = encode_string(value, CP_ACP);
+            auto utf8 = encode_string(value, CP_UTF8);
             return [name, ansi, utf8](const EVENT_RECORD& record, const krabs::trace_context& context) {
-                auto info = context.schema_locator.get_event_schema(record);
-                return string_code_page(info, name) == CP_UTF8 ?
-                    utf8(record, context) : ansi(record, context);
+                krabs::schema schema(record, context.schema_locator);
+                krabs::parser parser(schema);
+                try {
+                    adapter adapt;
+                    auto view = parser.view_of(name, adapt);
+                    const auto& expected = string_code_page(parser.last_property_out_type()) == CP_UTF8 ?
+                        utf8 : ansi;
+                    return Comparer()(view.begin(), view.end(), expected.begin(), expected.end());
+                }
+                catch (...) {
+                    return false;
+                }
             };
         }
+
+#pragma managed(pop)
     }
 
     /// <summary>

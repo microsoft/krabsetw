@@ -68,6 +68,12 @@ namespace krabs {
         property_iterator properties() const;
 
         /**
+         * Returns the output type of the last located top-level, non-struct
+         * property, or TDH_OUTTYPE_NULL if there is no such property.
+         */
+        USHORT last_property_out_type() const;
+
+        /**
          * <summary>
          * Attempts to retrieve the given property by name and type.
          * </summary>
@@ -179,6 +185,15 @@ namespace krabs {
             inlineStarts_[0] = 0;
         }
         resolvedSlots_ = 1;
+    }
+
+    inline USHORT parser::last_property_out_type() const
+    {
+        if (lastIndex_ >= schema_.pSchema_->TopLevelPropertyCount)
+            return TDH_OUTTYPE_NULL;
+        const auto& property = schema_.pSchema_->EventPropertyInfoArray[lastIndex_];
+        return (property.Flags & PropertyStruct) == 0 ?
+            property.nonStructType.OutType : TDH_OUTTYPE_NULL;
     }
 
     inline ULONG parser::find_index(std::wstring_view name, ULONG hint) const
