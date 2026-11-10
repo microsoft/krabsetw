@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.O365.Security.ETW;
 using Microsoft.O365.Security.ETW.Testing;
@@ -41,7 +42,56 @@ namespace EtwTestsCS
             return record;
         }
 
-        private static readonly Guid Utf8Provider = new Guid("43833E12-078D-4D7D-8AAF-AE8C8520F18C");
+        private static readonly Guid Utf8Provider = Guid.NewGuid();
+        private static string utf8ManifestPath;
+
+        [DllImport("tdh.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        private static extern uint TdhLoadManifest(string manifest);
+
+        [DllImport("tdh.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        private static extern uint TdhUnloadManifest(string manifest);
+
+        [ClassInitialize]
+        public static void LoadUtf8Schema(TestContext context)
+        {
+            // Load only into this process; do not require or register a machine-wide provider.
+            utf8ManifestPath = Path.Combine(Path.GetTempPath(), Utf8Provider.ToString("N") + ".man");
+            File.WriteAllText(utf8ManifestPath, $@"<instrumentationManifest
+    xmlns=""http://schemas.microsoft.com/win/2004/08/events""
+    xmlns:win=""http://manifests.microsoft.com/win/2004/08/windows/events"">
+  <instrumentation>
+    <events>
+      <provider name=""Krabs-Tests-Utf8"" guid=""{Utf8Provider:B}"" symbol=""KrabsTestsUtf8""
+          resourceFileName=""unused.dll"" messageFileName=""unused.dll"">
+        <events>
+          <event value=""10003"" version=""0"" template=""Utf8"" />
+        </events>
+        <templates>
+          <template tid=""Utf8"">
+            <data name=""ExceptionWhatString"" inType=""win:AnsiString"" outType=""win:Utf8"" />
+          </template>
+        </templates>
+      </provider>
+    </events>
+  </instrumentation>
+</instrumentationManifest>");
+            Assert.AreEqual(0U, TdhLoadManifest(utf8ManifestPath), "Could not load the UTF-8 test manifest.");
+        }
+
+        [ClassCleanup]
+        public static void UnloadUtf8Schema()
+        {
+            if (utf8ManifestPath == null)
+                return;
+            try
+            {
+                Assert.AreEqual(0U, TdhUnloadManifest(utf8ManifestPath), "Could not unload the UTF-8 test manifest.");
+            }
+            finally
+            {
+                File.Delete(utf8ManifestPath);
+            }
+        }
 
         [TestMethod]
         public void utf8_getter_decodes_literal_bytes()
