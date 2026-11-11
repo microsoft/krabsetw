@@ -223,6 +223,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         bool disposed_ = false;
         O365::Security::ETW::NativePtr<krabs::user_trace> trace_;
         CallbackBridge^ bridge_ = gcnew CallbackBridge();
+        System::Collections::Generic::List<System::Object^>^ providers_ =
+            gcnew System::Collections::Generic::List<System::Object^>();
 
         void RegisterCallbacks();
     };
@@ -256,6 +258,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void UserTrace::Enable(O365::Security::ETW::Provider ^provider)
     {
+        providers_->Add(provider);
         return trace_->enable(*provider->provider_);
     }
 
@@ -263,6 +266,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 #pragma warning(disable: 4947) // Deprecated warning
     inline void UserTrace::Enable(O365::Security::ETW::RawProvider ^provider)
     {
+        providers_->Add(provider);
         return trace_->enable(*provider->provider_);
     }
 #pragma warning(pop)
@@ -285,7 +289,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void UserTrace::Start()
     {
-        ExecuteAndConvertExceptions(return trace_->start());
+        try {
+            ExecuteAndConvertExceptions(trace_->start());
+        }
+        finally {
+            GC::KeepAlive(this);
+        }
     }
 
     inline void UserTrace::Stop()

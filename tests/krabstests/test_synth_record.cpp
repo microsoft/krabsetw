@@ -12,6 +12,25 @@ namespace krabstests
     {
     public:
 
+        TEST_METHOD(rejects_payload_length_that_cannot_fit_the_record)
+        {
+            EVENT_RECORD record = {};
+            std::vector<BYTE> data(65536);
+            Assert::ExpectException<std::invalid_argument>([&] {
+                krabs::testing::synth_record oversized(record, data);
+            });
+        }
+
+        TEST_METHOD(accepts_the_largest_representable_payload)
+        {
+            EVENT_RECORD record = {};
+            std::vector<BYTE> data(65535, 0xA5);
+            krabs::testing::synth_record packed(record, data);
+            const EVENT_RECORD& actual = packed;
+            Assert::AreEqual((unsigned)65535, (unsigned)actual.UserDataLength);
+            Assert::AreEqual((BYTE)0xA5, ((BYTE*)actual.UserData)[65534]);
+        }
+
         TEST_METHOD(should_deep_copy)
         {
             EVENT_RECORD record;

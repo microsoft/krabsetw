@@ -42,7 +42,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         EventRecordError^ error_;
 
         EventRecordMetadata^ WrapMetadata(const EVENT_RECORD& record);
-        EventRecord^ WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser);
+        EventRecord^ WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema,
+            krabs::parser& parser);
         EventRecordError^ WrapError(const std::string& error_message, const EVENT_RECORD& record);
 
         void EventNotification(const EVENT_RECORD& record, const krabs::trace_context& trace_context);
@@ -78,7 +79,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         return value;
     }
 
-    EventRecord^ CallbackBridge::WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema, krabs::parser& parser)
+    EventRecord^ CallbackBridge::WrapRecord(const EVENT_RECORD& record, const krabs::schema& schema,
+        krabs::parser& parser)
     {
         auto value = record_;
         if (!value) 

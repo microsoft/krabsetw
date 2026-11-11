@@ -106,6 +106,21 @@ namespace Microsoft.O365.Security.ETW.Tests
                 });
         }
 
+        [Theory]
+        [InlineData("\ufffeAB")]
+        [InlineData("\u0003AB")]
+        public void CountedStringRejectsOversizedAndOddByteCounts(string payload)
+        {
+            WithPowerShellRecord(
+                payload,
+                (in EventRecordRef record) =>
+                {
+                    Assert.False(record.TryGetCountedString("Payload".AsSpan(), out ReadOnlySpan<char> value));
+                    Assert.True(value.IsEmpty);
+                    Assert.True(record.GetCountedString("Payload".AsSpan(), "fallback".AsSpan()).SequenceEqual("fallback".AsSpan()));
+                });
+        }
+
         [Fact]
         public void AnsiStringBytesMatchTheDecodedSurface()
         {

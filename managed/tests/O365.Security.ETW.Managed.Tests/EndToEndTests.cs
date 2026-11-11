@@ -297,6 +297,12 @@ namespace Microsoft.O365.Security.ETW.Tests
             provider.OnMetadata += record => Interlocked.Increment(ref metadataHits);
             provider.OnError += e =>
             {
+                // EventSource also emits manifest events, including from sibling test processes.
+                if (e.Record.Id != 1 || e.Record.ProcessId != System.Diagnostics.Process.GetCurrentProcess().Id)
+                {
+                    return;
+                }
+
                 providerError = e.Message;
                 signal.Set();
             };

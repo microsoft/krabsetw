@@ -73,6 +73,8 @@ namespace krabs {
          * krabs::provider::enable_trace_logging_full_schema_hashing.
          */
         uint64_t  schema_hash;
+        // Borrow during lookup; own the exact declared bytes when cached.
+        std::string_view metadata;
 
     private:
         /**
@@ -80,9 +82,11 @@ namespace krabs {
          * provides memory ownership for the string_view.
          */
         std::unique_ptr<std::string> backing_name;
+        std::unique_ptr<std::string> backing_metadata;
 
     public:
-        schema_key(const EVENT_RECORD &record, std::string_view name, uint64_t schema_hash = 0)
+        schema_key(const EVENT_RECORD &record, std::string_view name, uint64_t schema_hash = 0,
+            std::string_view metadata = {})
             : provider(record.EventHeader.ProviderId)
             , name(name)
             , id(record.EventHeader.EventDescriptor.Id)
@@ -90,7 +94,8 @@ namespace krabs {
             , opcode(record.EventHeader.EventDescriptor.Opcode)
             , level(record.EventHeader.EventDescriptor.Level)
             , keyword(record.EventHeader.EventDescriptor.Keyword)
-            , schema_hash(schema_hash) { }
+            , schema_hash(schema_hash)
+            , metadata(metadata) { }
 
         schema_key(const schema_key &rhs)
             : provider(rhs.provider)
@@ -101,6 +106,7 @@ namespace krabs {
             , level(rhs.level)
             , keyword(rhs.keyword)
             , schema_hash(rhs.schema_hash)
+            , metadata(rhs.metadata)
         {
             internalize_name();
         }
@@ -115,6 +121,10 @@ namespace krabs {
                 if (!rhs.name.empty()) {
                     incoming_name = std::make_unique<std::string>(rhs.name);
                 }
+                std::unique_ptr<std::string> incoming_metadata;
+                if (!rhs.metadata.empty()) {
+                    incoming_metadata = std::make_unique<std::string>(rhs.metadata);
+                }
 
                 provider = rhs.provider;
                 id = rhs.id;
@@ -127,6 +137,8 @@ namespace krabs {
                 // Take ownership of the copy, matching the copy constructor.
                 backing_name = std::move(incoming_name);
                 name = backing_name ? std::string_view(*backing_name) : std::string_view();
+                backing_metadata = std::move(incoming_metadata);
+                metadata = backing_metadata ? std::string_view(*backing_metadata) : std::string_view();
             }
 
             return *this;
@@ -144,7 +156,8 @@ namespace krabs {
                    opcode == rhs.opcode &&
                    level == rhs.level &&
                    keyword == rhs.keyword &&
-                   name == rhs.name;
+                   name == rhs.name &&
+                   metadata == rhs.metadata;
         }
 
         bool operator!=(const schema_key &rhs) const { return !(*this == rhs); }
@@ -154,6 +167,7 @@ namespace krabs {
          * Allocate the 'backing_name' and set 'name' to point at it. This must be
          * called before adding the key to a cache so that the lifetime of the
          * 'name' string_view matches the lifetime of the cached instance.
+         * Also internalizes the metadata view for providers using full hashing.
          * </summary>
          */
         void internalize_name()
@@ -161,6 +175,10 @@ namespace krabs {
             if (!name.empty()) {
                 backing_name = std::make_unique<std::string>(name);
                 name = *backing_name;
+            }
+            if (!metadata.empty()) {
+                backing_metadata = std::make_unique<std::string>(metadata);
+                metadata = *backing_metadata;
             }
         }
     };
@@ -247,8 +265,7 @@ namespace krabs {
         }
 
         // FNV-1a (64-bit). The metadata blob is small, so this is cheap, and a
-        // 64-bit digest makes a collision between two variants of one event name
-        // negligible. TdhGetEventInformation still validates the result.
+        // 64-bit digest selects a bucket. Exact metadata comparison handles collisions.
         uint64_t h = 14695981039346656037ULL;
         for (uint16_t i = 0; i < size; ++i) {
             h ^= static_cast<unsigned char>(data[i]);
@@ -620,7 +637,8 @@ namespace krabs {
             schema_hash = hash_trace_logging_metadata(metadata.data, metadata.size);
         }
 
-        auto key = schema_key(record, metadata.name, schema_hash);
+        auto key = schema_key(record, metadata.name, schema_hash,
+            schema_hash != 0 ? std::string_view(metadata.data, metadata.size) : std::string_view());
 
         // Check the cache...
         auto it = cache_.find(key);

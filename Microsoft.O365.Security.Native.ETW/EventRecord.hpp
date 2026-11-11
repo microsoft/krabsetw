@@ -8,6 +8,7 @@
 #include "EventRecordMetadata.hpp"
 #include "IEventRecord.hpp"
 #include "Property.hpp"
+#include "StringEncoding.hpp"
 
 #include <msclr\marshal.h>
 #include <msclr\marshal_cppstd.h>
@@ -31,7 +32,6 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         krabs::parser* parser_;
 
     internal:
-
         EventRecord(
             const EVENT_RECORD& record,
             const krabs::schema& schema,
@@ -106,7 +106,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         virtual String^ GetUnicodeString(String^ name)
         {
             const auto& str = GetValue<std::wstring>(name);
-            return gcnew String(str.c_str());
+            return gcnew String(str.data(), 0, static_cast<int>(str.size()));
         }
 
         /// <summary>
@@ -138,7 +138,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             bool success = TryGetValue(name, str);
 
             if (success)
-                result = gcnew String(str.c_str());
+                result = gcnew String(str.data(), 0, static_cast<int>(str.size()));
 
             return success;
         }
@@ -155,7 +155,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         virtual String^ GetAnsiString(String^ name)
         {
             const auto& str = GetValue<std::string>(name);
-            return gcnew String(str.c_str());
+            return details::decode_string(str,
+                details::string_code_page(parser_->last_property_out_type()));
         }
 
         /// <summary>
@@ -187,7 +188,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             bool success = TryGetValue(name, str);
 
             if (success)
-                result = gcnew String(str.c_str());
+                result = details::decode_string(str,
+                    details::string_code_page(parser_->last_property_out_type()));
 
             return success;
         }
@@ -331,6 +333,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
             krabs::socket_address addr;
             bool success = TryGetValue(name, addr);
 
+            if (success && addr.size == 0)
+                return false;
             if (success)
                 result = ConvertToSocketAddress(addr);
 
@@ -440,9 +444,10 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// <returns>the DateTime value associated with the specified property</returns>
         virtual DateTime^ GetDateTime(String^ name)
         {
-            const auto& time = GetValue<::FILETIME>(name);
-            LARGE_INTEGER *largeInt = (LARGE_INTEGER*)&time;
-            return DateTime::FromFileTimeUtc(largeInt->QuadPart);
+            DateTime^ result;
+            if (!TryGetDateTime(name, result))
+                throw gcnew ParserException("Invalid FILETIME property");
+            return result;
         }
 
         /// <summary>
@@ -472,12 +477,14 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         {
             ::FILETIME time;
             bool success = TryGetValue(name, time);
-            LARGE_INTEGER *largeInt = (LARGE_INTEGER*)&time;
-
-            if (success)
-                result = DateTime::FromFileTimeUtc(largeInt->QuadPart);
-
-            return success;
+            if (!success)
+                return false;
+            const uint64_t ticks = (static_cast<uint64_t>(time.dwHighDateTime) << 32) |
+                time.dwLowDateTime;
+            if (ticks > 2650467743999999999ULL)
+                return false;
+            result = DateTime::FromFileTimeUtc(static_cast<long long>(ticks));
+            return true;
         }
 #pragma endregion
 
@@ -875,10 +882,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
         SocketAddress^ ConvertToSocketAddress(const krabs::socket_address& addr)
         {
-            auto managed = gcnew SocketAddress((Sockets::AddressFamily)addr.sa_stor.ss_family);
+            if (addr.size == 0)
+                return nullptr;
+            auto managed = gcnew SocketAddress((Sockets::AddressFamily)addr.sa_stor.ss_family,
+                static_cast<int>(addr.size));
             BYTE* ptr = (BYTE*)&(addr.sa_stor);
 
-            int size = addr.sa_stor.ss_family == AF_INET ? sizeof addr.sa_in : sizeof addr.sa_in6;
+            int size = static_cast<int>(addr.size);
 
             for (int ii = 0; ii < size; ii++)
                 managed[ii] = ptr[ii];
@@ -909,11 +919,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         array<Byte>^ ConvertToByteArray(const krabs::binary& data)
         {
             auto managed = gcnew array<Byte>((int)data.bytes().size());
-            IntPtr start((void*)&data.bytes()[0]);
-
-            if (start == IntPtr::Zero) return nullptr;
-
-            Marshal::Copy(start, managed, 0, (int)data.bytes().size());
+            if (managed->Length != 0)
+                Marshal::Copy(IntPtr((void*)data.bytes().data()), managed, 0, managed->Length);
 
             return managed;
         }

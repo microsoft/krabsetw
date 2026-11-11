@@ -11,6 +11,58 @@ namespace krabstests
     TEST_CLASS(test_record_builder)
     {
     public:
+        TEST_METHOD(unfilled_pointer_and_empty_sized_strings_preserve_the_next_scalar)
+        {
+            for (auto flags : { EVENT_HEADER_FLAG_32_BIT_HEADER, EVENT_HEADER_FLAG_64_BIT_HEADER }) {
+                krabs::guid wininet(L"{43D1A55C-76D6-4F7E-995C-64C711E5CAFE}");
+                krabs::testing::record_builder builder(wininet, 101, 0);
+                builder.header().Flags = (USHORT)flags;
+                builder.add_properties()(L"Flags", (uint32_t)0x12345678);
+                auto record = builder.pack_incomplete();
+                krabs::schema schema(record, schema_locator_);
+                krabs::parser parser(schema);
+                Assert::AreEqual((uint32_t)0x12345678, parser.parse<uint32_t>(L"Flags"));
+            }
+        }
+
+        TEST_METHOD(sized_unicode_string_has_no_extra_terminator)
+        {
+            krabs::guid wininet(L"{43D1A55C-76D6-4F7E-995C-64C711E5CAFE}");
+            krabs::testing::record_builder builder(wininet, 404, 0);
+            builder.add_properties()(L"TruncatedLength", (uint16_t)3)
+                (L"TruncatedData", std::wstring(L"a\0b", 3));
+            auto packed = builder.pack_incomplete();
+            const EVENT_RECORD& record = packed;
+            Assert::AreEqual((unsigned)32, (unsigned)record.UserDataLength);
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+            Assert::AreEqual(std::wstring(L"a\0b", 3), parser.parse<std::wstring>(L"TruncatedData"));
+        }
+
+        TEST_METHOD(sized_binary_rejects_a_mismatched_payload_length)
+        {
+            krabs::guid wininet(L"{43D1A55C-76D6-4F7E-995C-64C711E5CAFE}");
+            krabs::testing::record_builder builder(wininet, 414, 0);
+            BYTE bytes[] = { 0xA1, 0xB2 };
+            builder.add_properties()(L"PayloadByteLength", (uint32_t)3)
+                (L"Payload", krabs::binary(bytes, sizeof(bytes)));
+            Assert::ExpectException<std::invalid_argument>([&] { builder.pack_incomplete(); });
+        }
+
+        TEST_METHOD(sized_binary_preserves_the_declared_bytes)
+        {
+            krabs::guid wininet(L"{43D1A55C-76D6-4F7E-995C-64C711E5CAFE}");
+            krabs::testing::record_builder builder(wininet, 414, 0);
+            BYTE bytes[] = { 0xA1, 0x00, 0xB2 };
+            builder.add_properties()(L"PayloadByteLength", (uint32_t)sizeof(bytes))
+                (L"Payload", krabs::binary(bytes, sizeof(bytes)));
+            auto record = builder.pack_incomplete();
+            krabs::schema schema(record, schema_locator_);
+            krabs::parser parser(schema);
+            auto value = parser.parse<krabs::binary>(L"Payload");
+            Assert::IsTrue(value.bytes() == std::vector<BYTE>(bytes, bytes + sizeof(bytes)));
+        }
+
         TEST_METHOD(should_remember_added_properties)
         {
             krabs::guid id(krabs::guid::random_guid());

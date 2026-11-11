@@ -198,6 +198,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         bool disposed_ = false;
         O365::Security::ETW::NativePtr<krabs::kernel_trace> trace_;
         CallbackBridge^ bridge_ = gcnew CallbackBridge();
+        System::Collections::Generic::List<KernelProvider^>^ providers_ =
+            gcnew System::Collections::Generic::List<KernelProvider^>();
 
         void RegisterCallbacks();
     };
@@ -231,6 +233,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void KernelTrace::Enable(O365::Security::ETW::KernelProvider ^provider)
     {
+        providers_->Add(provider);
         return trace_->enable(*provider->provider_);
     }
 
@@ -252,7 +255,12 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
 
     inline void KernelTrace::Start()
     {
-        ExecuteAndConvertExceptions(return trace_->start());
+        try {
+            ExecuteAndConvertExceptions(trace_->start());
+        }
+        finally {
+            GC::KeepAlive(this);
+        }
     }
 
     inline void KernelTrace::Stop()

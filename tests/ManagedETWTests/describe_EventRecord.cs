@@ -146,6 +146,51 @@ namespace EtwTestsCS
             //public void it_should_parse_counted_strings()
             //{
             //}
+#if !DEBUG
+            // Release builds allow type-confused properties; their in-band counts must still be bounded.
+            [TestMethod]
+            public void counted_string_getters_reject_invalid_in_band_counts()
+            {
+                foreach (var data in new[] { "\ufffeAB", "\u0003AB" })
+                {
+                    var provider = new Provider(PowerShellEvent.ProviderId);
+                    bool called = false;
+                    provider.OnEvent += e =>
+                    {
+                        called = true;
+                        Assert.ThrowsException<ParserException>(() => e.GetCountedString(PowerShellEvent.UserData));
+                        Assert.IsFalse(e.TryGetCountedString(PowerShellEvent.UserData, out var result));
+                        Assert.AreEqual("fallback", e.GetCountedString(PowerShellEvent.UserData, "fallback"));
+                        Assert.AreEqual("following", e.GetUnicodeString(PowerShellEvent.ContextInfo));
+                    };
+                    using (var localTrace = new UserTrace())
+                    {
+                        localTrace.Enable(provider);
+                        new Proxy(localTrace).PushEvent(PowerShellEvent.CreateRecord(data, "following", ""));
+                    }
+                    Assert.IsTrue(called);
+                }
+            }
+
+            [TestMethod]
+            public void counted_string_getters_preserve_valid_content_without_following_fields()
+            {
+                var provider = new Provider(PowerShellEvent.ProviderId);
+                bool called = false;
+                provider.OnEvent += e =>
+                {
+                    called = true;
+                    Assert.AreEqual("AB", e.GetCountedString(PowerShellEvent.UserData));
+                    Assert.IsTrue(e.TryGetCountedString(PowerShellEvent.UserData, out var result));
+                    Assert.AreEqual("AB", result);
+                    Assert.AreEqual("AB", e.GetCountedString(PowerShellEvent.UserData, "fallback"));
+                    Assert.AreEqual("following", e.GetUnicodeString(PowerShellEvent.ContextInfo));
+                };
+                trace.Enable(provider);
+                proxy.PushEvent(PowerShellEvent.CreateRecord("\u0004AB", "following", ""));
+                Assert.IsTrue(called);
+            }
+#endif
 
             //[TestMethod]
             //public void it_should_parse_ip_addresses()

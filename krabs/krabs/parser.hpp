@@ -68,6 +68,12 @@ namespace krabs {
         property_iterator properties() const;
 
         /**
+         * Returns the output type of the last located top-level, non-struct
+         * property, or TDH_OUTTYPE_NULL if there is no such property.
+         */
+        USHORT last_property_out_type() const;
+
+        /**
          * <summary>
          * Attempts to retrieve the given property by name and type.
          * </summary>
@@ -179,6 +185,15 @@ namespace krabs {
             inlineStarts_[0] = 0;
         }
         resolvedSlots_ = 1;
+    }
+
+    inline USHORT parser::last_property_out_type() const
+    {
+        if (lastIndex_ >= schema_.pSchema_->TopLevelPropertyCount)
+            return TDH_OUTTYPE_NULL;
+        const auto& property = schema_.pSchema_->EventPropertyInfoArray[lastIndex_];
+        return (property.Flags & PropertyStruct) == 0 ?
+            property.nonStructType.OutType : TDH_OUTTYPE_NULL;
     }
 
     inline ULONG parser::find_index(std::wstring_view name, ULONG hint) const
@@ -492,7 +507,7 @@ namespace krabs {
 
         krabs::debug::assert_valid_assignment<const counted_string*>(name, propInfo);
 
-        return reinterpret_cast<const counted_string*>(propInfo.pPropertyIndex_);
+        return counted_string::from_bytes(propInfo.pPropertyIndex_, propInfo.length_);
     }
 
     template<>
@@ -519,9 +534,13 @@ namespace krabs {
 
         switch (outType) {
         case TDH_OUTTYPE_IPV6:
+            if (propInfo.length_ != 16)
+                throw std::runtime_error("Invalid IPv6 property length");
             return ip_address::from_ipv6(propInfo.pPropertyIndex_);
 
         case TDH_OUTTYPE_IPV4:
+            if (propInfo.length_ != sizeof(DWORD))
+                throw std::runtime_error("Invalid IPv4 property length");
             return ip_address::from_ipv4(*(DWORD*)propInfo.pPropertyIndex_);
 
         default:

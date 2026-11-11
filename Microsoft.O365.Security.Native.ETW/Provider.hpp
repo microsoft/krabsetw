@@ -190,6 +190,7 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         /// </summary>
         /// <param name="filter">the <see cref="O365::Security::ETW::EventFilter"/> to add</param>
         void AddFilter(O365::Security::ETW::EventFilter ^filter) {
+            filters_->Add(filter);
             provider_->add_filter(filter);
         }
 
@@ -223,6 +224,8 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
     internal:
         NativePtr<krabs::provider<>> provider_;
         CallbackBridge^ bridge_ = gcnew CallbackBridge();
+        System::Collections::Generic::List<EventFilter^>^ filters_ =
+            gcnew System::Collections::Generic::List<EventFilter^>();
 
         void RegisterCallbacks();
     };

@@ -103,7 +103,13 @@ namespace Microsoft { namespace O365 { namespace Security { namespace ETW {
         {
             auto& nativeRecord = *(record->record_);
             krabs::trace_context trace_context;
-            return to_underlying()(nativeRecord, trace_context);
+            try {
+                return to_underlying()(nativeRecord, trace_context);
+            }
+            finally {
+                GC::KeepAlive(record);
+                GC::KeepAlive(this);
+            }
         }
 
     internal:
